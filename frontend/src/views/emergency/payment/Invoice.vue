@@ -142,7 +142,7 @@ const formatCurrency = (val) => {
             <!-- Notice -->
             <div class="notice">
               <p>This is a computer-generated invoice and does not require a physical signature.</p>
-              <p class="wish">*** Thank You for Visiting EHMS ***</p>
+              <p class="wish">*** Thank You for Visiting ***</p>
             </div>
           </div>
         </div>
@@ -174,8 +174,8 @@ const formatCurrency = (val) => {
 
 <style scoped>
 .emergency-print-receipt-container {
-  width: 210mm;
-  height: 148mm;
+  width: 148mm;
+  height: 210mm;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
@@ -348,7 +348,7 @@ const formatCurrency = (val) => {
 
 @media print {
   @page {
-    size: A5 landscape;
+    size: A5 portrait;
     margin: 0;
   }
   body * {
@@ -361,8 +361,8 @@ const formatCurrency = (val) => {
     position: fixed;
     left: 0;
     top: 0;
-    width: 210mm;
-    height: 148mm;
+    width: 148mm;
+    height: 210mm;
     margin: 0;
     padding: 10mm;
     box-shadow: none;
