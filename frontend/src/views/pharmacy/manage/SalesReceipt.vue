@@ -74,12 +74,13 @@ const numberToWords = (num) => {
 </script>
 
 <template>
-  <div v-if="show && sale" class="fixed inset-0 z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200 print:p-0 print:items-start print:justify-start">
+  <Teleport to="body">
+    <div v-if="show && sale" class="fixed inset-0 z-[999] flex items-center justify-center p-4 animate-in fade-in duration-200 print:static print:block print:p-0">
     <!-- Backdrop -->
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="emit('close')"></div>
     
     <!-- Modal Wrapper -->
-    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
+    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:static print:block print:max-w-none print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
       
       <!-- Preview Area -->
       <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block">
@@ -198,7 +199,7 @@ const numberToWords = (num) => {
       </div>
 
       <!-- Action Footer -->
-      <div class="p-4 bg-white border-t border-slate-100 flex justify-end gap-3 screen-only">
+      <div class="p-4 bg-white border-t border-slate-100 flex justify-end gap-3 print:hidden">
         <button 
           @click="emit('close')"
           class="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
@@ -218,7 +219,8 @@ const numberToWords = (num) => {
         </button>
       </div>
     </div>
-  </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -377,34 +379,32 @@ const numberToWords = (num) => {
 @media print {
   @page {
     size: A5 landscape;
-    margin: 0;
+    margin: 100mm;
   }
 
-  /* Override global 1-page restriction to allow native browser pagination for long lists */
-  html, body, #app {
+  /* Hide the main application entirely during print so only the Teleported modal is processed */
+  :global(#app) {
+    display: none !important;
+  }
+
+  html, body {
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
+    background-color: white !important;
   }
 
-  body * {
-    visibility: hidden;
-  }
-  .print-receipt-container, .print-receipt-container * {
-    visibility: visible;
-  }
   .print-receipt-container {
-    position: relative !important;
-    left: auto !important;
-    top: auto !important;
-    width: 210mm !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
     min-height: 148mm !important;
     height: auto !important;
     overflow: visible !important;
-    padding: 10mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
     box-shadow: none !important;
     border: none !important;
-    z-index: 999999 !important;
     background-color: white !important;
   }
   .items-table tr {
