@@ -348,9 +348,20 @@ const formatCurrency = (val) => {
 
 @media print {
   @page {
-    size: A4 portrait;
+    size: A5 landscape;
     margin: 0;
   }
+  
+  /* Reset layout structure for printing */
+  html, body, #app, .min-h-screen, .flex-1, main, .fixed, .relative {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -358,17 +369,17 @@ const formatCurrency = (val) => {
     visibility: visible;
   }
   .emergency-print-receipt-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 210mm;
-    min-height: 148mm;
-    height: auto;
-    margin: 0;
-    padding: 10mm;
-    box-shadow: none;
-    border: none;
-    z-index: 999999;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    min-height: 148mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    z-index: 999999 !important;
     background-color: white !important;
   }
   .items-table tr {
