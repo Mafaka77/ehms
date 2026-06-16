@@ -171,8 +171,8 @@ const formatCurrency = (val) => {
 
 <style scoped>
 .print-receipt-container {
-  width: 148mm;
-  height: 210mm;
+  width: 210mm;
+  height: 148mm;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
@@ -345,7 +345,7 @@ const formatCurrency = (val) => {
 
 @media print {
   @page {
-    size: A5 portrait;
+    size: A4 portrait;
     margin: 0;
   }
   body * {
@@ -358,8 +358,8 @@ const formatCurrency = (val) => {
     position: fixed;
     left: 0;
     top: 0;
-    width: 148mm;
-    height: 210mm;
+    width: 210mm;
+    height: 148mm;
     margin: 0;
     padding: 10mm;
     box-shadow: none;
