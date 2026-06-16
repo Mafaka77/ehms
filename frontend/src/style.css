@@ -5,3 +5,54 @@ html, body, #app {
   margin: 0;
   padding: 0;
 }
+
+@media print {
+  /* Completely hide sidebar, header (which contains the hamburger menu), buttons, and screen-only wrappers */
+  header, 
+  aside, 
+  nav, 
+  footer,
+  button,
+  .screen-only,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset layout wrapper styling to avoid margins, clipping, and padding offsets */
+  html, body, #app, .min-h-screen, .flex-1, main, .fixed, .relative {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Scale down text elements inside receipt containers */
+  .receipt-header h1 {
+    font-size: 11px !important;
+    font-weight: bold !important;
+  }
+  .receipt-header p {
+    font-size: 7.5px !important;
+  }
+  .receipt-header h2 {
+    font-size: 8.5px !important;
+  }
+  .demographics, 
+  .doctor-section, 
+  .items-table, 
+  .financials-summary {
+    font-size: 8px !important;
+  }
+  .signatures, 
+  .notice {
+    font-size: 7px !important;
+  }
+
+  /* Optimize table cell paddings for dense layouts */
+  .items-table th, 
+  .items-table td {
+    padding: 3px 0 !important;
+  }
+}
