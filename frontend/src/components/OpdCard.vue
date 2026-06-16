@@ -141,16 +141,16 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
   
   /* Break out of the modal/DOM flow completely */
   .print-container {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 210mm;
-    height: 297mm;
-    margin: 0;
-    padding: 15mm; /* Inner padding so content doesn't touch the paper edge */
-    box-shadow: none;
-    border: none;
-    z-index: 999999;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    margin: 0 !important;
+    padding: 15mm !important; /* Inner padding so content doesn't touch the paper edge */
+    box-shadow: none !important;
+    border: none !important;
+    z-index: 999999 !important;
   }
 
   .print-no-bg {

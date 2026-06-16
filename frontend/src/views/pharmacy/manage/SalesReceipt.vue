@@ -379,7 +379,7 @@ const numberToWords = (num) => {
 @media print {
   @page {
     size: A5 landscape;
-    margin: 100mm;
+    margin: 0;
   }
 
   /* Hide the main application entirely during print so only the Teleported modal is processed */
@@ -388,21 +388,24 @@ const numberToWords = (num) => {
   }
 
   html, body {
+    width: 210mm !important;
     height: auto !important;
-    max-height: none !important;
+    min-height: 148mm !important;
     overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background-color: white !important;
   }
 
   .print-receipt-container {
     position: static !important;
-    width: 100% !important;
-    max-width: 100% !important;
+    width: 210mm !important;
     min-height: 148mm !important;
     height: auto !important;
     overflow: visible !important;
-    padding: 0 !important;
+    padding: 15mm !important;
     margin: 0 !important;
+    box-sizing: border-box !important;
     box-shadow: none !important;
     border: none !important;
     background-color: white !important;
