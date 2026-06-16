@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps({
   show: {
@@ -14,17 +14,6 @@ const props = defineProps({
     type: Array,
     default: () => []
   }
-})
-
-const ITEMS_PER_PAGE = 5;
-
-const paginatedPages = computed(() => {
-  if (!props.items || props.items.length === 0) return [[]]
-  const pages = []
-  for (let i = 0; i < props.items.length; i += ITEMS_PER_PAGE) {
-    pages.push(props.items.slice(i, i + ITEMS_PER_PAGE))
-  }
-  return pages
 })
 
 const emit = defineEmits(['close'])
@@ -95,13 +84,7 @@ const numberToWords = (num) => {
       <!-- Preview Area -->
       <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block">
         <!-- Receipt Mockup Sheet (Sized to 210mm x 148mm ratio on screen) -->
-        <div class="flex flex-col gap-4 print:gap-0">
-          <div 
-            v-for="(pageItems, index) in paginatedPages" 
-            :key="index"
-            class="print-receipt-container select-none"
-            :style="{ pageBreakAfter: index < paginatedPages.length - 1 ? 'always' : 'auto' }"
-          >
+        <div class="print-receipt-container select-none">
           <!-- Receipt Content -->
           <div class="receipt-content">
             <!-- Header Brand -->
@@ -154,7 +137,7 @@ const numberToWords = (num) => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in pageItems" :key="item._id">
+                <tr v-for="item in items" :key="item._id">
                   <td class="font-medium truncate max-w-[150px]">
                     {{ item.medicineId?.medicineName }}
                     <span v-if="item.medicineId?.brandName" class="text-[8px] text-slate-500 font-normal ml-1">({{ item.medicineId.brandName }})</span>
@@ -173,7 +156,7 @@ const numberToWords = (num) => {
             </table>
 
             <!-- Financials Summary -->
-            <div v-if="index === paginatedPages.length - 1" class="financials-summary-container flex justify-between mt-3">
+            <div class="financials-summary-container flex justify-between mt-3">
               <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%]">
                 <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
                 {{ numberToWords(sale.totalAmount) }}
@@ -195,7 +178,7 @@ const numberToWords = (num) => {
             </div>
 
             <!-- Signatures Operator info -->
-            <div v-if="index === paginatedPages.length - 1" class="signatures">
+            <div class="signatures">
               <div>
                 <p>Dispensed By:</p>
                 <p class="operator-name">{{ sale.createdBy?.fullName || 'Pharmacist' }}</p>
@@ -210,12 +193,7 @@ const numberToWords = (num) => {
               <p>This is a computer-generated invoice and does not require a physical signature.</p>
               <p class="wish">*** Get Well Soon ***</p>
             </div>
-            <!-- Page Indicator -->
-            <div class="text-center text-[9px] text-slate-500 mt-2 font-mono">
-              Page {{ index + 1 }} of {{ paginatedPages.length }}
-            </div>
           </div>
-        </div>
         </div>
       </div>
 
@@ -246,8 +224,9 @@ const numberToWords = (num) => {
 <style scoped>
 .print-receipt-container {
   width: 210mm;
-  height: 148mm;
-  overflow: hidden;
+  min-height: 148mm;
+  height: auto;
+  overflow: visible;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
@@ -401,12 +380,12 @@ const numberToWords = (num) => {
     margin: 0;
   }
 
+  /* Override global 1-page restriction to allow native browser pagination for long lists */
   html, body, #app {
     height: auto !important;
     max-height: none !important;
     overflow: visible !important;
   }
-  
 
   body * {
     visibility: hidden;
@@ -419,9 +398,9 @@ const numberToWords = (num) => {
     left: auto !important;
     top: auto !important;
     width: 210mm !important;
-    height: 148mm !important;
-    overflow: hidden !important;
-    margin: 0 !important;
+    min-height: 148mm !important;
+    height: auto !important;
+    overflow: visible !important;
     padding: 10mm !important;
     box-shadow: none !important;
     border: none !important;
