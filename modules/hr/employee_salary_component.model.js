@@ -1,0 +1,39 @@
+const mongoose=require('mongoose')
+const employeeSalaryComponentSchema=new mongoose.Schema({
+    employeeId:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'Employee'
+    },
+    name:{
+        type:String,
+        required:true
+    },
+    amount:{
+        type:Number,
+        required:true
+    },
+    type:{
+        type:String,
+        enum:['Earning','Deduction']
+    },
+    effectiveFrom:{
+        type:Date,
+        required:true
+    },
+    effectiveTo:{
+        type:Date,
+    },
+    recurring:{
+        type:Boolean,
+        default:true
+    },
+    createdBy:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'User'
+    },
+    updatedBy:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'User'
+    },
+},{timestamps:true})
+module.exports=mongoose.model('EmployeeSalaryComponent',employeeSalaryComponentSchema)

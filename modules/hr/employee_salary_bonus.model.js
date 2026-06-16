@@ -1,0 +1,40 @@
+const mongoose=require('mongoose');
+const employeeSalaryBonusSchema=new mongoose.Schema({
+    employeeId:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'Employee'
+    },
+    month:{
+        type:Date,
+        required:true
+    },
+    year:{
+        type:Number,
+    },
+    bonus:{
+        type:Number,
+    },
+    bonusType:{
+        type:String,
+    },
+    remarks:{
+        type:String,
+    },
+    recurring:{
+        type:Boolean,
+        default:false
+    },
+    createdBy:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'User'
+    },
+    updatedBy:{
+        type:mongoose.Schema.Types.ObjectId,
+        ref:'User'
+    },
+    isActive:{
+        type:Boolean,
+        default:true
+    }
+},{timestamps:true})
+module.exports=mongoose.model('EmployeeSalaryBonus',employeeSalaryBonusSchema)
