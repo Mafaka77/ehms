@@ -88,61 +88,8 @@ const closeModal = () => {
 
 const printingPDF = ref(false)
 
-const handlePrintCard = async () => {
-  if (printingPDF.value) return
-  
-  // Open window immediately to bypass popup blockers
-  const printWindow = window.open('', '_blank')
-  if (!printWindow) {
-    snackbarStore.show({ message: 'Popup blocked. Please allow popups for this site.', type: 'error' })
-    return
-  }
-  printWindow.document.write('<p style="font-family:sans-serif;text-align:center;margin-top:100px;">Generating PDF... Please wait...</p>')
-
-  printingPDF.value = true
-  try {
-    const element = document.querySelector('.print-container')
-    if (!element) {
-      printWindow.close()
-      snackbarStore.show({ message: 'Print element not found', type: 'error' })
-      return
-    }
-
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      logging: false
-    })
-    const imgData = canvas.toDataURL('image/jpeg', 0.98)
-
-    // A4 portrait: 210mm x 297mm
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    })
-
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297)
-
-    const blob = pdf.output('blob')
-    const blobUrl = URL.createObjectURL(blob)
-
-    printWindow.location.href = blobUrl
-
-    setTimeout(() => {
-      try {
-        printWindow.print()
-      } catch (e) {
-        console.error('Auto-print trigger error:', e)
-      }
-    }, 500)
-  } catch (error) {
-    printWindow.close()
-    console.error('Error generating PDF:', error)
-    snackbarStore.show({ message: 'Failed to generate PDF', type: 'error' })
-  } finally {
-    printingPDF.value = false
-  }
+const handlePrintCard = () => {
+  window.print()
 }
 
 const getStatusColor = (status) => {
