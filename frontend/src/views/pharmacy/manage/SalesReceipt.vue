@@ -34,6 +34,43 @@ const formatDate = (dateString) => {
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val || 0)
 }
+
+const formatDateShort = (dateString) => {
+  if (!dateString) return '-'
+  const d = new Date(dateString)
+  const month = (d.getMonth() + 1).toString().padStart(2, '0')
+  const year = d.getFullYear().toString().slice(-2)
+  return `${month}/${year}`
+}
+
+const numberToWords = (num) => {
+  if (num === 0 || !num) return 'Zero Rupees Only'
+  
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen ']
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+  
+  const inWords = (n) => {
+    if ((n = n.toString()).length > 9) return 'overflow'
+    n = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/)
+    if (!n) return ''
+    let str = ''
+    str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : ''
+    str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : ''
+    str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : ''
+    str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : ''
+    str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : ''
+    return str.trim()
+  }
+  
+  let wholePart = Math.floor(num)
+  let fractionalPart = Math.round((num - wholePart) * 100)
+  
+  let words = inWords(wholePart) + ' Rupees'
+  if (fractionalPart > 0) {
+    words += ' and ' + inWords(fractionalPart) + ' Paise'
+  }
+  return words + ' Only'
+}
 </script>
 
 <template>
@@ -52,9 +89,11 @@ const formatCurrency = (val) => {
           <div class="receipt-content">
             <!-- Header Brand -->
             <div class="receipt-header">
-              <h1>EHMS Hospital & Research Centre</h1>
-              <p>123 Health Care Avenue, Medical City</p>
-              <p>Mob: +91 98765 43210 | Email: billing@ehms.com</p>
+              <h1 class="uppercase tracking-widest text-slate-900">Emmanuel Hospital</h1>
+              <p>Luangmual Near Appollo School of Nursing</p>
+              <p>Aizawl, Mizoram - 796009</p>
+              <p>Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
+              <p>GSTIN: 15CDTPN0612H1ZK</p>
               <hr class="receipt-divider" />
               <h2>PHARMACY BILL / INVOICE</h2>
             </div>
@@ -85,40 +124,56 @@ const formatCurrency = (val) => {
             <table class="items-table">
               <thead>
                 <tr>
-                  <th>Medicine Name</th>
+                  <th class="text-left">Medicine Name</th>
                   <th class="text-center">Batch No</th>
-                  <th class="text-right">Rate</th>
+                  <th class="text-center">Exp. Dt</th>
                   <th class="text-center">Qty</th>
-                  <th class="text-right">Net Amount</th>
+                  <th class="text-right">Rate</th>
+                  <th class="text-right">CGST 2.50%</th>
+                  <th class="text-right">CGST Amt</th>
+                  <th class="text-right">SGST 2.50%</th>
+                  <th class="text-right">SGST Amt</th>
+                  <th class="text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="item in items" :key="item._id">
-                  <td class="font-medium truncate max-w-[220px]">
+                  <td class="font-medium truncate max-w-[150px]">
                     {{ item.medicineId?.medicineName }}
-                    <span v-if="item.medicineId?.brandName" class="text-[9px] text-slate-500 font-normal ml-1">({{ item.medicineId.brandName }})</span>
+                    <span v-if="item.medicineId?.brandName" class="text-[8px] text-slate-500 font-normal ml-1">({{ item.medicineId.brandName }})</span>
                   </td>
-                  <td class="text-center font-mono font-bold text-[10px]">{{ item.batchId?.batchNo || '—' }}</td>
-                  <td class="text-right font-mono">{{ formatCurrency(item.rate) }}</td>
-                  <td class="text-center font-mono">{{ item.quantity }}</td>
-                  <td class="text-right font-mono font-semibold">{{ formatCurrency(item.amount) }}</td>
+                  <td class="text-center font-mono font-bold text-[9px]">{{ item.batchId?.batchNo || '—' }}</td>
+                  <td class="text-center font-mono text-[9px]">{{ formatDateShort(item.batchId?.expiryDate) }}</td>
+                  <td class="text-center font-mono text-[9px]">{{ item.quantity }}</td>
+                  <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.rate) }}</td>
+                  <td class="text-right font-mono text-[9px]">2.50%</td>
+                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 105) }}</td>
+                  <td class="text-right font-mono text-[9px]">2.50%</td>
+                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 105) }}</td>
+                  <td class="text-right font-mono font-semibold text-[9px]">{{ formatCurrency(item.amount) }}</td>
                 </tr>
               </tbody>
             </table>
 
             <!-- Financials Summary -->
-            <div class="financials-summary">
-              <div class="flex justify-between">
-                <span>Gross Total:</span>
-                <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+            <div class="financials-summary-container flex justify-between mt-3">
+              <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%]">
+                <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
+                {{ numberToWords(sale.totalAmount) }}
               </div>
-              <div class="flex justify-between net-payable">
-                <span>Net Payable:</span>
-                <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span>Paid Amount:</span>
-                <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+              <div class="financials-summary w-48">
+                <div class="flex justify-between">
+                  <span>Gross Total:</span>
+                  <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+                </div>
+                <div class="flex justify-between net-payable">
+                  <span>Net Payable:</span>
+                  <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>Paid Amount:</span>
+                  <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+                </div>
               </div>
             </div>
 
