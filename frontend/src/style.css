@@ -18,8 +18,17 @@ html, body, #app {
     display: none !important;
   }
 
-  /* Reset layout wrapper styling to avoid margins, clipping, and padding offsets */
-  html, body, #app, .min-h-screen, .flex-1, main, .fixed, .relative {
+  /* Reset layout wrapper styling and strictly enforce a 1-page print maximum */
+  html, body, #app {
+    position: static !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .min-h-screen, .flex-1, main, .fixed, .relative {
     position: static !important;
     overflow: visible !important;
     height: auto !important;

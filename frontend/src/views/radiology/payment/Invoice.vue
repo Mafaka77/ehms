@@ -1,7 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas-pro'
 
 const props = defineProps({
   show: {
@@ -20,9 +18,12 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
+const printingPDF = ref(false)
+
 const printInvoicePDF = () => {
   window.print()
 }
+
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
@@ -37,15 +38,15 @@ const formatCurrency = (val) => {
 </script>
 
 <template>
-  <div v-if="show && billDetails" class="fixed inset-0 z-50 flex items-center justify-center p-4 screen-only animate-in fade-in duration-200">
+  <div v-if="show && billDetails" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print:p-0 print:items-start print:justify-start">
     <!-- Backdrop -->
-    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="emit('close')"></div>
-    
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="emit('close')"></div>
+
     <!-- Modal Wrapper -->
-    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-      
+    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
+
       <!-- Preview Area -->
-      <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow">
+      <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block">
         <!-- Receipt Mockup Sheet (Sized to 210mm x 148mm ratio on screen) -->
         <div class="print-receipt-container select-none">
           <!-- Receipt Content -->
@@ -349,15 +350,6 @@ const formatCurrency = (val) => {
     margin: 0;
   }
   
-  /* Reset layout structure for printing */
-  html, body, #app, .min-h-screen, .flex-1, main, .fixed, .relative {
-    position: static !important;
-    overflow: visible !important;
-    height: auto !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
 
   body * {
     visibility: hidden;

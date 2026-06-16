@@ -1,7 +1,5 @@
 <script setup>
 import { ref, watch } from 'vue'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas-pro'
 import { useLabStore } from '../../../stores/labStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 
@@ -60,15 +58,15 @@ const formatDate = (dateString) => {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4 screen-only animate-in fade-in duration-200">
+  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print:p-0 print:items-start print:justify-start">
     <!-- Backdrop -->
-    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="emit('close')"></div>
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="emit('close')"></div>
 
     <!-- Modal Wrapper -->
-    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
       
       <!-- Preview Area -->
-      <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow">
+      <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block">
         <!-- A4 Page representation on screen -->
         <div class="print-report-container select-none">
           <div class="report-content">

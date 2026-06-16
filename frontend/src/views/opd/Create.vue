@@ -10,8 +10,6 @@ import BaseSelect from '../../components/BaseSelect.vue'
 import BaseTextarea from '../../components/BaseTextarea.vue'
 import SearchableSelect from '../../components/SearchableSelect.vue'
 import OpdCard from '../../components/OpdCard.vue'
-import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas-pro'
 
 const router = useRouter()
 const patientStore = usePatientStore()
@@ -411,10 +409,10 @@ const closeModal = () => {
     </div>
     
     <!-- Print Modal Overlay -->
-    <div v-if="showCardModal && createdAppointment" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeModal"></div>
+    <div v-if="showCardModal && createdAppointment" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 print:p-0 print:items-start print:justify-start">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="closeModal"></div>
       
-      <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
         
         <!-- Modal Header (Hidden when printing) -->
         <div class="flex items-center justify-between p-4 border-b border-slate-200 bg-white print:hidden">
@@ -442,7 +440,7 @@ const closeModal = () => {
         </div>
 
         <!-- Scrollable Print Area -->
-        <div class="flex-grow overflow-y-auto p-4 sm:p-8 bg-slate-200 print:p-0 print:bg-white print:overflow-visible">
+        <div class="flex-grow overflow-y-auto p-4 sm:p-8 bg-slate-200 print:p-0 print:bg-white print:overflow-visible print:block">
           <!-- Render the Card Component -->
           <OpdCard :appointment="createdAppointment" />
         </div>
