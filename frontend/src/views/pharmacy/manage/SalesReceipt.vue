@@ -170,6 +170,7 @@ const formatCurrency = (val) => {
 .print-receipt-container {
   width: 210mm;
   height: 148mm;
+  overflow: hidden;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
@@ -335,8 +336,8 @@ const formatCurrency = (val) => {
     left: 0 !important;
     top: 0 !important;
     width: 210mm !important;
-    min-height: 148mm !important;
-    height: auto !important;
+    height: 148mm !important;
+    overflow: hidden !important;
     margin: 0 !important;
     padding: 10mm !important;
     box-shadow: none !important;
