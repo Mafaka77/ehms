@@ -349,7 +349,7 @@ const formatCurrency = (val) => {
 
 @media print {
   @page {
-    size: A4 portrait;
+    size: A5 landscape;
     margin: 0;
   }
   body * {
@@ -359,17 +359,27 @@ const formatCurrency = (val) => {
     visibility: visible;
   }
   .opd-print-receipt-container {
-    position: fixed;
+    position: absolute;
     left: 0;
     top: 0;
     width: 210mm;
-    height: 148mm;
+    min-height: 148mm;
+    height: auto;
     margin: 0;
     padding: 10mm;
     box-shadow: none;
     border: none;
     z-index: 999999;
     background-color: white !important;
+  }
+  .items-table tr {
+    page-break-inside: avoid;
+  }
+  .signatures {
+    page-break-inside: avoid;
+  }
+  .notice {
+    page-break-inside: avoid;
   }
 }
 </style>
