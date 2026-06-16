@@ -20,56 +20,8 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const printingPDF = ref(false)
-
-const printInvoicePDF = async () => {
-  if (printingPDF.value) return
-  
-  // Open window immediately to bypass popup blockers
-  const printWindow = window.open('', '_blank')
-  if (!printWindow) {
-    console.error('Popup blocked')
-    return
-  }
-  printWindow.document.write('<p style="font-family:sans-serif;text-align:center;margin-top:100px;">Generating PDF... Please wait...</p>')
-
-  printingPDF.value = true
-  try {
-    const element = document.querySelector('.opd-print-receipt-container')
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      logging: false
-    })
-    const imgData = canvas.toDataURL('image/jpeg', 0.98)
-
-    // A5 landscape: 210mm x 148mm
-    const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: [210, 148]
-    })
-
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 148)
-
-    const blob = pdf.output('blob')
-    const blobUrl = URL.createObjectURL(blob)
-
-    printWindow.location.href = blobUrl
-
-    setTimeout(() => {
-      try {
-        printWindow.print()
-      } catch (e) {
-        console.error('Auto-print trigger error:', e)
-      }
-    }, 500)
-  } catch (error) {
-    printWindow.close()
-    console.error('Error generating PDF print:', error)
-  } finally {
-    printingPDF.value = false
-  }
+const printInvoicePDF = () => {
+  window.print()
 }
 
 const formatDate = (dateString) => {
@@ -393,5 +345,31 @@ const formatCurrency = (val) => {
   font-weight: bold;
   color: #475569;
   margin-top: 2px;
+}
+
+@media print {
+  @page {
+    size: A5 landscape;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .opd-print-receipt-container, .opd-print-receipt-container * {
+    visibility: visible;
+  }
+  .opd-print-receipt-container {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    height: 148mm;
+    margin: 0;
+    padding: 10mm;
+    box-shadow: none;
+    border: none;
+    z-index: 999999;
+    background-color: white !important;
+  }
 }
 </style>

@@ -47,56 +47,8 @@ watch(() => props.show, (newVal) => {
   }
 })
 
-const printReportPDF = async () => {
-  if (printingPDF.value) return
-  
-  // Open window immediately to bypass popup blockers
-  const printWindow = window.open('', '_blank')
-  if (!printWindow) {
-    snackbarStore.show({ message: 'Popup blocked. Please allow popups for this site.', type: 'error' })
-    return
-  }
-  printWindow.document.write('<p style="font-family:sans-serif;text-align:center;margin-top:100px;">Generating PDF... Please wait...</p>')
-
-  printingPDF.value = true
-  try {
-    const element = document.querySelector('.print-report-container')
-    const canvas = await html2canvas(element, {
-      scale: 2, // High resolution vector output
-      useCORS: true,
-      logging: false
-    })
-    const imgData = canvas.toDataURL('image/jpeg', 0.98)
-    
-    // Create jsPDF instance (portrait, mm, A4 is [210, 297])
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'mm',
-      format: 'a4'
-    })
-    
-    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297)
-    
-    // Generate blob URL
-    const blob = pdf.output('blob')
-    const blobUrl = URL.createObjectURL(blob)
-    
-    printWindow.location.href = blobUrl
-    
-    setTimeout(() => {
-      try {
-        printWindow.print()
-      } catch (e) {
-        console.error('Auto-print report error:', e)
-      }
-    }, 500)
-  } catch (error) {
-    printWindow.close()
-    console.error('Error generating PDF report:', error)
-    snackbarStore.show({ message: 'Failed to generate PDF report', type: 'error' })
-  } finally {
-    printingPDF.value = false
-  }
+const printReportPDF = () => {
+  window.print()
 }
 
 const formatDate = (dateString) => {
@@ -404,5 +356,31 @@ const formatDate = (dateString) => {
 .notice .wish {
   font-style: italic;
   margin-top: 4px;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-report-container, .print-report-container * {
+    visibility: visible;
+  }
+  .print-report-container {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 20mm 15mm;
+    box-shadow: none;
+    border: none;
+    z-index: 999999;
+    background-color: white !important;
+  }
 }
 </style>
