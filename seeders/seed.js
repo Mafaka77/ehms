@@ -16,16 +16,14 @@ async function runSeeders() {
 
     console.log('Starting RBAC seeder...')
     await seedRBAC()
-    // await departmetSeed();
-    // await designationSeed();
-    // await specializationSeed();
-    // await labCategorySeed();
-    // await radiologySeed();
-    // await medicineCategorySeed()
-// await chargeCategorySeed();
+    await departmetSeed();
+    await designationSeed();
+    await specializationSeed();
+    await labCategorySeed();
+    await radiologySeed();
+    await medicineCategorySeed()
+    await chargeCategorySeed();
     console.log('All seeders completed successfully!')
-    
-    // Disconnect and exit
     await mongoose.disconnect()
     process.exit(0)
   } catch (error) {

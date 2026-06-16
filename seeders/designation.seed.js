@@ -16,12 +16,9 @@ const designations = [
   'Resident Doctor',
 
   // Nursing
-  'Chief Nursing Officer',
   'Nursing Superintendent',
-  'Deputy Nursing Superintendent',
   'Ward Sister',
-  'Senior Staff Nurse',
-  'Staff Nurse',
+  'Nursing Officer',
   'Nursing Assistant',
 
   // Laboratory
@@ -31,7 +28,6 @@ const designations = [
   'Lab Assistant',
 
   // Pharmacy
-  'Chief Pharmacist',
   'Pharmacist',
   'Assistant Pharmacist',
 
@@ -65,10 +61,7 @@ const designations = [
   'Emergency Technician',
 
   // IT
-  'IT Manager',
-  'System Administrator',
-  'Software Engineer',
-  'Network Engineer',
+  'IT Assistant',
 
   // Support
   'Housekeeping Supervisor',
