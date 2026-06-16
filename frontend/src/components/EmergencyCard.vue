@@ -23,7 +23,7 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
 </script>
 
 <template>
-  <div class="print-container bg-white text-black p-8 max-w-4xl mx-auto border-2 border-slate-800 h-full min-h-[1000px] flex flex-col justify-between">
+  <div class="print-container bg-white text-black mx-auto border-2 border-slate-800 flex flex-col justify-between">
     <div>
       <!-- Hospital Header -->
       <div class="text-center border-b-2 border-slate-800 pb-6 mb-6">
@@ -108,10 +108,11 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
 <style scoped>
 /* Screen styles */
 .print-container {
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  padding: 15mm;
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
-  width: 100%;
-  max-width: 210mm; /* A4 width */
-  min-height: 297mm; /* A4 height */
   margin: 0 auto;
   background-color: white;
 }

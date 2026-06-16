@@ -24,6 +24,15 @@ const printingPDF = ref(false)
 
 const printInvoicePDF = async () => {
   if (printingPDF.value) return
+  
+  // Open window immediately to bypass popup blockers
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    console.error('Popup blocked')
+    return
+  }
+  printWindow.document.write('<p style="font-family:sans-serif;text-align:center;margin-top:100px;">Generating PDF... Please wait...</p>')
+
   printingPDF.value = true
   try {
     const element = document.querySelector('.emergency-print-receipt-container')
@@ -46,20 +55,17 @@ const printInvoicePDF = async () => {
     const blob = pdf.output('blob')
     const blobUrl = URL.createObjectURL(blob)
 
-    const printWindow = window.open(blobUrl, '_blank')
-    if (printWindow) {
-      printWindow.onload = () => {
+    printWindow.location.href = blobUrl
+
+    setTimeout(() => {
+      try {
         printWindow.print()
+      } catch (e) {
+        console.error('Auto-print trigger error:', e)
       }
-      setTimeout(() => {
-        try {
-          printWindow.print()
-        } catch (e) {
-          console.error('Auto-print trigger error:', e)
-        }
-      }, 500)
-    }
+    }, 500)
   } catch (error) {
+    printWindow.close()
     console.error('Error generating PDF print:', error)
   } finally {
     printingPDF.value = false

@@ -49,6 +49,15 @@ watch(() => props.show, (newVal) => {
 
 const printReportPDF = async () => {
   if (printingPDF.value) return
+  
+  // Open window immediately to bypass popup blockers
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) {
+    snackbarStore.show({ message: 'Popup blocked. Please allow popups for this site.', type: 'error' })
+    return
+  }
+  printWindow.document.write('<p style="font-family:sans-serif;text-align:center;margin-top:100px;">Generating PDF... Please wait...</p>')
+
   printingPDF.value = true
   try {
     const element = document.querySelector('.print-report-container')
@@ -72,22 +81,17 @@ const printReportPDF = async () => {
     const blob = pdf.output('blob')
     const blobUrl = URL.createObjectURL(blob)
     
-    // Open in new tab
-    const printWindow = window.open(blobUrl, '_blank')
-    if (printWindow) {
-      printWindow.onload = () => {
+    printWindow.location.href = blobUrl
+    
+    setTimeout(() => {
+      try {
         printWindow.print()
+      } catch (e) {
+        console.error('Auto-print report error:', e)
       }
-      // Fallback delay
-      setTimeout(() => {
-        try {
-          printWindow.print()
-        } catch (e) {
-          console.error('Auto-print report error:', e)
-        }
-      }, 500)
-    }
+    }, 500)
   } catch (error) {
+    printWindow.close()
     console.error('Error generating PDF report:', error)
     snackbarStore.show({ message: 'Failed to generate PDF report', type: 'error' })
   } finally {
