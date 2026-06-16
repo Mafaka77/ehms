@@ -348,7 +348,7 @@ const formatCurrency = (val) => {
 
 @media print {
   @page {
-    size: A5 landscape;
+    size: A4 portrait;
     margin: 0;
   }
   body * {
