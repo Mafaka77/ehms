@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 
@@ -7,12 +7,24 @@ const props = defineProps({
   collapsed: {
     type: Boolean,
     default: false
+  },
+  isMobileOpen: {
+    type: Boolean,
+    default: false
   }
 })
+
+const emit = defineEmits(['close-mobile'])
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+
+watch(() => route.path, () => {
+  if (props.isMobileOpen) {
+    emit('close-mobile')
+  }
+})
 
 // Navigation items with required permissions attached
 const navigation = [
@@ -207,8 +219,11 @@ const handleLogout = () => {
 
 <template>
   <aside 
-    class="hidden md:flex flex-col h-screen sticky top-0 bg-slate-900 text-white shadow-2xl z-20 transition-all duration-300 ease-in-out overflow-hidden"
-    :class="collapsed ? 'w-16' : 'w-72'"
+    class="flex-col h-screen bg-slate-900 text-white shadow-2xl transition-all duration-300 ease-in-out overflow-hidden"
+    :class="[
+      isMobileOpen ? 'fixed inset-y-0 left-0 flex w-72 z-40' : 'hidden md:flex md:sticky md:top-0 z-20',
+      !isMobileOpen && collapsed ? 'w-16' : 'w-72'
+    ]"
   >
     <!-- Logo -->
     <div class="h-20 flex items-center border-b border-white/10 bg-slate-950/50 shrink-0" :class="collapsed ? 'justify-center px-0' : 'px-8'">
@@ -424,22 +439,20 @@ const handleLogout = () => {
 </template>
 
 <style scoped>
-/* Custom scrollbar for sidebar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
 .custom-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* Submenu Slide Transition */
 .submenu-slide-enter-active,
 .submenu-slide-leave-active {
   transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
@@ -451,7 +464,6 @@ const handleLogout = () => {
   opacity: 0;
 }
 
-/* Label fade when collapsing */
 .label-fade-enter-active,
 .label-fade-leave-active {
   transition: opacity 0.2s ease, max-width 0.3s ease;

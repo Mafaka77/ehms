@@ -65,24 +65,22 @@ const patientSchema = new mongoose.Schema({
 
 patientSchema.pre('validate', async function() {
   if (!this.patientCode) {
-    const currentYear = new Date().getFullYear().toString();
-    
     const lastPatient = await mongoose.model('Patient').findOne(
-      { patientCode: { $regex: new RegExp(`^EH-PT-${currentYear}`) } }
+      { patientCode: { $regex: /^EH-PT-\d{6}$/ } }
     ).sort({ patientCode: -1 });
 
     let nextNumber = 1;
     if (lastPatient && lastPatient.patientCode) {
-      // e.g. EH-PT-20260001 -> Extract the last 4 digits
-      const lastNumStr = lastPatient.patientCode.slice(-4);
+      // e.g. EH-PT-000001 -> Extract the last 6 digits
+      const lastNumStr = lastPatient.patientCode.slice(-6);
       const lastNum = parseInt(lastNumStr, 10);
       if (!isNaN(lastNum)) {
         nextNumber = lastNum + 1;
       }
     }
 
-    const paddedNumber = nextNumber.toString().padStart(4, '0');
-    this.patientCode = `EH-PT-${currentYear}${paddedNumber}`;
+    const paddedNumber = nextNumber.toString().padStart(6, '0');
+    this.patientCode = `EH-PT-${paddedNumber}`;
   }
 })
 

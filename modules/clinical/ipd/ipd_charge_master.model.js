@@ -91,7 +91,8 @@ new mongoose.Schema({
       'OPD',
       'IPD',
       'EMERGENCY',
-      'DAYCARE'
+      'DAYCARE',
+      'DENTAL'
     ],
     default: ['IPD']
   },

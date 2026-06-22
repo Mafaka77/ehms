@@ -200,7 +200,7 @@ onMounted(() => {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <BaseInput v-model="form.qualification" id="qualification" label="Qualification" placeholder="e.g. MBBS, MD" required />
             <BaseInput v-model="form.registrationNo" id="registrationNo" label="Medical Registration No." placeholder="Registration number" />
-            <BaseInput v-model.number="form.consultationFee" id="consultationFee" type="number" label="Consultation Fee (₹)" placeholder="0" required />
+            <!-- <BaseInput v-model.number="form.consultationFee" id="consultationFee" type="number" label="Consultation Fee (₹)" placeholder="0" required /> -->
             
             <!-- Specialization Autocomplete -->
             <div class="relative">

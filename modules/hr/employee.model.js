@@ -40,9 +40,18 @@ const employeeSchema = new mongoose.Schema({
     ]
   },
 
+
   basicSalary: {
     type: Number,
     required: true
+  },
+
+  bankDetails: {
+    bankName: String,
+    accountName: String,
+    accountNumber: String,
+    ifscCode: String,
+    branchName: String
   },
 
   isActive: {

@@ -42,14 +42,14 @@ const error = ref('')
 
 // Compute options for SearchableSelect
 const categoryOptions = computed(() => {
-  return pharmacyStore.categories.map(c => ({
+  return pharmacyStore.allCategories.map(c => ({
     value: c._id,
     label: c.name
   }))
 })
 
 const supplierOptions = computed(() => {
-  return pharmacyStore.suppliers.map(s => ({
+  return pharmacyStore.allSuppliers.map(s => ({
     value: s._id,
     label: `${s.supplierName} (${s.supplierCode || 'N/A'})`
   }))
@@ -94,11 +94,11 @@ watch(() => props.show, (newVal) => {
 onMounted(async () => {
   try {
     // Load categories and suppliers for selectors
-    if (pharmacyStore.categories.length === 0) {
-      await pharmacyStore.fetchCategories(1, 100)
+    if (pharmacyStore.allCategories.length === 0) {
+      await pharmacyStore.fetchAllCategories()
     }
-    if (pharmacyStore.suppliers.length === 0) {
-      await pharmacyStore.fetchSuppliers(1, 100)
+    if (pharmacyStore.allSuppliers.length === 0) {
+      await pharmacyStore.fetchAllSuppliers()
     }
   } catch (err) {
     console.error('Failed to load category/supplier options:', err)

@@ -33,14 +33,15 @@ const form = ref({
 
 const wardTypes = [
   'GENERAL',
-  'SEMI_PRIVATE',
-  'PRIVATE',
-  'DELUXE',
+  'CABIN',
+  'DYLYSIS/HDU',
+  'SUPER DELUXE',
   'ICU',
   'NICU',
   'PICU',
   'CCU',
-  'EMERGENCY'
+  'EMERGENCY',
+  'DELUXE'
 ]
 
 // Load Wards list

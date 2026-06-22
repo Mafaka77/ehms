@@ -50,11 +50,13 @@ const openEditModal = (med) => {
 
 const handleMedicineCreated = (newMed) => {
   if (currentPage.value === 1) {
-    pharmacyStore.medicines.unshift(newMed)
+    // pharmacyStore.createMedicine already unshifted the new medicine into the array
     if (pharmacyStore.medicines.length > limit.value) {
       pharmacyStore.medicines.pop()
     }
-    pharmacyStore.medicinePagination.total++
+    if (pharmacyStore.medicinePagination) {
+      pharmacyStore.medicinePagination.total++
+    }
   } else {
     fetchMedicines()
   }

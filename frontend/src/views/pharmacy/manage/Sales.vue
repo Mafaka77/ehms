@@ -30,7 +30,7 @@ const selectedSaleItems = ref([])
 const isWalkIn = ref(true)
 const patientSearchQuery = ref('')
 const selectedPatient = ref(null)
-const customerName = ref('')
+const customerName = ref('Customer')
 const customerPhone = ref('')
 const remarks = ref('')
 

@@ -103,7 +103,14 @@ const form = reactive({
   joiningDate: '',
   employmentType: 'Permanent',
   basicSalary: '',
-  isActive: true
+  isActive: true,
+  bankDetails: {
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    ifscCode: '',
+    branchName: ''
+  }
 })
 
 const loading = ref(false)
@@ -137,6 +144,21 @@ const populateEmployee = async () => {
       form.employmentType = emp.employmentType || 'Permanent'
       form.basicSalary = emp.basicSalary || ''
       form.isActive = emp.isActive !== false
+      if (emp.bankDetails) {
+        form.bankDetails.bankName = emp.bankDetails.bankName || ''
+        form.bankDetails.accountName = emp.bankDetails.accountName || ''
+        form.bankDetails.accountNumber = emp.bankDetails.accountNumber || ''
+        form.bankDetails.ifscCode = emp.bankDetails.ifscCode || ''
+        form.bankDetails.branchName = emp.bankDetails.branchName || ''
+      } else {
+        form.bankDetails = {
+          bankName: '',
+          accountName: '',
+          accountNumber: '',
+          ifscCode: '',
+          branchName: ''
+        }
+      }
     } else {
       error.value = 'Employee profile not found.'
       snackbarStore.show({
@@ -430,6 +452,50 @@ const handleSubmit = async () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Bank Details -->
+        <div>
+          <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">Bank Details</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <BaseInput 
+              v-model="form.bankDetails.bankName"
+              id="bankName"
+              label="Bank Name"
+              placeholder="e.g. State Bank of India"
+              :disabled="loading"
+            />
+            <BaseInput 
+              v-model="form.bankDetails.accountName"
+              id="accountName"
+              label="Account Holder Name"
+              placeholder="e.g. Arthur Dent"
+              :disabled="loading"
+            />
+            <BaseInput 
+              v-model="form.bankDetails.accountNumber"
+              id="accountNumber"
+              label="Account Number"
+              placeholder="e.g. 1234567890"
+              :disabled="loading"
+            />
+            <div class="grid grid-cols-2 gap-4">
+              <BaseInput 
+                v-model="form.bankDetails.ifscCode"
+                id="ifscCode"
+                label="IFSC Code"
+                placeholder="e.g. SBIN0001234"
+                :disabled="loading"
+              />
+              <BaseInput 
+                v-model="form.bankDetails.branchName"
+                id="branchName"
+                label="Branch Name"
+                placeholder="e.g. Main Branch"
+                :disabled="loading"
+              />
             </div>
           </div>
         </div>

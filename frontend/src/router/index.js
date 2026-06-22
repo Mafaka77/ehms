@@ -441,21 +441,21 @@ const routes = [
             path: '',
             name: 'users',
             component: () => import('../views/master/users/Index.vue'),
-            meta: { permission: 'users.view' }
+            meta: { permission: 'user.view' }
           },
           {
             path: 'view/:id',
             name: 'users-view',
             component: () => import('../views/master/users/View.vue'),
             props: true,
-            meta: { permission: 'users.view' }
+            meta: { permission: 'user.view' }
           },
           {
             path: 'edit/:id',
             name: 'users-edit',
             component: () => import('../views/master/users/Edit.vue'),
             props: true,
-            meta: { permission: 'users.view' }
+            meta: { permission: 'user.view' }
           }
         ]
       },
@@ -467,14 +467,14 @@ const routes = [
             path: '',
             name: 'roles',
             component: () => import('../views/master/roles/Index.vue'),
-            meta: { permission: 'users.view' }
+            meta: { permission: 'user.view' }
           },
           {
             path: 'view/:id',
             name: 'roles-view',
             component: () => import('../views/master/roles/View.vue'),
             props: true,
-            meta: { permission: 'users.view' }
+            meta: { permission: 'user.view' }
           }
         ]
       },
@@ -484,7 +484,8 @@ const routes = [
           {
             path: '',
             name: 'permissions',
-            component: () => import('../views/master/permission/Index.vue')
+            component: () => import('../views/master/permission/Index.vue'),
+            meta: { permission: 'user.view' }
           }
         ]
       }
@@ -498,25 +499,23 @@ const router = createRouter({
 })
 
 // Global Navigation Guard
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, from) => {
   const authStore = useAuthStore()
 
   // 1. If route requires authentication and user is NOT logged in
   if (to.matched.some(record => record.meta.requiresAuth) && !authStore.isAuthenticated) {
-    next({ name: 'login' }) // Kick them back to login
+    return { name: 'login' } // Kick them back to login
   } 
   // 2. If route has permission metadata and user is not authorized
   else if (to.meta.permission && !authStore.hasPermission(to.meta.permission)) {
-    next({ name: 'dashboard' }) // Redirect to dashboard
+    return { name: 'dashboard' } // Redirect to dashboard
   }
   // 3. If route is for guests only (e.g. login) and user IS logged in
   else if (to.meta.guestOnly && authStore.isAuthenticated) {
-    next({ name: 'dashboard' }) // Redirect straight to dashboard
+    return { name: 'dashboard' } // Redirect straight to dashboard
   } 
   // 4. Otherwise, let them proceed normally
-  else {
-    next()
-  }
+  return true
 })
 
 export default router

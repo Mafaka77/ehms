@@ -23,42 +23,42 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
 </script>
 
 <template>
-  <div class="print-container bg-white text-black mx-auto border-2 border-slate-800 flex flex-col justify-between">
+  <div class="print-container bg-white text-black mx-auto border border-slate-800 flex flex-col justify-between">
     <div>
       <!-- Hospital Header -->
-      <div class="text-center border-b-2 border-slate-800 pb-6 mb-6">
-        <h1 class="text-3xl font-black uppercase tracking-widest text-slate-900">Emmanuel Hospital</h1>
-        <p class="text-sm font-semibold mt-1">Luangmual Near Appollo School of Nursing</p>
-        <p class="text-sm font-semibold mt-1">Aizawl, Mizoram - 796009</p>
-        <p class="text-sm font-semibold">Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
-        <p class="text-sm font-semibold">GSTIN:15CDTPN0612H1ZK</p>
-        <div class="mt-4 inline-block bg-rose-600 text-white px-6 py-1.5 rounded-full font-bold uppercase tracking-widest shadow-md">
+      <div class="text-center border-b border-slate-800 pb-5 mb-5">
+        <h1 class="text-2xl font-bold uppercase tracking-widest text-slate-900">Emmanuel Hospital</h1>
+        <p class="text-xs text-slate-700 mt-1">Luangmual Near Appollo School of Nursing</p>
+        <p class="text-xs text-slate-700 mt-0.5">Aizawl, Mizoram - 796009</p>
+        <p class="text-xs text-slate-700 mt-0.5">Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
+        <p class="text-xs text-slate-700 mt-0.5">GSTIN: 15CDTPN0612H1ZK</p>
+        <div class="mt-3 inline-block bg-rose-600 text-white px-5 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-rose-700 print-exact-color">
           Emergency Visit Card
         </div>
       </div>
 
       <!-- Details Grid -->
-      <div class="grid grid-cols-2 gap-8 mb-8 border-b-2 border-slate-800 pb-6">
+      <div class="grid grid-cols-2 gap-4 mb-6 border-b border-slate-800 pb-5">
         
         <!-- Patient Details -->
         <div>
-          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-xs mb-3">Patient Details</h2>
-          <table class="w-full text-sm">
+          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-2">Patient Details</h2>
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 font-semibold w-1/3">Patient Name:</td>
+                <td class="py-1 text-slate-600 w-1/3">Patient Name:</td>
                 <td class="py-1 font-bold">{{ patient.fullName || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 font-semibold">Patient ID:</td>
+                <td class="py-1 text-slate-600">Patient ID:</td>
                 <td class="py-1 font-bold">{{ patient.patientCode || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 font-semibold">Age / Gender:</td>
+                <td class="py-1 text-slate-600">Age / Gender:</td>
                 <td class="py-1 font-bold">{{ patient.age || '-' }} / {{ patient.gender || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 font-semibold">Contact:</td>
+                <td class="py-1 text-slate-600">Contact:</td>
                 <td class="py-1 font-bold">{{ patient.mobileNo || '-' }}</td>
               </tr>
             </tbody>
@@ -67,24 +67,16 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
 
         <!-- Visit Details -->
         <div>
-          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-xs mb-3">Visit Details</h2>
-          <table class="w-full text-sm">
+          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-2">Visit Details</h2>
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 font-semibold w-1/3">Visit No:</td>
-                <td class="py-1 font-bold font-mono text-indigo-650">{{ visit.visitNo || '-' }}</td>
+                <td class="py-1 text-slate-600 w-1/3">Visit No:</td>
+                <td class="py-1 font-bold font-mono text-indigo-700 print-exact-text">{{ visit.visitNo || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 font-semibold">Arrival Time:</td>
+                <td class="py-1 text-slate-600">Arrival Time:</td>
                 <td class="py-1 font-bold">{{ formatDate(visit.arrivalDateTime) }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold">Triage Doctor:</td>
-                <td class="py-1 font-bold">Dr. {{ doctor.fullName || 'On Duty' }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold">Department:</td>
-                <td class="py-1 font-bold">{{ doctor.fullName ? specialization : 'Emergency Services' }}</td>
               </tr>
             </tbody>
           </table>
@@ -93,12 +85,9 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
     </div>
 
     <!-- Footer Signatures -->
-    <div class="grid grid-cols-2 pt-12 border-t-2 border-slate-800 mt-8">
-      <div class="text-center">
-        <div class="border-t border-slate-400 w-48 mx-auto pt-2 text-sm font-semibold">Triage Nurse Signature</div>
-      </div>
-      <div class="text-center">
-        <div class="border-t border-slate-400 w-48 mx-auto pt-2 text-sm font-semibold">Doctor Signature & Stamp</div>
+    <div class="grid grid-cols-2 pt-10 mt-6">
+      <div class="text-center col-start-2">
+        <div class="border-t border-slate-400 w-40 mx-auto pt-2 text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Doctor Signature & Stamp</div>
       </div>
     </div>
 

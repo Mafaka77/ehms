@@ -4,7 +4,9 @@ import api from '../axios/api'
 export const usePharmacyStore = defineStore('pharmacy', {
   state: () => ({
     suppliers: [],
+    allSuppliers: [],
     categories: [],
+    allCategories: [],
     medicines: [],
     sales: [],
     pendingIpdOrdersCount: 0,
@@ -52,6 +54,23 @@ export const usePharmacyStore = defineStore('pharmacy', {
         return this.suppliers
       } catch (err) {
         this.error = err.response?.data?.message || 'Failed to fetch suppliers'
+        return []
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchAllSuppliers() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get('/pharmacy/suppliers', {
+          params: { page: 1, limit: 1000, isActive: true }
+        })
+        this.allSuppliers = response.data.data || []
+        return this.allSuppliers
+      } catch (err) {
+        this.error = err.response?.data?.message || 'Failed to fetch all suppliers'
         return []
       } finally {
         this.loading = false
@@ -129,6 +148,23 @@ export const usePharmacyStore = defineStore('pharmacy', {
         return this.categories
       } catch (err) {
         this.error = err.response?.data?.message || 'Failed to fetch categories'
+        return []
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchAllCategories() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get('/pharmacy/categories', {
+          params: { page: 1, limit: 1000, isActive: true }
+        })
+        this.allCategories = response.data.data || []
+        return this.allCategories
+      } catch (err) {
+        this.error = err.response?.data?.message || 'Failed to fetch all categories'
         return []
       } finally {
         this.loading = false

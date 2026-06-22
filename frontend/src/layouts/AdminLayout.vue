@@ -18,8 +18,20 @@ const userRoleName = computed(() => {
 <template>
   <div class="min-h-screen bg-slate-50 flex font-sans">
     
-    <!-- Sidebar (Desktop) -->
-    <AdminSidebar :collapsed="isSidebarCollapsed" />
+    <!-- Mobile Sidebar Backdrop -->
+    <div 
+      v-if="isMobileMenuOpen" 
+      @click="isMobileMenuOpen = false" 
+      class="fixed inset-0 bg-slate-900/50 z-30 md:hidden backdrop-blur-sm transition-opacity"
+    ></div>
+
+    <!-- Sidebar -->
+    <AdminSidebar 
+      :collapsed="isSidebarCollapsed" 
+      :isMobileOpen="isMobileMenuOpen"
+      @close-mobile="isMobileMenuOpen = false"
+      class="z-40"
+    />
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden transition-all duration-300">
