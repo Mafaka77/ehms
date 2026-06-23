@@ -22,7 +22,7 @@ export const useIpdWardStore = defineStore('ipdWard', {
     // ==========================================
     // Ward Actions
     // ==========================================
-    async fetchWards(page = 1, limit = 10, search = '') {
+    async fetchWards(page = 1, limit = 100, search = '') {
       this.loading = true
       this.error = null
       try {
