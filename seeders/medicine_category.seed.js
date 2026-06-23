@@ -129,16 +129,13 @@ async function seedMedicineCategories() {
       `✓ ${medicineCategories.length} medicine categories seeded successfully`
     )
 
-    process.exit(0)
-
   } catch (error) {
 
     console.error(
       'Medicine Category Seeder Error:',
       error
     )
-
-    process.exit(1)
+    throw error;
   }
 }
 

@@ -121,6 +121,66 @@ exports.generateBillFromEmergencyVisit = async (req, res) => {
     }
 }
 
+exports.generateBillFromDentalAppointment = async (req, res) => {
+    try {
+        const { dentalAppointmentId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        if (!dentalAppointmentId) {
+            return res.code(STATUS_CODES.BAD_REQUEST).send({
+                message: 'dentalAppointmentId is required',
+                status: STATUS_CODES.BAD_REQUEST
+            })
+        }
+        const bill = await billService.generateBillFromDentalAppointment(
+            dentalAppointmentId, 
+            req.user._id, 
+            discountAmount || 0,
+            discountType,
+            discountRemarks,
+            employeeId
+        )
+        return res.code(STATUS_CODES.CREATED).send({
+            message: 'Bill generated successfully',
+            data: bill,
+            status: STATUS_CODES.CREATED
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.generateBillFromDentalConsultation = async (req, res) => {
+    try {
+        const { dentalAppointmentId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        if (!dentalAppointmentId) {
+            return res.code(STATUS_CODES.BAD_REQUEST).send({
+                message: 'dentalAppointmentId is required',
+                status: STATUS_CODES.BAD_REQUEST
+            })
+        }
+        const bill = await billService.generateBillFromDentalConsultation(
+            dentalAppointmentId, 
+            req.user._id, 
+            discountAmount || 0,
+            discountType,
+            discountRemarks,
+            employeeId
+        )
+        return res.code(STATUS_CODES.CREATED).send({
+            message: 'Consultation Bill generated successfully',
+            data: bill,
+            status: STATUS_CODES.CREATED
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 exports.processPayment = async (req, res) => {
     try {
         const { id } = req.params

@@ -15,6 +15,8 @@ const category = ref(null)
 const masters = ref([])
 const showAddModal = ref(false)
 const submitting = ref(false)
+const editMode = ref(false)
+const editMasterId = ref(null)
 
 // Package item states
 const expandedMasters = ref([])
@@ -37,12 +39,6 @@ const form = ref({
   description: '',
   billingUnit: 'ITEM',
   standardRate: 0,
-  minimumRate: '',
-  maximumRate: '',
-  isVariableRate: false,
-  requiresApproval: false,
-  isPackage: false,
-  packageDurationType: '',
   applicableTo: ['IPD'],
   remarks: ''
 })
@@ -58,17 +54,13 @@ const billingUnits = [
   { value: 'PROCEDURE', label: 'Per Procedure' }
 ]
 
-const packageDurationTypes = [
-  { value: 'DAILY', label: 'Daily basis' },
-  { value: 'HOURLY', label: 'Hourly basis' },
-  { value: 'FIXED', label: 'Fixed basis' }
-]
 
 const applicableOptions = [
   { value: 'OPD', label: 'OPD' },
   { value: 'IPD', label: 'IPD' },
   { value: 'EMERGENCY', label: 'Emergency' },
-  { value: 'DAYCARE', label: 'Daycare' }
+  { value: 'DAYCARE', label: 'Daycare' },
+  { value: 'DENTAL', label: 'Dental' }
 ]
 
 const fetchCategoryDetails = async () => {
@@ -88,20 +80,31 @@ const fetchCategoryDetails = async () => {
 }
 
 const openAddModal = () => {
+  editMode.value = false
+  editMasterId.value = null
   form.value = {
     code: '',
     name: '',
     description: '',
     billingUnit: 'ITEM',
     standardRate: 0,
-    minimumRate: '',
-    maximumRate: '',
-    isVariableRate: false,
-    requiresApproval: false,
-    isPackage: false,
-    packageDurationType: '',
     applicableTo: ['IPD'],
     remarks: ''
+  }
+  showAddModal.value = true
+}
+
+const openEditModal = (master) => {
+  editMode.value = true
+  editMasterId.value = master._id
+  form.value = {
+    code: master.code || '',
+    name: master.name || '',
+    description: master.description || '',
+    billingUnit: master.billingUnit || 'ITEM',
+    standardRate: master.standardRate || 0,
+    applicableTo: [...(master.applicableTo || [])],
+    remarks: master.remarks || ''
   }
   showAddModal.value = true
 }
@@ -130,9 +133,15 @@ const submitChargeMaster = async () => {
   }
 
   submitting.value = true
-  const res = await admissionStore.createChargeMaster(categoryId, form.value)
+  let res;
+  if (editMode.value) {
+    res = await admissionStore.updateChargeMaster(editMasterId.value, form.value)
+  } else {
+    res = await admissionStore.createChargeMaster(categoryId, form.value)
+  }
+  
   if (res.success) {
-    snackbarStore.show({ message: res.message || 'Charge master added successfully', type: 'success' })
+    snackbarStore.show({ message: res.message || `Charge master ${editMode.value ? 'updated' : 'added'} successfully`, type: 'success' })
     showAddModal.value = false
     await fetchCategoryDetails()
   } else {
@@ -381,15 +390,26 @@ onMounted(async () => {
                     </span>
                   </td>
                   <td class="px-4 py-3.5 text-center">
-                    <button 
-                      @click="deleteChargeMaster(master._id)"
-                      class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
-                      title="Delete Service Rate"
-                    >
-                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    <div class="flex items-center justify-center gap-2">
+                      <button 
+                        @click="openEditModal(master)"
+                        class="text-blue-500 hover:text-blue-700 p-1.5 rounded-lg hover:bg-blue-50 transition-all cursor-pointer"
+                        title="Edit Service Rate"
+                      >
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                      <button 
+                        @click="deleteChargeMaster(master._id)"
+                        class="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
+                        title="Delete Service Rate"
+                      >
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </td>
                 </tr>
 
@@ -491,7 +511,7 @@ onMounted(async () => {
         <!-- Header -->
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 class="font-bold text-slate-800 text-base">Add New Service Rate</h3>
+            <h3 class="font-bold text-slate-800 text-base">{{ editMode ? 'Edit Service Rate' : 'Add New Service Rate' }}</h3>
             <p class="text-xs text-slate-400 mt-0.5">Configure rate cards, item billing units, and base prices.</p>
           </div>
           <button 
@@ -563,42 +583,8 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Row 3: Rate bounds -->
-          <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-1">
-              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Minimum Rate (₹) <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
-              <input type="number" v-model.number="form.minimumRate" min="0" placeholder="No min cap" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all text-right" />
-            </div>
-            <div class="space-y-1">
-              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Maximum Rate (₹) <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
-              <input type="number" v-model.number="form.maximumRate" min="0" placeholder="No max cap" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all text-right" />
-            </div>
-          </div>
 
-          <!-- Row 4: Option Checkboxes -->
-          <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 grid grid-cols-3 gap-4">
-            <label class="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" v-model="form.isVariableRate" class="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer" />
-              <span class="text-xs font-semibold text-slate-650">Variable Price</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" v-model="form.requiresApproval" class="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer" />
-              <span class="text-xs font-semibold text-slate-650">Requires Approval</span>
-            </label>
-            <label class="flex items-center gap-2 cursor-pointer select-none">
-              <input type="checkbox" v-model="form.isPackage" class="w-4 h-4 rounded text-indigo-600 border-slate-300 focus:ring-indigo-500 cursor-pointer" />
-              <span class="text-xs font-semibold text-slate-650">Is Package</span>
-            </label>
-          </div>
 
-          <!-- Package specific option: packageDurationType -->
-          <div v-if="form.isPackage" class="space-y-1 animate-in fade-in duration-200">
-            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Package Duration Basis</label>
-            <select v-model="form.packageDurationType" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all">
-              <option value="">-- Select Duration --</option>
-              <option v-for="pd in packageDurationTypes" :key="pd.value" :value="pd.value">{{ pd.label }}</option>
-            </select>
-          </div>
 
           <!-- Applicable Modules -->
           <div class="space-y-1.5">
@@ -626,7 +612,7 @@ onMounted(async () => {
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Save Rate Card
+            {{ editMode ? 'Update Rate Card' : 'Save Rate Card' }}
           </button>
         </div>
       </div>

@@ -315,6 +315,18 @@ const permissions = [
   'supplier.update',
   'supplier.delete',
 
+  //DENTAL
+  'dental.view',
+  'dental.create',
+  'dental.update',
+  'dental.delete',
+  //SALARY BONUS
+  'salary_bonus.view',
+  'salary_bonus.create',
+  'salary_bonus.update',
+  'salary_bonus.delete',
+  'salary_bonus.process'
+
 ]
 
   const capitalize = (str) => {

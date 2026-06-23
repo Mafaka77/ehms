@@ -286,6 +286,21 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async updateChargeMaster(chargeMasterId, data) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put(`/ipd/charge-masters/${chargeMasterId}`, data)
+        return { success: true, data: response.data.data, message: response.data.message || 'Charge master updated successfully' }
+      } catch (err) {
+        console.error('Error updating charge master:', err)
+        this.error = err.response?.data?.message || 'Failed to update charge master'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchPackageItems(chargeMasterId) {
       this.loading = true
       this.error = null

@@ -3,10 +3,14 @@ const STATUS_CODES = require('../../utils/statuscode');
 
 exports.createDoctor = async (req, res) => {
     try {
-        const doctor = await doctorService.createDoctor(req.body);
+        const result = await doctorService.createDoctor(req.body);
+        const message = result.autoUserCreated
+            ? 'Doctor registered successfully. A doctor login account has been automatically created (default password: mobile number).'
+            : 'Doctor created successfully';
         return res.code(STATUS_CODES.CREATED).send({
-            message: 'Doctor created successfully',
-            data: doctor,
+            message: message,
+            data: result.doctor,
+            autoUserCreated: result.autoUserCreated,
             status: STATUS_CODES.CREATED
         });
     } catch (error) {

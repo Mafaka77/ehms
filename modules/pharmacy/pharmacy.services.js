@@ -712,7 +712,7 @@ exports.updateIpdOrderStatus = async (orderId, status) => {
 
         if (status === 'ISSUED') {
             const items = await MedicineIpdOrderItem.find({ medicineIpdOrderId: orderId }).populate('medicineId')
-            const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
+            const PatientCharge = require('../common/patient_charge.model')
             const MedicineBatch = require('./medicine_batch.model')
             const ChargeCategory = require('../clinical/ipd/ipd_charge_category.model')
 
@@ -737,8 +737,9 @@ exports.updateIpdOrderStatus = async (orderId, status) => {
                 await item.save()
 
                 // Create patient charge for the issued medicine
-                await IpdPatientCharge.create({
+                await PatientCharge.create({
                     admissionId: order.admissionId,
+                    sourceType: 'PHARMACY',
                     patientId: order.patientId,
                     chargeCategoryId: pharmacyCategory._id,
                     description: `Dispensed: ${item.quantity} units of ${item.medicineId?.medicineName || 'medicine'}`,
@@ -782,9 +783,9 @@ exports.returnIpdMedicineItem = async (itemId, returnQty, remarks) => {
         item.amount = item.quantity * (item.rate || 0)
         await item.save()
 
-        // Update original positive patient charge document inside IpdPatientCharge
-        const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-        const charge = await IpdPatientCharge.findOne({ sourceId: item._id })
+        // Update original positive patient charge document inside PatientCharge
+        const PatientCharge = require('../common/patient_charge.model')
+        const charge = await PatientCharge.findOne({ sourceId: item._id })
         if (charge) {
             charge.quantity = item.quantity
             charge.amount = charge.quantity * charge.rate

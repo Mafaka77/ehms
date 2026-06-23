@@ -52,6 +52,38 @@ const routes = [
         ]
       },
       // ==========================================
+      // DENTAL MODULE
+      // ==========================================
+      {
+        path: 'dental',
+        children: [
+          {
+            path: 'appointment',
+            name: 'dental-appointment',
+            component: () => import('../views/dental/Index.vue'),
+            meta: { permission: 'dental.view' }
+          },
+          {
+            path: 'create',
+            name: 'dental-create',
+            component: () => import('../views/dental/Create.vue'),
+            meta: { permission: 'dental.view' }
+          },
+          {
+            path: ':id/view',
+            name: 'dental-view',
+            component: () => import('../views/dental/View.vue'),
+            meta: { permission: 'dental.view' }
+          },
+          {
+            path: 'payment',
+            name: 'dental-payment',
+            component: () => import('../views/dental/payment/Index.vue'),
+            meta: { permission: 'dental.view' }
+          }
+        ]
+      },
+      // ==========================================
       // EMERGENCY MODULE
       // ==========================================
       {
@@ -61,6 +93,12 @@ const routes = [
             path: 'visits',
             name: 'emergency-visits',
             component: () => import('../views/emergency/Index.vue'),
+            meta: { permission: 'emergency.view' }
+          },
+          {
+            path: 'view/:id',
+            name: 'emergency-view',
+            component: () => import('../views/emergency/View.vue'),
             meta: { permission: 'emergency.view' }
           },
           {

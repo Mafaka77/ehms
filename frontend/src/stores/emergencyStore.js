@@ -177,6 +177,54 @@ export const useEmergencyStore = defineStore('emergency', {
             } finally {
                 this.loading = false;
             }
+        },
+        async addPatientCharge(visitId, chargeData) {
+            this.loading = true;
+            try {
+                const response = await api.post(`/emergency/visits/${visitId}/charges`, chargeData);
+                return { success: true, data: response.data.data, message: 'Charge added successfully' };
+            } catch (error) {
+                console.error('Error adding patient charge:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to add charge' };
+            } finally {
+                this.loading = false;
+            }
+        },
+        async fetchPatientCharges(visitId) {
+            this.loading = true;
+            try {
+                const response = await api.get(`/emergency/visits/${visitId}/charges`);
+                return { success: true, data: response.data.data };
+            } catch (error) {
+                console.error('Error fetching patient charges:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to fetch charges' };
+            } finally {
+                this.loading = false;
+            }
+        },
+        async deletePatientCharge(visitId, chargeId) {
+            this.loading = true;
+            try {
+                await api.delete(`/emergency/visits/${visitId}/charges/${chargeId}`);
+                return { success: true, message: 'Charge deleted successfully' };
+            } catch (error) {
+                console.error('Error deleting patient charge:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to delete charge' };
+            } finally {
+                this.loading = false;
+            }
+        },
+        async updatePatientCharge(visitId, chargeId, updateData) {
+            this.loading = true;
+            try {
+                const response = await api.put(`/emergency/visits/${visitId}/charges/${chargeId}`, updateData);
+                return { success: true, data: response.data.data, message: 'Charge updated successfully' };
+            } catch (error) {
+                console.error('Error updating patient charge:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to update charge' };
+            } finally {
+                this.loading = false;
+            }
         }
     }
 });

@@ -621,20 +621,20 @@ exports.deleteLabOrder = async (id) => {
         }
 
         if (order.admissionId) {
-            const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-            const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+            const PatientCharge = require('../common/patient_charge.model')
+            const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
             const orderItems = await LabOrderItem.find({ orderId: id }).session(session);
             const itemIds = orderItems.map(item => item._id);
 
-            const charges = await IpdPatientCharge.find({
+            const charges = await PatientCharge.find({
                 admissionId: order.admissionId,
                 sourceId: { $in: itemIds }
             }).session(session);
             const chargeIds = charges.map(c => c._id);
 
-            await IpdPatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session);
-            await IpdPatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session);
+            await PatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session);
+            await PatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session);
         }
 
         const LabResult = require('./lab_result.model')
@@ -779,21 +779,22 @@ exports.saveLabOrderResults = async (orderId, resultsData, userId) => {
             order.paymentStatus = 'PAID';
 
             const ChargeCategory = require('../clinical/ipd/ipd_charge_category.model')
-            const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-            const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+            const PatientCharge = require('../common/patient_charge.model')
+            const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
             const labCategory = await ChargeCategory.findOne({ code: 'LAB' }).session(session)
             const orderItems = await LabOrderItem.find({ orderId: order._id }).session(session)
 
             for (const item of orderItems) {
-                const existingCharge = await IpdPatientCharge.findOne({
+                const existingCharge = await PatientCharge.findOne({
                     admissionId: order.admissionId,
                     sourceId: item._id
                 }).session(session)
 
                 if (!existingCharge) {
-                    const [charge] = await IpdPatientCharge.create([{
+                    const [charge] = await PatientCharge.create([{
                         admissionId: order.admissionId,
+                        sourceType: 'LAB',
                         patientId: order.patientId,
                         doctorId: null,
                         chargeCategoryId: labCategory?._id,

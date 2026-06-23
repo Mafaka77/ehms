@@ -38,7 +38,41 @@ exports.createDoctor = async (data) => {
         };
 
         const doctor = await Doctor.create(doctorData);
-        return doctor;
+
+        // Auto-create User account if requested
+        let autoUserCreated = false;
+        if (data.createLoginAccount && data.email && data.mobileNo) {
+            try {
+                const User = require('../auth/user.model');
+                const Role = require('../auth/role.model');
+                const bcrypt = require('bcrypt');
+
+                const doctorRole = await Role.findOne({ name: { $regex: 'doctor|doc', $options: 'i' } });
+                if (!doctorRole) {
+                    console.warn('[Doctor] No Doctor role found in DB — skipping auto user creation');
+                } else {
+                    const existingUser = await User.findOne({ email: data.email });
+                    if (existingUser) {
+                        console.info(`[Doctor] User already exists for ${data.email} — skipping`);
+                    } else {
+                        const hashedPassword = await bcrypt.hash(String(data.mobileNo), 10);
+                        await User.create({
+                            fullName: doctor.fullName,
+                            email: doctor.email,
+                            password: hashedPassword,
+                            role: doctorRole._id,
+                            roles: [doctorRole._id]
+                        });
+                        autoUserCreated = true;
+                        console.info(`[Doctor] Auto-created doctor User for ${data.email}`);
+                    }
+                }
+            } catch (userErr) {
+                console.error('[Doctor] Failed to auto-create doctor User:', userErr.message);
+            }
+        }
+
+        return { doctor, autoUserCreated };
     } catch (error) {
         throw error;
     }

@@ -96,3 +96,67 @@ exports.getEmergencyVisitsReport = async (req, res) => {
         });
     }
 }
+
+exports.getPatientCharges = async (req, res) => {
+    try {
+        const charges = await emergencyService.getEmergencyCharges(req.params.id);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Patient charges fetched successfully',
+            data: charges,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
+exports.addPatientCharge = async (req, res) => {
+    try {
+        const charge = await emergencyService.createEmergencyCharge(req.params.id, req.body);
+        return res.code(STATUS_CODES.CREATED).send({
+            message: 'Patient charge added successfully',
+            data: charge,
+            status: STATUS_CODES.CREATED
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
+exports.deletePatientCharge = async (req, res) => {
+    try {
+        const charge = await emergencyService.deleteEmergencyCharge(req.params.chargeId);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Patient charge deleted successfully',
+            data: charge,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
+exports.updatePatientCharge = async (req, res) => {
+    try {
+        const charge = await emergencyService.updateEmergencyCharge(req.params.chargeId, req.body);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Patient charge updated successfully',
+            data: charge,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}

@@ -16,7 +16,8 @@ new mongoose.Schema({
       'SURGERY',
       'PROCEDURE',
       'EMERGENCY',
-      'IPD_ROUND'
+      'IPD_ROUND',
+      'DENTAL'
     ],
     required: true
   },

@@ -468,12 +468,12 @@ exports.updateAdmission = async (id, data) => {
                     currentHistory.totalAmount = diffDays * currentHistory.dailyRate
                     await currentHistory.save({ session })
 
-                    // Add charge to IpdPatientCharge
-                    const IpdPatientCharge = require('./ipd_patient_charge.model')
+                    // Add charge to PatientCharge
+                    const PatientCharge = require('../../common/patient_charge.model')
                     const ChargeCategory = require('./ipd_charge_category.model')
                     const roomCategory = await ChargeCategory.findOne({ code: 'ROOM' })
 
-                    await IpdPatientCharge.create([{
+                    await PatientCharge.create([{
                         admissionId: id,
                         patientId: admission.patientId,
                         chargeCategoryId: roomCategory?._id,
@@ -544,13 +544,14 @@ exports.updateAdmission = async (id, data) => {
                 currentHistory.totalAmount = diffDays * currentHistory.dailyRate
                 await currentHistory.save({ session })
 
-                // Add charge to IpdPatientCharge
-                const IpdPatientCharge = require('./ipd_patient_charge.model')
+                // Add charge to PatientCharge
+                const PatientCharge = require('../../common/patient_charge.model')
                 const ChargeCategory = require('./ipd_charge_category.model')
                 const roomCategory = await ChargeCategory.findOne({ code: 'ROOM' })
 
-                await IpdPatientCharge.create([{
+                await PatientCharge.create([{
                     admissionId: id,
+                    sourceType: 'IPD',
                     patientId: admission.patientId,
                     chargeCategoryId: roomCategory?._id,
                     description: `IPD Bed Rental (Bed Rate: ₹${currentHistory.dailyRate}/day)`,
@@ -728,19 +729,20 @@ exports.updateAdmissionBedHistory = async (id, data) => {
 
         await history.save()
 
-        // Sync to IpdPatientCharge
-        const IpdPatientCharge = require('./ipd_patient_charge.model')
+        // Sync to PatientCharge
+        const PatientCharge = require('../../common/patient_charge.model')
         const Admission = require('./admission.model')
         const admission = await Admission.findById(history.admissionId)
 
         const ChargeCategory = require('./ipd_charge_category.model')
         const roomCategory = await ChargeCategory.findOne({ code: 'ROOM' })
 
-        let charge = await IpdPatientCharge.findOne({ sourceId: history._id })
+        let charge = await PatientCharge.findOne({ sourceId: history._id })
         if (history.isCurrent === false || history.totalDays > 0) {
             if (!charge) {
-                charge = new IpdPatientCharge({
+                charge = new PatientCharge({
                     admissionId: history.admissionId,
+                    sourceType: 'IPD',
                     patientId: admission?.patientId,
                     chargeCategoryId: roomCategory?._id,
                     description: `IPD Bed Rental (Bed Rate: ₹${history.dailyRate}/day)`,
@@ -784,8 +786,8 @@ exports.deleteAdmission = async (id) => {
         const AdmissionDoctor = require('./admission_doctor.model')
         const AdmissionNote = require('./admission_note.model')
         const DoctorVisit = require('./admission_doctor_visit.model')
-        const IpdPatientCharge = require('./ipd_patient_charge.model')
-        const IpdPatientChargeAddon = require('./ipd_patient_charge_addon.model')
+        const PatientCharge = require('../../common/patient_charge.model')
+        const PatientChargeAddon = require('../../common/patient_charge_addon.model')
         const IpdPatientFile = require('./ipd_patient_file.model')
         const MedicineIpdOrder = require('../../pharmacy/medicine_ipd_order.model')
         const MedicineIpdOrderItem = require('../../pharmacy/medicine_idp_order_item.model')
@@ -800,7 +802,7 @@ exports.deleteAdmission = async (id) => {
         const BillItem = require('../../accounting/bill_item.model')
 
         // 3. Find IDs of parent documents to delete child documents
-        const patientCharges = await IpdPatientCharge.find({ admissionId: id }).session(session)
+        const patientCharges = await PatientCharge.find({ admissionId: id }).session(session)
         const patientChargeIds = patientCharges.map(c => c._id)
 
         const orders = await MedicineIpdOrder.find({ admissionId: id }).session(session)
@@ -828,8 +830,8 @@ exports.deleteAdmission = async (id) => {
         await DoctorVisit.updateMany({ admissionId: id }, updateObj).session(session)
         await IpdPatientFile.updateMany({ admissionId: id }, updateObj).session(session)
         
-        await IpdPatientChargeAddon.updateMany({ patientChargeId: { $in: patientChargeIds } }, updateObj).session(session)
-        await IpdPatientCharge.updateMany({ admissionId: id }, updateObj).session(session)
+        await PatientChargeAddon.updateMany({ patientChargeId: { $in: patientChargeIds } }, updateObj).session(session)
+        await PatientCharge.updateMany({ admissionId: id }, updateObj).session(session)
         
         await MedicineIpdOrderItem.updateMany({ medicineIpdOrderId: { $in: orderIds } }, updateObj).session(session)
         await MedicineIpdOrder.updateMany({ admissionId: id }, updateObj).session(session)
@@ -865,14 +867,14 @@ exports.deleteAdmission = async (id) => {
 
 exports.getAdmissionCharges = async (admissionId) => {
     try {
-        const IpdPatientCharge = require('./ipd_patient_charge.model')
-        const IpdPatientChargeAddon = require('./ipd_patient_charge_addon.model')
-        const charges = await IpdPatientCharge.find({ admissionId })
+        const PatientCharge = require('../../common/patient_charge.model')
+        const PatientChargeAddon = require('../../common/patient_charge_addon.model')
+        const charges = await PatientCharge.find({ admissionId })
             .populate('chargeCategoryId')
             .sort({ createdAt: -1 })
         
         const chargesWithAddons = await Promise.all(charges.map(async (charge) => {
-            const addons = await IpdPatientChargeAddon.find({ patientChargeId: charge._id }).populate('doctorId')
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).populate('doctorId')
             return {
                 ...charge.toObject(),
                 addons
@@ -888,9 +890,9 @@ exports.createAdmissionCharge = async (admissionId, data) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
-        const IpdPatientCharge = require('./ipd_patient_charge.model')
+        const PatientCharge = require('../../common/patient_charge.model')
         const Admission = require('./admission.model')
-        const IpdPatientChargeAddon = require('./ipd_patient_charge_addon.model')
+        const PatientChargeAddon = require('../../common/patient_charge_addon.model')
 
         const admission = await Admission.findById(admissionId).session(session)
         if (!admission) {
@@ -904,8 +906,9 @@ exports.createAdmissionCharge = async (admissionId, data) => {
         const amount = rate * quantity
         const chargeDate = data.chargeDate ? new Date(data.chargeDate) : new Date()
 
-        const [charge] = await IpdPatientCharge.create([{
+        const [charge] = await PatientCharge.create([{
             admissionId,
+            sourceType: 'IPD',
             patientId: admission.patientId,
             chargeCategoryId: data.chargeCategoryId,
             description: data.description,
@@ -947,7 +950,7 @@ exports.createAdmissionCharge = async (admissionId, data) => {
         }
 
         if (addonRecords.length > 0) {
-            await IpdPatientChargeAddon.insertMany(addonRecords, { session })
+            await PatientChargeAddon.insertMany(addonRecords, { session })
         }
 
         await session.commitTransaction()
@@ -965,10 +968,10 @@ exports.deleteAdmissionCharge = async (chargeId) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
-        const IpdPatientCharge = require('./ipd_patient_charge.model')
-        const IpdPatientChargeAddon = require('./ipd_patient_charge_addon.model')
+        const PatientCharge = require('../../common/patient_charge.model')
+        const PatientChargeAddon = require('../../common/patient_charge_addon.model')
 
-        const charge = await IpdPatientCharge.findById(chargeId).session(session)
+        const charge = await PatientCharge.findById(chargeId).session(session)
         if (!charge) {
             const error = new Error('Charge record not found')
             error.status = STATUS_CODES.NOT_FOUND
@@ -982,7 +985,7 @@ exports.deleteAdmissionCharge = async (chargeId) => {
         }
 
         // Delete all associated addons
-        await IpdPatientChargeAddon.deleteMany({ patientChargeId: chargeId }).session(session)
+        await PatientChargeAddon.deleteMany({ patientChargeId: chargeId }).session(session)
 
         await charge.deleteOne({ session })
 
@@ -998,8 +1001,8 @@ exports.deleteAdmissionCharge = async (chargeId) => {
 
 exports.updateAdmissionCharge = async (chargeId, data) => {
     try {
-        const IpdPatientCharge = require('./ipd_patient_charge.model')
-        const charge = await IpdPatientCharge.findById(chargeId)
+        const PatientCharge = require('../../common/patient_charge.model')
+        const charge = await PatientCharge.findById(chargeId)
         if (!charge) {
             const error = new Error('Charge record not found')
             error.status = STATUS_CODES.NOT_FOUND
@@ -1099,6 +1102,46 @@ exports.createChargeMaster = async (categoryId, data, userId) => {
             createdBy: userId
         })
 
+        return chargeMaster
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.updateChargeMaster = async (id, data) => {
+    try {
+        const ChargeMaster = require('./ipd_charge_master.model')
+        const chargeMaster = await ChargeMaster.findById(id)
+        if (!chargeMaster) {
+            const error = new Error('Charge Master not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        if (data.code && data.code.toUpperCase().trim() !== chargeMaster.code) {
+            const existing = await ChargeMaster.findOne({ code: data.code.toUpperCase().trim() })
+            if (existing) {
+                const error = new Error(`Charge Master with code "${data.code}" already exists`)
+                error.status = STATUS_CODES.BAD_REQUEST
+                throw error
+            }
+            chargeMaster.code = data.code.toUpperCase().trim()
+        }
+
+        if (data.name !== undefined) chargeMaster.name = data.name
+        if (data.description !== undefined) chargeMaster.description = data.description || null
+        if (data.billingUnit !== undefined) chargeMaster.billingUnit = data.billingUnit || 'ITEM'
+        if (data.standardRate !== undefined) chargeMaster.standardRate = Number(data.standardRate)
+        if (data.minimumRate !== undefined) chargeMaster.minimumRate = data.minimumRate !== null && data.minimumRate !== '' ? Number(data.minimumRate) : null
+        if (data.maximumRate !== undefined) chargeMaster.maximumRate = data.maximumRate !== null && data.maximumRate !== '' ? Number(data.maximumRate) : null
+        if (data.isVariableRate !== undefined) chargeMaster.isVariableRate = !!data.isVariableRate
+        if (data.requiresApproval !== undefined) chargeMaster.requiresApproval = !!data.requiresApproval
+        if (data.isPackage !== undefined) chargeMaster.isPackage = !!data.isPackage
+        if (data.packageDurationType !== undefined) chargeMaster.packageDurationType = data.packageDurationType || null
+        if (data.applicableTo !== undefined) chargeMaster.applicableTo = data.applicableTo || ['IPD']
+        if (data.remarks !== undefined) chargeMaster.remarks = data.remarks || null
+
+        await chargeMaster.save()
         return chargeMaster
     } catch (error) {
         throw error

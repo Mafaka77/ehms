@@ -48,6 +48,7 @@ module.exports = async (fastify, options) => {
     fastify.get('/charge-categories/:id/charge-masters', { onRequest: [auth] }, ipdController.getChargeMastersByCategory)
     fastify.post('/charge-categories/:id/charge-masters', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.createChargeMaster)
     fastify.delete('/charge-masters/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.deleteChargeMaster)
+    fastify.put('/charge-masters/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.updateChargeMaster)
 
     // Charge Package Items routes
     fastify.get('/charge-masters/:id/package-items', { onRequest: [auth] }, ipdController.getPackageItems)

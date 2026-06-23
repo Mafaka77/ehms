@@ -7,6 +7,7 @@ const LabOrderItem = require('../laboratory/lab_order_item.model')
 const RadiologyOrder = require('../radiology/radiology_order.model')
 const RadiologyOrderItem = require('../radiology/radiology_order_item.model')
 const OpdAppointment = require('../clinical/opd/opd_appointment.model')
+const DentalAppointment = require('../dental/dental_appointment.model')
 const Counter = require('../common/counter.model')
 const Discount = require('./discount.model')
 const Employee = require('../hr/employee.model')
@@ -415,6 +416,193 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
 }
 
 // ---------------------------------------------------------------------------
+// generateBillFromDentalConsultation
+// ---------------------------------------------------------------------------
+exports.generateBillFromDentalConsultation = async (dentalAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    try {
+        const appointment = await DentalAppointment.findById(dentalAppointmentId)
+            .populate({ path: 'doctorId', select: 'fullName' })
+            .session(session)
+        if (!appointment) {
+            const error = new Error('Dental appointment not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const existingBill = await Bill.findOne({ dentalAppointmentId, billType: 'DENTAL_CONSULTATION' }).session(session)
+        if (existingBill) {
+            await session.abortTransaction()
+            session.endSession()
+            return existingBill
+        }
+
+        const grossAmount = appointment.consultationFee || 0
+        const netAmount = grossAmount - discountAmount
+
+        const [bill] = await Bill.create([{
+            patientId: appointment.patientId,
+            dentalAppointmentId: appointment._id,
+            billType: 'DENTAL_CONSULTATION',
+            grossAmount,
+            discountAmount,
+            netAmount,
+            paidAmount: 0,
+            balanceAmount: netAmount,
+            status: 'DRAFT',
+            generatedBy: userId,
+            generatedAt: new Date()
+        }], { session })
+
+        await BillItem.create([{
+            billId: bill._id,
+            itemType: 'CONSULTATION',
+            sourceModule: 'CONSULTATION',
+            description: `Dental Consultation Fee - Dr. ${appointment.doctorId?.fullName || 'N/A'}`,
+            quantity: 1,
+            rate: grossAmount,
+            amount: grossAmount,
+            discountAmount: discountAmount,
+            netAmount: netAmount
+        }], { session })
+
+        if (discountAmount > 0) {
+            await Discount.create([{
+                billId: bill._id,
+                discountType,
+                employeeId,
+                originalAmount: grossAmount,
+                discountAmount,
+                netAmount,
+                appliedBy: userId,
+                remarks: discountRemarks || 'Discount applied during bill generation'
+            }], { session })
+        }
+
+        await session.commitTransaction()
+        session.endSession()
+        return bill
+    } catch (err) {
+        await session.abortTransaction()
+        session.endSession()
+        throw err
+    }
+}
+
+// ---------------------------------------------------------------------------
+// generateBillFromDentalAppointment
+
+exports.generateBillFromDentalAppointment = async (dentalAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null, specificChargeId = null) => {
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    try {
+        // 1. Fetch Dental appointment
+        const appointment = await DentalAppointment.findById(dentalAppointmentId)
+            .populate({ path: 'doctorId', select: 'fullName' })
+            .session(session)
+        if (!appointment) {
+            const error = new Error('Dental appointment not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        // 2. Fetch unbilled PatientCharges
+        const PatientCharge = require('../common/patient_charge.model')
+        const query = { dentalAppointmentId, isBilled: false };
+        if (specificChargeId) {
+            query._id = specificChargeId;
+        }
+
+        const unbilledCharges = await PatientCharge.find(query).populate('chargeCategoryId').session(session)
+
+        let totalChargesAmount = 0
+        unbilledCharges.forEach(charge => totalChargesAmount += charge.amount)
+
+        // 3. We only bill the dental procedures here. Consultation fee is handled separately.
+        const grossAmount = totalChargesAmount
+        
+        if (grossAmount === 0 && unbilledCharges.length === 0) {
+            const error = new Error('No unbilled charges found for this appointment')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        const netAmount = grossAmount - discountAmount
+
+        // 4. Create Bill
+        const [bill] = await Bill.create([{
+            patientId: appointment.patientId,
+            dentalAppointmentId: appointment._id,
+            billType: 'DENTAL',
+            grossAmount,
+            discountAmount,
+            netAmount,
+            paidAmount: 0,
+            balanceAmount: netAmount,
+            status: 'DRAFT',
+            generatedBy: userId,
+            generatedAt: new Date()
+        }], { session })
+
+        // 5. Consultation fee is no longer included in this bill.
+
+        // 6. Create BillItems for unbilled charges
+        for (const charge of unbilledCharges) {
+            await BillItem.create([{
+                billId: bill._id,
+                itemType: 'PROCEDURE', // Using PROCEDURE
+                sourceModule: 'OTHER',
+                description: charge.description,
+                referenceId: charge._id,
+                quantity: charge.quantity,
+                rate: charge.rate,
+                amount: charge.amount,
+                discountAmount: 0,
+                netAmount: charge.amount
+            }], { session })
+            
+            // Mark as billed
+            charge.isBilled = true
+            charge.billId = bill._id
+            await charge.save({ session })
+        }
+
+        // Handle total discount proportionally on items if needed (skipping for simplicity, just putting it on bill model)
+
+        // 7. Update Dental Appointment reference
+        if (appointment.paymentStatus !== 'Paid') {
+            appointment.paymentStatus = 'Unpaid'
+            await appointment.save({ session })
+        }
+
+        // 8. Handle Discount Model
+        if (discountAmount > 0) {
+            const resolvedEmployeeId = await resolveDiscountEmployee(appointment.patientId, employeeId, session)
+            await Discount.create([{
+                billId: bill._id,
+                patientId: appointment.patientId,
+                discountType,
+                originalAmount: grossAmount,
+                discountAmount,
+                netAmount,
+                appliedBy: userId,
+                remarks: discountRemarks || 'Discount applied during bill generation'
+            }], { session })
+        }
+
+        await session.commitTransaction()
+        session.endSession()
+        return bill
+    } catch (err) {
+        await session.abortTransaction()
+        session.endSession()
+        throw err
+    }
+}
+
+
+// ---------------------------------------------------------------------------
 // processBillPayment
 // ---------------------------------------------------------------------------
 exports.processBillPayment = async (billId, paymentData, userId) => {
@@ -494,21 +682,22 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
                 // If fully PAID and linked to an admission, record as IPD patient charge
                 if (order.paymentStatus === 'PAID' && order.admissionId) {
                     const ChargeCategory = require('../clinical/ipd/ipd_charge_category.model')
-                    const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-                    const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+                    const PatientCharge = require('../common/patient_charge.model')
+                    const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
                     const labCategory = await ChargeCategory.findOne({ code: 'LAB' }).session(session)
                     const orderItems = await LabOrderItem.find({ orderId: order._id }).session(session)
 
                     for (const item of orderItems) {
-                        const existingCharge = await IpdPatientCharge.findOne({
+                        const existingCharge = await PatientCharge.findOne({
                             admissionId: order.admissionId,
                             sourceId: item._id
                         }).session(session)
 
                         if (!existingCharge) {
-                            const [charge] = await IpdPatientCharge.create([{
+                            const [charge] = await PatientCharge.create([{
                                 admissionId: order.admissionId,
+                                sourceType: 'LAB',
                                 patientId: order.patientId,
                                 doctorId: null,
                                 chargeCategoryId: labCategory?._id,
@@ -536,8 +725,8 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
                 // If fully PAID and linked to an admission, record as IPD patient charge
                 if (order.paymentStatus === 'PAID' && order.admissionId) {
                     const ChargeCategory = require('../clinical/ipd/ipd_charge_category.model')
-                    const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-                    const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+                    const PatientCharge = require('../common/patient_charge.model')
+                    const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
                     const radCategory = await ChargeCategory.findOne({ code: 'RADIOLOGY' }).session(session)
                     const orderItems = await RadiologyOrderItem.find({ orderId: order._id })
@@ -545,15 +734,16 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
                         .session(session)
 
                     for (const item of orderItems) {
-                        const existingCharge = await IpdPatientCharge.findOne({
+                        const existingCharge = await PatientCharge.findOne({
                             admissionId: order.admissionId,
                             sourceId: item._id
                         }).session(session)
 
                         if (!existingCharge) {
                             const testName = item.radiologyTestId?.name || 'Radiology Test'
-                            const [charge] = await IpdPatientCharge.create([{
+                            const [charge] = await PatientCharge.create([{
                                 admissionId: order.admissionId,
+                                sourceType: 'RADIOLOGY',
                                 patientId: order.patientId,
                                 doctorId: null,
                                 chargeCategoryId: radCategory?._id,
@@ -575,15 +765,27 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
         if (txBill.billType === 'OPD' && txBill.opdAppointmentId) {
             const appointment = await OpdAppointment.findById(txBill.opdAppointmentId).session(session)
             if (appointment) {
-                // Normalize paymentMode to match OpdAppointment enum: 'Cash' | 'Card' | 'UPI'
-                // const paymentModeMap = { CASH: 'Cash', CARD: 'Card', UPI: 'UPI' }
                 appointment.paymentStatus = txBill.status === 'PAID' ? 'Paid' : 'Unpaid'
                 if (txBill.status === 'PAID') {
                     appointment.status = 'Booked'
                 } else {
                     appointment.status = 'Draft'
                 }
-                // appointment.paymentMode = 'Cash'
+                await appointment.save({ session })
+            }
+        }
+
+        // Sync DentalAppointment (Only for Consultation Bills)
+        if (txBill.billType === 'DENTAL_CONSULTATION' && txBill.dentalAppointmentId) {
+            const DentalAppointment = require('../dental/dental_appointment.model')
+            const appointment = await DentalAppointment.findById(txBill.dentalAppointmentId).session(session)
+            if (appointment) {
+                appointment.paymentStatus = txBill.status === 'PAID' ? 'Paid' : 'Unpaid'
+                if (txBill.status === 'PAID') {
+                    appointment.status = 'Booked'
+                } else {
+                    appointment.status = 'Draft'
+                }
                 await appointment.save({ session })
             }
         }
@@ -678,6 +880,17 @@ exports.cancelBill = async (billId) => {
             }
         }
 
+        // Revert associated Dental appointment status (Only for Consultation Bills)
+        if (bill.billType === 'DENTAL_CONSULTATION' && bill.dentalAppointmentId) {
+            const DentalAppointment = require('../dental/dental_appointment.model')
+            const appointment = await DentalAppointment.findById(bill.dentalAppointmentId).session(session)
+            if (appointment) {
+                appointment.paymentStatus = 'Unpaid'
+                appointment.status = 'Draft'
+                await appointment.save({ session })
+            }
+        }
+
         // Revert associated Emergency visit status
         if (bill.billType === 'EMERGENCY' && bill.emergencyVisitId) {
             const visit = await mongoose.model('EmergencyVisit').findById(bill.emergencyVisitId).session(session)
@@ -743,18 +956,18 @@ exports.cancelPayment = async (paymentId, userId) => {
 
                     // If order payment status is no longer PAID, remove IPD charges
                     if (order.admissionId) {
-                        const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-                        const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+                        const PatientCharge = require('../common/patient_charge.model')
+                        const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
-                        const charges = await IpdPatientCharge.find({
+                        const charges = await PatientCharge.find({
                             admissionId: order.admissionId,
                             billId: bill._id
                         }).session(session)
 
                         const chargeIds = charges.map(c => c._id)
 
-                        await IpdPatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session)
-                        await IpdPatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session)
+                        await PatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session)
+                        await PatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session)
                     }
                 }
             }
@@ -768,18 +981,18 @@ exports.cancelPayment = async (paymentId, userId) => {
 
                     // If order payment status is no longer PAID, remove IPD charges
                     if (order.admissionId) {
-                        const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-                        const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+                        const PatientCharge = require('../common/patient_charge.model')
+                        const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
-                        const charges = await IpdPatientCharge.find({
+                        const charges = await PatientCharge.find({
                             admissionId: order.admissionId,
                             billId: bill._id
                         }).session(session)
 
                         const chargeIds = charges.map(c => c._id)
 
-                        await IpdPatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session)
-                        await IpdPatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session)
+                        await PatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session)
+                        await PatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session)
                     }
                 }
             }
@@ -787,6 +1000,17 @@ exports.cancelPayment = async (paymentId, userId) => {
             // Sync OpdAppointment
             if (bill.billType === 'OPD' && bill.opdAppointmentId) {
                 const appointment = await OpdAppointment.findById(bill.opdAppointmentId).session(session)
+                if (appointment) {
+                    appointment.paymentStatus = bill.status === 'PAID' ? 'Paid' : 'Unpaid'
+                    appointment.status = bill.status === 'PAID' ? 'Booked' : 'Draft'
+                    await appointment.save({ session })
+                }
+            }
+
+            // Sync DentalAppointment (Only for Consultation Bills)
+            if (bill.billType === 'DENTAL_CONSULTATION' && bill.dentalAppointmentId) {
+                const DentalAppointment = require('../dental/dental_appointment.model')
+                const appointment = await DentalAppointment.findById(bill.dentalAppointmentId).session(session)
                 if (appointment) {
                     appointment.paymentStatus = bill.status === 'PAID' ? 'Paid' : 'Unpaid'
                     appointment.status = bill.status === 'PAID' ? 'Booked' : 'Draft'

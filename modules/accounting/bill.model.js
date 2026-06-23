@@ -30,6 +30,12 @@ const billSchema = new mongoose.Schema({
     default: null
   },
 
+  dentalAppointmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'DentalAppointment',
+    default: null
+  },
+
   emergencyVisitId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'EmergencyVisit',
@@ -55,6 +61,8 @@ const billSchema = new mongoose.Schema({
       'IPD',
       'LAB',
       'RADIOLOGY',
+      'DENTAL',
+      'DENTAL_CONSULTATION',
       'ADVANCE',
       'EMERGENCY',
       'PHARMACY',

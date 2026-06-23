@@ -451,6 +451,22 @@ exports.createChargeMaster = async (req, res) => {
     }
 }
 
+exports.updateChargeMaster = async (req, res) => {
+    try {
+        const master = await ipdService.updateChargeMaster(req.params.id, req.body)
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Charge master updated successfully',
+            data: master,
+            status: STATUS_CODES.OK
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 // ==========================================
 // Charge Package Item Controllers
 // ==========================================

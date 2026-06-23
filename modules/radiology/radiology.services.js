@@ -243,8 +243,8 @@ exports.createRadiologyOrder = async (data, userId) => {
 
         if (orderData.admissionId && insertedItems.length > 0) {
             const ChargeCategory = require('../clinical/ipd/ipd_charge_category.model')
-            const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-            const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+            const PatientCharge = require('../common/patient_charge.model')
+            const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
             const radCategory = await ChargeCategory.findOne({ code: 'RADIOLOGY' }).session(session)
 
@@ -252,10 +252,12 @@ exports.createRadiologyOrder = async (data, userId) => {
                 const test = await RadiologyTest.findById(dbItem.radiologyTestId).session(session)
                 const testName = test ? test.name : 'Radiology Test'
 
-                const [charge] = await IpdPatientCharge.create([{
-                    admissionId: orderData.admissionId,
+                const [charge] = await PatientCharge.create([{
+                    admissionId: orderData.admissionId || null,
+                    emergencyVisitId: orderData.emergencyVisitId || null,
+                    dentalAppointmentId: orderData.dentalAppointmentId || null,
+                    sourceType: 'RADIOLOGY',
                     patientId: orderData.patientId,
-                    doctorId: null,
                     chargeCategoryId: radCategory?._id,
                     description: testName,
                     sourceId: dbItem._id,
@@ -393,20 +395,20 @@ exports.deleteRadiologyOrder = async (id) => {
         }
 
         if (order.admissionId) {
-            const IpdPatientCharge = require('../clinical/ipd/ipd_patient_charge.model')
-            const IpdPatientChargeAddon = require('../clinical/ipd/ipd_patient_charge_addon.model')
+            const PatientCharge = require('../common/patient_charge.model')
+            const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
             const orderItems = await RadiologyOrderItem.find({ orderId: id }).session(session)
             const itemIds = orderItems.map(item => item._id)
 
-            const charges = await IpdPatientCharge.find({
+            const charges = await PatientCharge.find({
                 admissionId: order.admissionId,
                 sourceId: { $in: itemIds }
             }).session(session)
             const chargeIds = charges.map(c => c._id)
 
-            await IpdPatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session)
-            await IpdPatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session)
+            await PatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session)
+            await PatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session)
         }
 
         await RadiologyOrderItem.deleteMany({ orderId: id }).session(session)

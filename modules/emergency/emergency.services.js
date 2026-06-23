@@ -208,3 +208,166 @@ exports.getEmergencyVisitsReport = async (query) => {
         throw error;
     }
 }
+
+exports.getEmergencyCharges = async (visitId) => {
+    try {
+        const PatientCharge = require('../common/patient_charge.model');
+        const PatientChargeAddon = require('../common/patient_charge_addon.model');
+        const charges = await PatientCharge.find({ emergencyVisitId: visitId })
+            .populate('chargeCategoryId')
+            .sort({ createdAt: -1 });
+        
+        const chargesWithAddons = await Promise.all(charges.map(async (charge) => {
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).populate('doctorId');
+            return {
+                ...charge.toObject(),
+                addons
+            };
+        }));
+        return chargesWithAddons;
+    } catch (error) {
+        throw error;
+    }
+}
+
+exports.createEmergencyCharge = async (visitId, data) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const PatientCharge = require('../common/patient_charge.model');
+        const EmergencyVisit = require('./emergency.model');
+        const PatientChargeAddon = require('../common/patient_charge_addon.model');
+
+        const visit = await EmergencyVisit.findById(visitId).session(session);
+        if (!visit) {
+            const error = new Error('Emergency visit record not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        const rate = Number(data.rate);
+        const quantity = Number(data.quantity || 1);
+        const amount = rate * quantity;
+        const chargeDate = data.chargeDate ? new Date(data.chargeDate) : new Date();
+
+        const [charge] = await PatientCharge.create([{
+            emergencyVisitId: visitId,
+            sourceType: 'EMERGENCY',
+            patientId: visit.patientId,
+            chargeCategoryId: data.chargeCategoryId,
+            chargeMasterId: data.chargeMasterId || null,
+            description: data.description,
+            quantity,
+            rate,
+            amount,
+            isBilled: false,
+            doctorId: data.doctorId || null,
+            createdAt: chargeDate
+        }], { session });
+
+        let addonRecords = [];
+        if (data.addons && Array.isArray(data.addons) && data.addons.length > 0) {
+            addonRecords = data.addons.map(addon => ({
+                patientChargeId: charge._id,
+                itemName: addon.itemName,
+                amount: Number(addon.amount || 0),
+                packageItemId: addon.packageItemId || null,
+                chargeCategoryId: data.chargeCategoryId,
+                chargeMasterId: data.chargeMasterId || null,
+                isCustom: !!addon.isCustom,
+                doctorId: addon.doctorId || null,
+                createdAt: chargeDate
+            }));
+        } else if (data.doctorId) {
+            addonRecords = [{
+                patientChargeId: charge._id,
+                itemName: data.description,
+                amount: amount,
+                packageItemId: null,
+                chargeCategoryId: data.chargeCategoryId,
+                chargeMasterId: data.chargeMasterId || null,
+                isCustom: true,
+                doctorId: data.doctorId,
+                createdAt: chargeDate
+            }];
+        }
+
+        if (addonRecords.length > 0) {
+            await PatientChargeAddon.insertMany(addonRecords, { session });
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+
+        return charge;
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
+}
+
+exports.deleteEmergencyCharge = async (chargeId) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const PatientCharge = require('../common/patient_charge.model');
+        const PatientChargeAddon = require('../common/patient_charge_addon.model');
+
+        const charge = await PatientCharge.findById(chargeId).session(session);
+        if (!charge) {
+            const error = new Error('Charge record not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        if (charge.isBilled) {
+            const error = new Error('Cannot delete a charge that is already billed');
+            error.status = STATUS_CODES.BAD_REQUEST;
+            throw error;
+        }
+
+        await PatientChargeAddon.deleteMany({ patientChargeId: chargeId }).session(session);
+        await charge.deleteOne({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+        return charge;
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
+}
+exports.updateEmergencyCharge = async (chargeId, updateData) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const PatientCharge = require('../common/patient_charge.model');
+        const charge = await PatientCharge.findById(chargeId).session(session);
+        if (!charge) {
+            const error = new Error('Charge record not found');
+            error.status = 404;
+            throw error;
+        }
+
+        if (charge.isBilled) {
+            const error = new Error('Cannot update a charge that is already billed');
+            error.status = 400;
+            throw error;
+        }
+
+        if (updateData.rate !== undefined) charge.rate = Number(updateData.rate);
+        if (updateData.quantity !== undefined) charge.quantity = Number(updateData.quantity);
+        charge.amount = charge.rate * charge.quantity;
+
+        await charge.save({ session });
+        await session.commitTransaction();
+        session.endSession();
+        return charge;
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
+}
