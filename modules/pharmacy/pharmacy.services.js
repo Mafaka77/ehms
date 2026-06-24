@@ -203,6 +203,25 @@ exports.deleteCategory = async (id) => {
 
 exports.createMedicine = async (data) => {
     try {
+        if (!data.medicineCode || data.medicineCode.trim() === '') {
+            // Auto generateMED-XXXXX
+            let uniqueCode = false;
+            let attempt = 0;
+            while (!uniqueCode && attempt < 10) {
+                const randomPart = Math.floor(10000 + Math.random() * 90000);
+                const code = `MED-${randomPart}`;
+                const exists = await Medicine.findOne({ medicineCode: code });
+                if (!exists) {
+                    data.medicineCode = code;
+                    uniqueCode = true;
+                }
+                attempt++;
+            }
+            if (!uniqueCode) {
+                data.medicineCode = `MED-${Date.now()}`;
+            }
+        }
+
         const existingCode = await Medicine.findOne({ medicineCode: data.medicineCode?.toUpperCase() })
         if (existingCode) {
             const error = new Error('Medicine with this code already exists')

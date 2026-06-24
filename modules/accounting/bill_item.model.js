@@ -23,6 +23,7 @@ const billItemSchema = new mongoose.Schema({
       'ROOM',
       'LAB',
       'RADIOLOGY',
+      'INVESTIGATION',
       'ENDOSCOPY',
       'CARDIAC',
       'NEURO',

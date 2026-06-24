@@ -19,6 +19,7 @@ const form = reactive({
   fullName: '',
   mobile: '',
   email: '',
+  address: '',
   departmentId: '',
   designationId: '',
   joiningDate: '',
@@ -246,6 +247,15 @@ const handleSubmit = async () => {
               type="email"
               placeholder="e.g. arthur@hms.com"
               required
+              :disabled="loading"
+            />
+          </div>
+          <div class="mt-6">
+            <BaseInput 
+              v-model="form.address"
+              id="address"
+              label="Address"
+              placeholder="e.g. 123 Main St, City, State, ZIP"
               :disabled="loading"
             />
           </div>

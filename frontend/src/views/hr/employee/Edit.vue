@@ -98,6 +98,7 @@ const form = reactive({
   fullName: '',
   mobile: '',
   email: '',
+  address: '',
   departmentId: '',
   designationId: '',
   joiningDate: '',
@@ -138,6 +139,7 @@ const populateEmployee = async () => {
       form.fullName = emp.fullName || ''
       form.mobile = emp.mobile || ''
       form.email = emp.email || ''
+      form.address = emp.address || ''
       form.departmentId = emp.departmentId?._id || emp.departmentId || ''
       form.designationId = emp.designationId?._id || emp.designationId || ''
       form.joiningDate = emp.joiningDate ? emp.joiningDate.split('T')[0] : ''
@@ -326,6 +328,15 @@ const handleSubmit = async () => {
               type="email"
               placeholder="e.g. arthur@hms.com"
               required
+              :disabled="loading"
+            />
+          </div>
+          <div class="mt-6">
+            <BaseInput 
+              v-model="form.address"
+              id="address"
+              label="Address"
+              placeholder="e.g. 123 Main St, City, State, ZIP"
               :disabled="loading"
             />
           </div>

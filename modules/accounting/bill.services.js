@@ -344,7 +344,7 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
         }
 
         // Check if bill already generated
-        const existingBill = await Bill.findOne({ emergencyVisitId }).session(session)
+        const existingBill = await Bill.findOne({ emergencyVisitId, billType: 'EMERGENCY_CONSULTATION' }).session(session)
         if (existingBill) {
             await session.abortTransaction()
             session.endSession()
@@ -359,7 +359,7 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
         const [bill] = await Bill.create([{
             patientId: visit.patientId,
             emergencyVisitId: visit._id,
-            billType: 'EMERGENCY',
+            billType: 'EMERGENCY_CONSULTATION',
             grossAmount,
             discountAmount,
             netAmount,
@@ -370,7 +370,7 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
             generatedAt: new Date()
         }], { session })
 
-        // 4. Create BillItem
+        // 4. Create BillItem for Consultation Fee
         const doctorName = visit.doctorId ? ` - Dr. ${visit.doctorId.fullName}` : ''
         await BillItem.create([{
             billId: bill._id,
@@ -388,6 +388,110 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
         // 5. Update Emergency Visit reference
         visit.paymentStatus = 'Unpaid'
         await visit.save({ session })
+
+        // 6. Create Discount record if discount is applied
+        if (discountAmount > 0) {
+            const resolvedEmployeeId = await resolveDiscountEmployee(visit.patientId, employeeId, session)
+            await Discount.create([{
+                billId: bill._id,
+                patientId: visit.patientId,
+                employeeId: resolvedEmployeeId,
+                discountType: discountType || 'CUSTOM',
+                originalAmount: grossAmount,
+                discountAmount,
+                netAmount,
+                appliedBy: userId,
+                remarks: discountRemarks || 'Discount applied during bill generation'
+            }], { session })
+        }
+
+        await session.commitTransaction()
+        session.endSession()
+        return bill
+    } catch (err) {
+        await session.abortTransaction()
+        session.endSession()
+        throw err
+    }
+}
+
+// ---------------------------------------------------------------------------
+// generateBillFromEmergencyCharges
+// ---------------------------------------------------------------------------
+exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    try {
+        // 1. Fetch Emergency visit
+        const visit = await mongoose.model('EmergencyVisit').findById(emergencyVisitId)
+            .populate({ path: 'doctorId', select: 'fullName' })
+            .session(session)
+        if (!visit) {
+            const error = new Error('Emergency visit not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        // Check if charges bill already generated
+        const existingBill = await Bill.findOne({ emergencyVisitId, billType: 'EMERGENCY' }).session(session)
+        if (existingBill) {
+            await session.abortTransaction()
+            session.endSession()
+            return existingBill
+        }
+
+        // 2. Fetch unbilled PatientCharges
+        const PatientCharge = require('../common/patient_charge.model')
+        const unbilledCharges = await PatientCharge.find({ emergencyVisitId: visit._id, isBilled: false }).populate('chargeCategoryId').session(session)
+
+        if (unbilledCharges.length === 0) {
+            const error = new Error('No unbilled charges found for this visit')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        let totalChargesAmount = 0
+        unbilledCharges.forEach(charge => totalChargesAmount += charge.amount)
+
+        // 3. Calculate amounts
+        const grossAmount = totalChargesAmount
+        const netAmount = grossAmount - discountAmount
+
+        // 4. Create Bill
+        const [bill] = await Bill.create([{
+            patientId: visit.patientId,
+            emergencyVisitId: visit._id,
+            billType: 'EMERGENCY',
+            grossAmount,
+            discountAmount,
+            netAmount,
+            paidAmount: 0,
+            balanceAmount: netAmount,
+            status: 'DRAFT',
+            generatedBy: userId,
+            generatedAt: new Date()
+        }], { session })
+
+        // 5. Create BillItems for PatientCharges
+        for (const charge of unbilledCharges) {
+            await BillItem.create([{
+                billId: bill._id,
+                itemType: charge.chargeCategoryId?.type === 'PROCEDURE' ? 'PROCEDURE' : 
+                           charge.chargeCategoryId?.type === 'INVESTIGATION' ? 'INVESTIGATION' : 'OTHER',
+                sourceModule: 'OTHER',
+                description: charge.description,
+                referenceId: charge._id,
+                quantity: charge.quantity,
+                rate: charge.rate,
+                amount: charge.amount,
+                discountAmount: 0,
+                netAmount: charge.amount
+            }], { session })
+
+            charge.isBilled = true
+            charge.billId = bill._id
+            await charge.save({ session })
+        }
 
         // 6. Create Discount record if discount is applied
         if (discountAmount > 0) {

@@ -111,10 +111,7 @@ const handleClose = () => {
 }
 
 const handleSubmit = async () => {
-  if (!form.medicineCode.trim()) {
-    error.value = 'Medicine code is required'
-    return
-  }
+  // Auto-generation will handle medicineCode if empty
   if (!form.medicineName.trim()) {
     error.value = 'Medicine name is required'
     return
@@ -218,9 +215,8 @@ const handleSubmit = async () => {
               <BaseInput 
                 v-model="form.medicineCode"
                 id="medicineCode"
-                label="Medicine Code"
+                label="Medicine Code (Leave blank to auto-generate)"
                 placeholder="e.g. MED-PARA-500"
-                required
                 :disabled="loading || !!medicine"
               />
               <BaseInput 

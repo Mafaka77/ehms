@@ -135,6 +135,23 @@ exports.deleteEmergencyVisit = async (id) => {
     }
 }
 
+exports.dischargeEmergencyVisit = async (id) => {
+    try {
+        const visit = await EmergencyVisit.findById(id);
+        if (!visit) {
+            const error = new Error('Emergency visit not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+        visit.visitStatus = 'DISCHARGED';
+        visit.dischargeDateTime = new Date();
+        await visit.save();
+        return visit;
+    } catch (error) {
+        throw error;
+    }
+}
+
 exports.getEmergencyVisitById = async (id) => {
     try {
         const visit = await EmergencyVisit.findById(id)
@@ -154,11 +171,18 @@ exports.getEmergencyVisitById = async (id) => {
         }
 
         const Bill = mongoose.model('Bill');
-        const bill = await Bill.findOne({ emergencyVisitId: visit._id });
+        const consultationBill = await Bill.findOne({ emergencyVisitId: visit._id, billType: 'EMERGENCY_CONSULTATION' });
+        const dischargeBill = await Bill.findOne({ emergencyVisitId: visit._id, billType: 'EMERGENCY' });
 
         const visitObj = visit.toObject();
-        visitObj.billId = bill ? bill._id : null;
-        visitObj.bill = bill || null;
+        visitObj.consultationBillId = consultationBill ? consultationBill._id : null;
+        visitObj.consultationBill = consultationBill || null;
+        
+        visitObj.dischargeBillId = dischargeBill ? dischargeBill._id : null;
+        visitObj.dischargeBill = dischargeBill || null;
+
+        // Keep legacy billId for backward compatibility in table listings
+        visitObj.billId = visitObj.consultationBillId; 
 
         return visitObj;
     } catch (error) {
@@ -368,6 +392,23 @@ exports.updateEmergencyCharge = async (chargeId, updateData) => {
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
+        throw error;
+    }
+}
+
+exports.updateDischargeSummary = async (visitId, summary) => {
+    try {
+        const visit = await EmergencyVisit.findById(visitId);
+        if (!visit) {
+            const error = new Error('Emergency visit not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        visit.dischargeSummary = summary;
+        await visit.save();
+        return visit;
+    } catch (error) {
         throw error;
     }
 }

@@ -39,13 +39,10 @@ const employeeSchema = new mongoose.Schema({
       'Temporary'
     ]
   },
-
-
   basicSalary: {
     type: Number,
     required: true
   },
-
   bankDetails: {
     bankName: String,
     accountName: String,
@@ -53,7 +50,10 @@ const employeeSchema = new mongoose.Schema({
     ifscCode: String,
     branchName: String
   },
-
+  address:{
+    type:String,
+    required: false
+  },
   isActive: {
     type: Boolean,
     default: true

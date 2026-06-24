@@ -9,6 +9,11 @@ const props = defineProps({
   appointment: {
     type: Object,
     required: true
+  },
+  processedCharges: {
+    type: Array,
+    required: false,
+    default: () => []
   }
 })
 
@@ -20,7 +25,6 @@ const snackbarStore = useSnackbarStore()
 const doctorStore = useDoctorStore()
 
 const loading = ref(false)
-const charges = ref([])
 const chargeCategories = ref([])
 const chargeMasters = ref([])
 const showAddModal = ref(false)
@@ -49,15 +53,10 @@ const chargeForm = ref({
   chargeDate: getLocalDateString()
 })
 
+const charges = computed(() => props.processedCharges)
+
 const fetchCharges = async () => {
-  loading.value = true
-  const res = await dentalStore.getCharges(props.appointment._id)
-  if (res.success) {
-    charges.value = res.data
-  } else {
-    snackbarStore.show({ message: res.message, type: 'error' })
-  }
-  loading.value = false
+  // Now fetched by parent View.vue and passed as props
 }
 
 const fetchCategories = async () => {
@@ -306,8 +305,7 @@ const removeCustomAddon = (id) => {
 
 const totalUnbilledAmount = computed(() => {
   return charges.value
-    .filter(c => !c.isBilled)
-    .reduce((sum, c) => sum + (c.amount || 0), 0)
+    .reduce((sum, c) => sum + (c.balance || 0), 0)
 })
 
 const expandedGroups = ref({})
@@ -451,7 +449,6 @@ const submitCharge = async () => {
   if (res.success) {
     snackbarStore.show({ message: res.message || 'Charge added successfully', type: 'success' })
     showAddModal.value = false
-    await fetchCharges()
     emit('refresh')
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
@@ -468,7 +465,6 @@ const deleteCharge = async (charge) => {
   const res = await dentalStore.deleteCharge(props.appointment._id, charge._id)
   if (res.success) {
     snackbarStore.show({ message: res.message || 'Charge deleted successfully', type: 'success' })
-    await fetchCharges()
     emit('refresh')
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
@@ -512,7 +508,6 @@ const saveCharge = async (charge) => {
   if (res.success) {
     snackbarStore.show({ message: res.message || 'Charge updated successfully', type: 'success' })
     editingChargeId.value = null
-    await fetchCharges()
     emit('refresh')
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
@@ -522,7 +517,6 @@ const saveCharge = async (charge) => {
 
 onMounted(async () => {
   await fetchCategories()
-  await fetchCharges()
   await doctorStore.fetchDoctors(1, 100)
   window.addEventListener('click', handleOutsideClick)
 })
@@ -542,7 +536,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="flex items-center gap-3 w-full sm:w-auto">
         <div class="bg-indigo-50 border border-indigo-100 text-indigo-700 px-4 py-2 rounded-xl text-right shrink-0">
-          <span class="text-[10px] uppercase font-bold tracking-wider block leading-none text-slate-400">Total Unbilled Balance</span>
+          <span class="text-[10px] uppercase font-bold tracking-wider block leading-none text-slate-400">Total Unpaid Balance</span>
           <span class="text-lg font-bold">₹{{ totalUnbilledAmount.toLocaleString() }}</span>
         </div>
         <button 
@@ -693,10 +687,28 @@ onBeforeUnmount(() => {
                 </td>
                 <td class="px-5 py-3 text-center">
                   <span 
-                    class="px-2 py-0.5 rounded text-[9px] font-bold border"
-                    :class="charge.isBilled ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'"
+                    v-if="charge.balance === 0"
+                    class="px-2 py-0.5 rounded text-[9px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-100"
                   >
-                    {{ charge.isBilled ? 'Billed' : 'Unbilled' }}
+                    Paid
+                  </span>
+                  <span 
+                    v-else-if="charge.balance > 0 && charge.balance < charge.amount"
+                    class="px-2 py-0.5 rounded text-[9px] font-bold border bg-blue-50 text-blue-700 border-blue-100"
+                  >
+                    Partial (₹{{ charge.balance }} bal)
+                  </span>
+                  <span 
+                    v-else-if="charge.isBilled"
+                    class="px-2 py-0.5 rounded text-[9px] font-bold border bg-amber-50 text-amber-700 border-amber-100"
+                  >
+                    Billed
+                  </span>
+                  <span 
+                    v-else
+                    class="px-2 py-0.5 rounded text-[9px] font-bold border bg-slate-50 text-slate-700 border-slate-200"
+                  >
+                    Unbilled
                   </span>
                 </td>
                 <td class="px-5 py-3 text-right">

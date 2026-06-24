@@ -194,8 +194,9 @@ const totalChargesAmount = computed(() => {
         
         <ChargesTab 
           v-if="activeTab === 'charges'" 
-          :appointment="appointment"
-          @refresh="fetchDetails"
+          :appointment="appointment" 
+          :processedCharges="processedCharges"
+          @refresh="fetchDetails" 
         />
 
         <InstallmentsTab 

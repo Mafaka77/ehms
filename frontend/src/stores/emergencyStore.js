@@ -89,6 +89,47 @@ export const useEmergencyStore = defineStore('emergency', {
                 this.loading = false;
             }
         },
+
+        async getVisitCharges(visitId) {
+            this.loading = true;
+            try {
+                const response = await api.get(`/emergency/visits/${visitId}/charges`);
+                return response.data; // usually returns { success, data }
+            } catch (error) {
+                console.error('Error fetching visit charges:', error);
+                throw error;
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async generateDischargeBill(payload) {
+            this.loading = true;
+            this.error = null;
+            try {
+                const response = await api.post('/billing/generate-from-emergency-charges', payload);
+                return response.data.data;
+            } catch (error) {
+                console.error('Error generating discharge bill:', error);
+                this.error = error.response?.data?.message || 'Failed to generate discharge bill';
+                throw error;
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async dischargeVisit(visitId) {
+            this.loading = true;
+            try {
+                const response = await api.put(`/emergency/visits/${visitId}/discharge`);
+                return response.data.data;
+            } catch (error) {
+                console.error('Error discharging emergency visit:', error);
+                throw error;
+            } finally {
+                this.loading = false;
+            }
+        },
         async fetchVisitsReport(filters = {}) {
             this.loading = true;
             try {

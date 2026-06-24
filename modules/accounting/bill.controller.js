@@ -121,6 +121,36 @@ exports.generateBillFromEmergencyVisit = async (req, res) => {
     }
 }
 
+exports.generateBillFromEmergencyCharges = async (req, res) => {
+    try {
+        const { emergencyVisitId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        if (!emergencyVisitId) {
+            return res.code(STATUS_CODES.BAD_REQUEST).send({
+                message: 'emergencyVisitId is required',
+                status: STATUS_CODES.BAD_REQUEST
+            })
+        }
+        const bill = await billService.generateBillFromEmergencyCharges(
+            emergencyVisitId, 
+            req.user._id, 
+            discountAmount || 0,
+            discountType,
+            discountRemarks,
+            employeeId
+        )
+        return res.code(STATUS_CODES.CREATED).send({
+            message: 'Discharge bill generated successfully',
+            data: bill,
+            status: STATUS_CODES.CREATED
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 exports.generateBillFromDentalAppointment = async (req, res) => {
     try {
         const { dentalAppointmentId, discountAmount, discountType, discountRemarks, employeeId } = req.body

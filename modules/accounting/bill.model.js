@@ -65,6 +65,7 @@ const billSchema = new mongoose.Schema({
       'DENTAL_CONSULTATION',
       'ADVANCE',
       'EMERGENCY',
+      'EMERGENCY_CONSULTATION',
       'PHARMACY',
       'PACKAGE',
       'REFUND'

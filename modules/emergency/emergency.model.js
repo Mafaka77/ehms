@@ -58,6 +58,22 @@ const emergencyVisitSchema = new mongoose.Schema({
     type: String,
     enum: ['Paid', 'Unpaid'],
     default: 'Unpaid'
+  },
+
+  visitStatus: {
+    type: String,
+    enum: ['ACTIVE', 'DISCHARGED', 'ADMITTED'],
+    default: 'ACTIVE'
+  },
+
+  dischargeDateTime: {
+    type: Date,
+    default: null
+  },
+
+  dischargeSummary: {
+    type: String,
+    default: ''
   }
 
 },{

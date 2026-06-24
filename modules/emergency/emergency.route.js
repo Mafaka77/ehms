@@ -13,4 +13,6 @@ module.exports = async function (fastify, opts) {
     fastify.get('/emergency/visits/:id/charges', { onRequest: [auth] }, emergencyController.getPatientCharges);
     fastify.delete('/emergency/visits/:id/charges/:chargeId', { onRequest: [auth] }, emergencyController.deletePatientCharge);
     fastify.put('/emergency/visits/:id/charges/:chargeId', { onRequest: [auth] }, emergencyController.updatePatientCharge);
+    fastify.put('/emergency/visits/:id/discharge', { onRequest: [auth] }, emergencyController.dischargeEmergencyVisit);
+    fastify.put('/emergency/visits/:id/discharge-summary', { onRequest: [auth] }, emergencyController.updateDischargeSummary);
 }

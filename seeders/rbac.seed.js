@@ -378,7 +378,10 @@ const permissions = [
   'Accountant',
   'Dental Assistant',
   'Daycare Technician',
-  'Casualty'
+  'Casualty',
+  'Medical Officer',
+  'Radiology Department',
+  'Endoscopy Department'
 ]
 
   for (const roleName of roleNames) {

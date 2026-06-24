@@ -65,6 +65,22 @@ exports.deleteEmergencyVisit = async (req, res) => {
     }
 }
 
+exports.dischargeEmergencyVisit = async (req, res) => {
+    try {
+        const visit = await emergencyService.dischargeEmergencyVisit(req.params.id);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Emergency visit discharged successfully',
+            data: visit,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
 exports.getEmergencyVisitById = async (req, res) => {
     try {
         const visit = await emergencyService.getEmergencyVisitById(req.params.id);
@@ -151,6 +167,23 @@ exports.updatePatientCharge = async (req, res) => {
         return res.code(STATUS_CODES.OK).send({
             message: 'Patient charge updated successfully',
             data: charge,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
+exports.updateDischargeSummary = async (req, res) => {
+    try {
+        const { dischargeSummary } = req.body;
+        const visit = await emergencyService.updateDischargeSummary(req.params.id, dischargeSummary);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Discharge summary updated successfully',
+            data: visit,
             status: STATUS_CODES.OK
         });
     } catch (error) {
