@@ -224,7 +224,7 @@ exports.deleteLabTestParameter = async (req, res) => {
 
 exports.createLabOrder = async (req, res) => { 
     try {
-        const order = await labService.createLabOrder(req.body);
+        const order = await labService.createLabOrder(req.body, req.user?._id);
         return res.code(STATUS_CODES.CREATED).send({ message: 'Lab order created successfully', data: order, status: STATUS_CODES.CREATED })
     } catch (error) {
         return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
@@ -305,4 +305,58 @@ exports.saveLabOrderResults = async (req, res) => {
     }
 }
 
+// --- Lab Instrument ---
 
+exports.createLabInstrument = async (req, res) => {
+    try {
+        const instrument = await labService.createLabInstrument(req.body);
+        return res.code(STATUS_CODES.CREATED).send({ message: 'Lab instrument created successfully', data: instrument, status: STATUS_CODES.CREATED })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.getAllLabInstruments = async (req, res) => {
+    try {
+        const { page, limit, search } = req.query
+        const result = await labService.getAllLabInstruments({ page, limit, search });
+        return res.code(STATUS_CODES.OK).send({ 
+            message: 'Lab instruments fetched successfully', 
+            data: result.instruments, 
+            pagination: result.pagination,
+            status: STATUS_CODES.OK 
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.getLabInstrumentById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const instrument = await labService.getLabInstrumentById(id);
+        return res.code(STATUS_CODES.OK).send({ message: 'Lab instrument fetched successfully', data: instrument, status: STATUS_CODES.OK })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.updateLabInstrument = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const instrument = await labService.updateLabInstrument(id, req.body);
+        return res.code(STATUS_CODES.OK).send({ message: 'Lab instrument updated successfully', data: instrument, status: STATUS_CODES.OK })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.deleteLabInstrument = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const instrument = await labService.deleteLabInstrument(id);
+        return res.code(STATUS_CODES.OK).send({ message: 'Lab instrument deleted successfully', data: instrument, status: STATUS_CODES.OK })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}

@@ -320,7 +320,7 @@ exports.getAppointmentsReport = async (query) => {
     }
 }
 
-exports.addPatientCharge = async (appointmentId, data) => {
+exports.addPatientCharge = async (appointmentId, data, userId) => {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
@@ -350,37 +350,26 @@ exports.addPatientCharge = async (appointmentId, data) => {
             amount: amount,
             isBilled: false,
             doctorId: data.doctorId || appointment.doctorId || null,
+            createdBy: userId || null,
+            updatedBy: userId || null,
             createdAt: chargeDate
         }], { session });
 
-        let addonRecords = [];
+        // Create addons as separate PatientChargeAddon records (amounts stored independently)
         if (data.addons && Array.isArray(data.addons) && data.addons.length > 0) {
-            addonRecords = data.addons.map(addon => ({
+            const addonRecords = data.addons.map(addon => ({
                 patientChargeId: charge._id,
                 itemName: addon.itemName,
                 amount: Number(addon.amount || 0),
                 packageItemId: addon.packageItemId || null,
-                chargeCategoryId: data.chargeCategoryId,
+                chargeCategoryId: addon.chargeCategoryId || data.chargeCategoryId,
                 chargeMasterId: data.chargeMasterId || null,
                 isCustom: !!addon.isCustom,
                 doctorId: addon.doctorId || null,
+                createdBy: userId || null,
+                updatedBy: userId || null,
                 createdAt: chargeDate
             }));
-        } else if (data.doctorId || appointment.doctorId) {
-            addonRecords = [{
-                patientChargeId: charge._id,
-                itemName: data.description,
-                amount: amount,
-                packageItemId: null,
-                chargeCategoryId: data.chargeCategoryId,
-                chargeMasterId: data.chargeMasterId || null,
-                isCustom: true,
-                doctorId: data.doctorId || appointment.doctorId,
-                createdAt: chargeDate
-            }];
-        }
-
-        if (addonRecords.length > 0) {
             await PatientChargeAddon.insertMany(addonRecords, { session });
         }
 
@@ -405,7 +394,8 @@ exports.getPatientCharges = async (appointmentId) => {
             .sort({ createdAt: -1 });
         
         const chargesWithAddons = await Promise.all(charges.map(async (charge) => {
-            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).populate('doctorId');
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id })
+                .populate('doctorId', 'fullName name specializationId');
             return {
                 ...charge.toObject(),
                 addons
@@ -455,11 +445,14 @@ exports.addInstallment = async (appointmentId, chargeId, data, userId) => {
             throw error;
         }
 
-        // Calculate current balance
+        // Calculate current balance (base charge + addon amounts)
+        const PatientChargeAddon = require('../common/patient_charge_addon.model');
         const installments = await DentalInstallment.find({ dentalPatientChargesId: chargeId, status: 'PAID' });
+        const addons = await PatientChargeAddon.find({ patientChargeId: chargeId });
+        const addonsTotal = addons.reduce((sum, a) => sum + (a.amount || 0), 0);
         let paidAmount = 0;
         installments.forEach(i => paidAmount += i.amount);
-        let balance = charge.amount - paidAmount;
+        let balance = (charge.amount + addonsTotal) - paidAmount;
 
         if (data.amount > balance) {
             const error = new Error('Installment amount exceeds remaining balance');
@@ -493,6 +486,20 @@ exports.addInstallment = async (appointmentId, chargeId, data, userId) => {
             throw error;
         }
 
+        // Sync bill amounts to include addon totals (handles bills created before addon fix)
+        const existingBill = await Bill.findById(targetBillId);
+        if (existingBill) {
+            const chargeTotal = charge.amount + addonsTotal;
+            const currentBillChargeAmount = existingBill.grossAmount || 0;
+            if (chargeTotal > currentBillChargeAmount && currentBillChargeAmount === charge.amount) {
+                const diff = addonsTotal;
+                existingBill.grossAmount += diff;
+                existingBill.netAmount += diff;
+                existingBill.balanceAmount += diff;
+                await existingBill.save();
+            }
+        }
+
         // Process payment through the central billing module
         const paymentData = {
             amount: data.amount,
@@ -513,9 +520,10 @@ exports.addInstallment = async (appointmentId, chargeId, data, userId) => {
             createdBy: userId
         });
 
+        const chargeTotal = charge.amount + addonsTotal;
         if (newBalance <= 0) {
             charge.paymentStatus = 'Paid';
-        } else if (newBalance < charge.amount) {
+        } else if (newBalance < chargeTotal) {
             charge.paymentStatus = 'Partial';
         } else {
             charge.paymentStatus = 'Unpaid';
@@ -542,7 +550,7 @@ exports.getInstallments = async (appointmentId) => {
     }
 };
 
-exports.updatePatientCharge = async (chargeId, updateData) => {
+exports.updatePatientCharge = async (chargeId, updateData, userId) => {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
@@ -563,6 +571,7 @@ exports.updatePatientCharge = async (chargeId, updateData) => {
         if (updateData.rate !== undefined) charge.rate = Number(updateData.rate);
         if (updateData.quantity !== undefined) charge.quantity = Number(updateData.quantity);
         charge.amount = charge.rate * charge.quantity;
+        if (userId) charge.updatedBy = userId;
 
         await charge.save({ session });
         await session.commitTransaction();

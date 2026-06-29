@@ -20,6 +20,7 @@ const snackbarStore = useSnackbarStore()
 const doctorStore = useDoctorStore()
 
 const loading = ref(false)
+const initialLoading = ref(true)
 const charges = ref([])
 const chargeCategories = ref([])
 const chargeMasters = ref([])
@@ -251,9 +252,10 @@ const updateRateAndDescriptionFromAddons = () => {
     baseRate = selectedMaster.standardRate || 0
   }
 
+  // Only set the base rate — addon amounts are stored separately in PatientChargeAddon
+  chargeForm.value.rate = baseRate
+
   const activeAddons = otPackageItems.value.filter(item => selectedAddons.value.includes(item._id))
-  const totalRate = baseRate + activeAddons.reduce((sum, item) => sum + (item.defaultAmount || 0), 0)
-  chargeForm.value.rate = totalRate
 
   const addonNames = activeAddons.map(item => item.itemName).join(', ')
   const descriptionWithAddons = addonNames ? `${baseName} (${addonNames})` : baseName
@@ -304,10 +306,17 @@ const removeCustomAddon = (id) => {
   updateRateAndDescriptionFromAddons()
 }
 
+// Helper: total amount for a charge = base amount + all addon amounts
+const getChargeTotal = (charge) => {
+  const base = charge.amount || 0
+  const addonsTotal = (charge.addons || []).reduce((sum, a) => sum + (a.amount || 0), 0)
+  return base + addonsTotal
+}
+
 const totalUnbilledAmount = computed(() => {
   return charges.value
     .filter(c => !c.isBilled)
-    .reduce((sum, c) => sum + (c.amount || 0), 0)
+    .reduce((sum, c) => sum + getChargeTotal(c), 0)
 })
 
 const expandedGroups = ref({})
@@ -340,7 +349,7 @@ const groupedCharges = computed(() => {
       }
     }
     groups[dateKey].charges.push(charge)
-    groups[dateKey].totalAmount += (charge.amount || 0)
+    groups[dateKey].totalAmount += getChargeTotal(charge)
   })
 
   return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp)
@@ -429,7 +438,13 @@ const submitCharge = async () => {
   submitting.value = true
   
   const payload = {
-    ...chargeForm.value,
+    chargeCategoryId: chargeForm.value.chargeCategoryId,
+    chargeMasterId: chargeForm.value.chargeMasterId || null,
+    description: chargeForm.value.description,
+    rate: chargeForm.value.rate,
+    quantity: chargeForm.value.quantity,
+    chargeDate: chargeForm.value.chargeDate,
+    doctorId: chargeForm.value.doctorId || null,
     addons: otPackageItems.value
       .filter(item => selectedAddons.value.includes(item._id))
       .map(item => ({
@@ -517,9 +532,13 @@ const saveCharge = async (charge) => {
 }
 
 onMounted(async () => {
-  await fetchCategories()
-  await fetchCharges()
-  await doctorStore.fetchDoctors(1, 100)
+  initialLoading.value = true
+  await Promise.all([
+    fetchCategories(),
+    fetchCharges(),
+    doctorStore.fetchDoctors(1, 100)
+  ])
+  initialLoading.value = false
   window.addEventListener('click', handleOutsideClick)
 })
 
@@ -530,6 +549,16 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="space-y-4">
+    <!-- Initial Loading State -->
+    <div v-if="initialLoading" class="py-16 text-center text-slate-400">
+      <svg class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <p class="text-sm font-medium">Loading charges data...</p>
+    </div>
+
+    <template v-else>
     <!-- Header Banner -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
@@ -685,7 +714,7 @@ onBeforeUnmount(() => {
                 </td>
                 <td class="px-5 py-3 text-right font-bold text-slate-900">
                   <span v-if="editingChargeId === charge._id">₹{{ (editingForm.rate * editingForm.quantity).toLocaleString() }}</span>
-                  <span v-else>₹{{ charge.amount?.toLocaleString() }}</span>
+                  <span v-else>₹{{ getChargeTotal(charge).toLocaleString() }}</span>
                 </td>
                 <td class="px-5 py-3 text-center">
                   <span 
@@ -1129,5 +1158,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>

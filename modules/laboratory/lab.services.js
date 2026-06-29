@@ -2,6 +2,7 @@ const LabCategory = require('./lab_category.model')
 const LabSampleType = require('./lab_sample_type.model')
 const LabTest = require('./lab_test.model')
 const LabTestParameter = require('./lab_test_params.model')
+const LabInstrument = require('./lab_instrument.model')
 const LabOrder = require('./lab_order.model')
 const LabOrderItem = require('./lab_order_item.model')
 const Employee = require('../hr/employee.model')
@@ -803,7 +804,9 @@ exports.saveLabOrderResults = async (orderId, resultsData, userId) => {
                         quantity: item.quantity || 1,
                         rate: item.rate,
                         amount: item.amount,
-                        isBilled: false
+                        isBilled: false,
+                        createdBy: userId || null,
+                        updatedBy: userId || null
                     }], { session })
                 }
             }
@@ -822,3 +825,108 @@ exports.saveLabOrderResults = async (orderId, resultsData, userId) => {
     }
 }
 
+// --- Lab Instrument Services ---
+
+exports.createLabInstrument = async (data) => {
+    try {
+        const existingInstrument = await LabInstrument.findOne({ name: data.name })
+        if (existingInstrument) {
+            const error = new Error('Lab instrument with this name already exists')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+        const instrument = await LabInstrument.create(data)
+        return instrument
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getAllLabInstruments = async (query = {}) => {
+    try {
+        const page = parseInt(query.page) || 1
+        const limit = parseInt(query.limit) || 10
+        const search = query.search || ''
+        const skip = (page - 1) * limit
+
+        let filter = {}
+        if (search) {
+            filter = {
+                $or: [
+                    { name: { $regex: search, $options: 'i' } },
+                    { code: { $regex: search, $options: 'i' } },
+                    { manufacturer: { $regex: search, $options: 'i' } }
+                ]
+            }
+        }
+
+        const total = await LabInstrument.countDocuments(filter)
+        const instruments = await LabInstrument.find(filter)
+            .populate('departmentId', 'name')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+
+        return {
+            instruments,
+            pagination: {
+                total,
+                page,
+                limit,
+                pages: Math.ceil(total / limit)
+            }
+        }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getLabInstrumentById = async (id) => {
+    try {
+        const instrument = await LabInstrument.findById(id).populate('departmentId', 'name')
+        if (!instrument) {
+            const error = new Error('Lab instrument not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+        return instrument
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.updateLabInstrument = async (id, data) => {
+    try {
+        if (data.name) {
+            const existingInstrument = await LabInstrument.findOne({ name: data.name, _id: { $ne: id } })
+            if (existingInstrument) {
+                const error = new Error('Lab instrument name already exists')
+                error.status = STATUS_CODES.BAD_REQUEST
+                throw error
+            }
+        }
+        const instrument = await LabInstrument.findByIdAndUpdate(id, data, { new: true }).populate('departmentId', 'name')
+        if (!instrument) {
+            const error = new Error('Lab instrument not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+        return instrument
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.deleteLabInstrument = async (id) => {
+    try {
+        const instrument = await LabInstrument.findByIdAndDelete(id)
+        if (!instrument) {
+            const error = new Error('Lab instrument not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+        return instrument
+    } catch (error) {
+        throw error
+    }
+}

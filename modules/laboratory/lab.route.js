@@ -41,4 +41,11 @@ module.exports = async (fastify, options) => {
     fastify.post('/order/:id/results', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'LabTechnician'])] }, labController.saveLabOrderResults);
     fastify.put('/order/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'LabTechnician'])] }, labController.updateLabOrder);
     fastify.delete('/order/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'LabTechnician'])] }, labController.deleteLabOrder);
+
+    // lab instrument routes
+    fastify.post('/instrument', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'LabTechnician'])] }, labController.createLabInstrument);
+    fastify.get('/instrument', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'LabTechnician'])] }, labController.getAllLabInstruments);
+    fastify.get('/instrument/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'LabTechnician'])] }, labController.getLabInstrumentById);
+    fastify.put('/instrument/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'LabTechnician'])] }, labController.updateLabInstrument);
+    fastify.delete('/instrument/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'LabTechnician'])] }, labController.deleteLabInstrument);
 }

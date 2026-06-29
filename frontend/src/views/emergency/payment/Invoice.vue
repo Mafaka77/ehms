@@ -13,10 +13,19 @@ const props = defineProps({
   billDetails: {
     type: Object,
     default: null
+  },
+  patientCharges: {
+    type: Array,
+    default: () => []
   }
 })
 
 const emit = defineEmits(['close'])
+
+// Find the charge record for a bill item to get addon details
+const getChargeForItem = (item) => {
+  return props.patientCharges.find(c => c._id === item.referenceId) || null
+}
 
 const printingPDF = ref(false)
 
@@ -96,7 +105,24 @@ const formatCurrency = (val) => {
               </thead>
               <tbody>
                 <tr v-for="item in billDetails.items" :key="item._id">
-                  <td class="font-medium truncate max-w-[200px]">{{ item.description }}</td>
+                  <td class="font-medium">
+                    <div class="truncate max-w-[200px]">{{ item.description }}</div>
+                    <!-- Doctor badge -->
+                    <div v-if="getChargeForItem(item)?.doctorId" class="mt-0.5" style="font-size: 7px; color: #4f46e5; font-weight: 600;">
+                      Dr. {{ getChargeForItem(item).doctorId.fullName || 'N/A' }}
+                    </div>
+                    <!-- Addon details -->
+                    <div v-if="getChargeForItem(item)?.addons?.length > 0" style="margin-top: 2px;">
+                      <span 
+                        v-for="addon in getChargeForItem(item).addons" 
+                        :key="addon._id" 
+                        style="display: inline-block; font-size: 7px; padding: 1px 4px; margin: 1px 2px 1px 0; border: 1px solid #d1d5db; border-radius: 3px; color: #0f766e; background: #f0fdfa;"
+                      >
+                        {{ addon.itemName }} (₹{{ addon.amount?.toLocaleString() }})
+                        <span v-if="addon.doctorId" style="color: #4f46e5; font-weight: 600;">- Dr. {{ addon.doctorId.fullName || addon.doctorId.name || '' }}</span>
+                      </span>
+                    </div>
+                  </td>
                   <td class="text-right font-mono">{{ formatCurrency(item.rate) }}</td>
                   <td class="text-center font-mono">{{ item.quantity }}</td>
                   <td class="text-right font-mono discount-col">-{{ formatCurrency(item.discountAmount) }}</td>

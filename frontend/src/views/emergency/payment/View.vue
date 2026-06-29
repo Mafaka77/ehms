@@ -147,10 +147,30 @@
                 <td class="px-2 py-3 text-slate-700">
                   <p class="font-medium text-slate-800">{{ charge.description }}</p>
                   <p class="text-[9px] text-slate-400 mt-0.5">{{ charge.chargeCategoryId?.name || 'Charge' }} • {{ formatDate(charge.createdAt) }}</p>
+                  <!-- Doctor badge -->
+                  <div v-if="charge.doctorId" class="text-[10px] text-indigo-500 font-bold mt-1 inline-flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                    Dr. {{ charge.doctorId.fullName || charge.doctorId.name || 'N/A' }}
+                  </div>
+                  <!-- Addon badges -->
+                  <div v-if="charge.addons && charge.addons.length > 0" class="mt-1.5 flex flex-wrap gap-1">
+                    <span 
+                      v-for="addon in charge.addons" 
+                      :key="addon._id" 
+                      class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-teal-50 text-teal-800 border border-teal-100 inline-flex items-center gap-1.5"
+                    >
+                      <span>{{ addon.itemName }}</span>
+                      <span v-if="addon.doctorId" class="px-1 py-0.2 text-[8px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-600 rounded">
+                        Dr. {{ addon.doctorId.fullName || addon.doctorId.name || addon.doctorId }}
+                      </span>
+                      <span class="text-slate-500 font-extrabold">(₹{{ addon.amount?.toLocaleString() }})</span>
+                    </span>
+                  </div>
                 </td>
                 <td class="px-2 py-3 text-right font-mono">{{ formatCurrency(charge.rate) }}</td>
                 <td class="px-2 py-3 text-center font-mono">{{ charge.quantity }}</td>
-                <td class="px-2 py-3 text-right font-mono font-semibold">{{ formatCurrency(charge.amount) }}</td>
+                <td class="px-2 py-3 text-right font-mono font-semibold">
+                  {{ formatCurrency((charge.amount || 0) + (charge.addons || []).reduce((s, a) => s + (a.amount || 0), 0)) }}
+                </td>
               </tr>
               <tr class="bg-slate-50/50 font-bold border-t border-slate-100" v-if="patientCharges.length > 0">
                 <td colspan="3" class="px-2 py-3 text-slate-800 text-right">Subtotal:</td>
@@ -216,6 +236,7 @@
       :show="showInvoiceModal" 
       :visit="visit" 
       :billDetails="activePrintBill" 
+      :patientCharges="patientCharges"
       @close="closeInvoiceModal" 
     />
   </div>
@@ -293,7 +314,10 @@ watch(() => props.visit, async (newVisit) => {
 }, { immediate: true })
 
 const totalChargesAmount = computed(() => {
-  return patientCharges.value.reduce((sum, c) => sum + (c.amount || 0), 0)
+  return patientCharges.value.reduce((sum, c) => {
+    const addonsTotal = (c.addons || []).reduce((s, a) => s + (a.amount || 0), 0)
+    return sum + (c.amount || 0) + addonsTotal
+  }, 0)
 })
 
 const consultationStatus = computed(() => {

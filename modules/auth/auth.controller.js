@@ -34,6 +34,38 @@ exports.getRoles = async (req, res) => {
     }
 }
 
+exports.createRole = async (req, res) => {
+    try {
+        const role = await authService.createRole(req.body)
+        return res.code(STATUS_CODES.CREATED).send({
+            message: 'Role created successfully',
+            data: role,
+            status: STATUS_CODES.CREATED
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.updateRole = async (req, res) => {
+    try {
+        const role = await authService.updateRole(req.params.id, req.body)
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Role updated successfully',
+            data: role,
+            status: STATUS_CODES.OK
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 exports.checkLogin = async (req, res) => {
     try {
         const { email } = req.query

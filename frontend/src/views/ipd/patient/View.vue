@@ -1,12 +1,12 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import PharmacyOrder from './PharmacyOrder.vue'
 import BedHistory from './BedHistory.vue'
 import PatientCharge from './PatientCharge.vue'
-import DoctorCharges from './DoctorCharges.vue'
+
 import PatientFiles from './PatientFIles.vue'
 import Test from './Test.vue'
 import { useIpdWardStore } from '../../../stores/ipdWardStore'
@@ -103,14 +103,8 @@ const formatDate = (dateString) => {
   })
 }
 
-const formatDateOnly = (dateString) => {
-  if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  })
-}
+
+
 
 // Badge styling helpers
 const getStatusColor = (status) => {
@@ -129,97 +123,6 @@ const getAdmissionTypeColor = (type) => {
     default: return 'bg-slate-100/60 text-slate-700 border-slate-200'
   }
 }
-
-// Mock Data for Tabs
-const mockCharges = computed(() => {
-  if (!admission.value) return []
-  const dailyRate = admission.value.bedId?.dailyRate || 1200
-  const admitDate = new Date(admission.value.admissionDate)
-  const days = Math.max(1, Math.ceil((new Date() - admitDate) / (1000 * 60 * 60 * 24)))
-  
-  return [
-    {
-      date: formatDateOnly(admission.value.admissionDate),
-      item: `IPD Bed Rental (Bed ${admission.value.bedId?.bedNo || 'N/A'} - ${admission.value.bedId?.wardId?.name || 'General Ward'})`,
-      category: 'Room/Bed Charge',
-      rate: dailyRate,
-      qty: days,
-      amount: dailyRate * days
-    },
-    {
-      date: formatDateOnly(admission.value.admissionDate),
-      item: `Initial Admission Charges`,
-      category: 'Registration',
-      rate: 350,
-      qty: 1,
-      amount: 350
-    },
-    {
-      date: formatDateOnly(new Date()),
-      item: `Consultant Visit (Dr. ${admission.value.consultantDoctorId?.fullName || 'N/A'})`,
-      category: 'Professional Fees',
-      rate: 500,
-      qty: Math.max(1, days),
-      amount: 500 * Math.max(1, days)
-    },
-    {
-      date: formatDateOnly(new Date()),
-      item: `Nursing Care Charges (Daily)`,
-      category: 'Nursing Charges',
-      rate: 250,
-      qty: days,
-      amount: 250 * days
-    }
-  ]
-})
-
-const totalChargesAmount = computed(() => {
-  return mockCharges.value.reduce((sum, charge) => sum + charge.amount, 0)
-})
-
-const mockPharmacyOrders = ref([
-  {
-    orderNo: 'RX-IPD-0254',
-    date: new Date(Date.now() - 3600000 * 4).toISOString(),
-    items: [
-      { name: 'Paracetamol 650mg', qty: 10, frequency: 'TDS (Three times a day)', status: 'ISSUED' },
-      { name: 'Pantoprazole 40mg', qty: 5, frequency: 'OD (Once daily - Empty stomach)', status: 'ISSUED' }
-    ],
-    priority: 'NORMAL',
-    status: 'ISSUED'
-  },
-  {
-    orderNo: 'RX-IPD-0279',
-    date: new Date().toISOString(),
-    items: [
-      { name: 'Amoxicillin 500mg', qty: 15, frequency: 'TDS', status: 'PENDING' },
-      { name: 'Cough Syrup 100ml', qty: 1, frequency: 'BD (Twice a day)', status: 'PENDING' }
-    ],
-    priority: 'URGENT',
-    status: 'PENDING'
-  }
-])
-
-const mockNotes = computed(() => [
-  {
-    date: new Date(Date.now() - 3600000 * 24).toISOString(),
-    type: 'CLINICAL_NOTE',
-    content: 'Patient admitted with complaints of acute abdominal pain. Preliminary checkups done. Vital parameters are stable. Advised ultrasound scan and basic hematology profiles.',
-    author: admission.value?.consultantDoctorId?.fullName ? 'Dr. ' + admission.value.consultantDoctorId.fullName : 'Consultant Doctor'
-  },
-  {
-    date: new Date(Date.now() - 3600000 * 12).toISOString(),
-    type: 'PROGRESS_NOTE',
-    content: 'Administered IV fluids and pain management drugs. Patient reports reduction in pain intensity. Urine output is normal. Checked BP (120/80 mmHg) and Temperature (98.6°F) at regular intervals.',
-    author: 'Nurse Administrator'
-  },
-  {
-    date: new Date().toISOString(),
-    type: 'CLINICAL_NOTE',
-    content: 'Reviewed lab profiles. Mild leukocytosis noted. Continue with antibiotic therapy. Patient is allowed liquids only. To be kept under close observations.',
-    author: admission.value?.consultantDoctorId?.fullName ? 'Dr. ' + admission.value.consultantDoctorId.fullName : 'Consultant Doctor'
-  }
-])
 
 
 
@@ -373,16 +276,7 @@ onMounted(async () => {
           </svg>
           Pharmacy Order
         </button>
-        <button 
-          @click="activeTab = 'doctor_charges'"
-          class="flex-1 sm:flex-initial px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-          :class="activeTab === 'doctor_charges' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
-        >
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-          Doctor Charges
-        </button>
+
         <button 
           @click="activeTab = 'tests'"
           class="flex-1 sm:flex-initial px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
@@ -437,10 +331,7 @@ onMounted(async () => {
           <Test :admissionId="admission._id" :admission="admission" />
         </div>
 
-        <!-- Tab: Doctor Charges -->
-        <div v-else-if="activeTab === 'doctor_charges'" class="space-y-4 animate-in fade-in duration-200">
-          <DoctorCharges :admissionId="admission._id" :admission="admission" />
-        </div>
+
 
         <!-- Tab: Bed History -->
         <div v-else-if="activeTab === 'bed_history'" class="space-y-4 animate-in fade-in duration-200">

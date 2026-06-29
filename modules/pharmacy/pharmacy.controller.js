@@ -245,7 +245,7 @@ exports.getAllIpdOrders = async (req, res) => {
 
 exports.updateIpdOrderStatus = async (req, res) => {
     try {
-        const result = await pharmacyService.updateIpdOrderStatus(req.params.id, req.body.status)
+        const result = await pharmacyService.updateIpdOrderStatus(req.params.id, req.body.status, req.user?._id)
         return res.code(STATUS_CODES.OK).send({ message: 'IPD Medicine Order status updated successfully', data: result, status: STATUS_CODES.OK })
     } catch (error) {
         return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })

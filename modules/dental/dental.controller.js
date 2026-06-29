@@ -115,7 +115,7 @@ exports.getAppointmentsReport = async (req, res) => {
 
 exports.addPatientCharge = async (req, res) => {
     try {
-        const charge = await dentalService.addPatientCharge(req.params.id, req.body);
+        const charge = await dentalService.addPatientCharge(req.params.id, req.body, req.user?._id);
         return res.code(STATUS_CODES.CREATED).send({
             status: STATUS_CODES.CREATED,
             message: 'Patient charge added successfully',
@@ -166,7 +166,7 @@ exports.deletePatientCharge = async (req, res) => {
 
 exports.updatePatientCharge = async (req, res) => {
     try {
-        const charge = await dentalService.updatePatientCharge(req.params.chargeId, req.body);
+        const charge = await dentalService.updatePatientCharge(req.params.chargeId, req.body, req.user?._id);
         return res.code(STATUS_CODES.OK).send({
             status: STATUS_CODES.OK,
             message: 'Patient charge updated successfully',

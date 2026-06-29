@@ -73,9 +73,13 @@ const processedCharges = computed(() => {
   return charges.value.map(charge => {
     const chargeInstallments = installments.value.filter(i => i.dentalPatientChargesId?._id === charge._id && i.status === 'PAID')
     const paidAmount = chargeInstallments.reduce((sum, i) => sum + i.amount, 0)
-    const balance = charge.amount - paidAmount
+    // Total = base charge amount + all addon amounts
+    const addonsTotal = (charge.addons || []).reduce((sum, a) => sum + (a.amount || 0), 0)
+    const chargeTotal = (charge.amount || 0) + addonsTotal
+    const balance = chargeTotal - paidAmount
     return {
       ...charge,
+      chargeTotal,
       paidAmount,
       balance
     }
@@ -83,7 +87,7 @@ const processedCharges = computed(() => {
 })
 
 const totalChargesAmount = computed(() => {
-  return charges.value.reduce((sum, c) => sum + (c.amount || 0), 0)
+  return processedCharges.value.reduce((sum, c) => sum + (c.chargeTotal || 0), 0)
 })
 </script>
 

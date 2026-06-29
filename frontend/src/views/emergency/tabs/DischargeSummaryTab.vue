@@ -1,7 +1,17 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useEmergencyStore } from '../../../stores/emergencyStore'
+import { useEditor, EditorContent } from '@tiptap/vue-3'
+import StarterKit from '@tiptap/starter-kit'
+import Underline from '@tiptap/extension-underline'
+import TextAlign from '@tiptap/extension-text-align'
+import Link from '@tiptap/extension-link'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import Placeholder from '@tiptap/extension-placeholder'
 
 const props = defineProps({
   visit: {
@@ -17,11 +27,40 @@ const emergencyStore = useEmergencyStore()
 const summaryText = ref('')
 const saving = ref(false)
 
+const editor = useEditor({
+  extensions: [
+    StarterKit.configure({
+      heading: { levels: [2, 3] }
+    }),
+    Underline,
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Link.configure({ openOnClick: false }),
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableCell,
+    TableHeader,
+    Placeholder.configure({
+      placeholder: 'Type the clinical discharge summary here...'
+    })
+  ],
+  content: '',
+  onUpdate({ editor: e }) {
+    summaryText.value = e.getHTML()
+  }
+})
+
 watch(() => props.visit, (newVal) => {
   if (newVal) {
     summaryText.value = newVal.dischargeSummary || ''
+    if (editor.value) {
+      editor.value.commands.setContent(summaryText.value)
+    }
   }
 }, { immediate: true })
+
+onBeforeUnmount(() => {
+  editor.value?.destroy()
+})
 
 const saveSummary = async () => {
   saving.value = true
@@ -120,12 +159,53 @@ const printSummary = () => {
     </div>
 
     <div class="relative">
-      <textarea
-        v-model="summaryText"
-        rows="12"
-        placeholder="Type the clinical discharge summary here..."
-        class="w-full bg-white border border-slate-200 rounded-xl p-4 text-sm focus:ring-2 focus:ring-rose-500 focus:border-rose-500 resize-y transition-shadow"
-      ></textarea>
+      <div v-if="editor" class="tiptap-wrapper border border-slate-200 rounded-xl overflow-hidden focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all">
+        <!-- Toolbar -->
+        <div class="flex flex-wrap items-center gap-1 p-2 bg-slate-50 border-b border-slate-200">
+          <button type="button" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()" :class="['tiptap-btn', { active: editor.isActive('heading', { level: 2 }) }]" title="Heading 2">H2</button>
+          <button type="button" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()" :class="['tiptap-btn', { active: editor.isActive('heading', { level: 3 }) }]" title="Heading 3">H3</button>
+          
+          <div class="w-px h-5 bg-slate-300 mx-1"></div>
+          <button type="button" @click="editor.chain().focus().toggleBold().run()" :class="['tiptap-btn', { active: editor.isActive('bold') }]" title="Bold">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"/></svg>
+          </button>
+          <button type="button" @click="editor.chain().focus().toggleItalic().run()" :class="['tiptap-btn', { active: editor.isActive('italic') }]" title="Italic">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4-8m-8 4l-4 8"/></svg>
+          </button>
+          <button type="button" @click="editor.chain().focus().toggleUnderline().run()" :class="['tiptap-btn', { active: editor.isActive('underline') }]" title="Underline">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8v8a5 5 0 0010 0V8M5 20h14"/></svg>
+          </button>
+          <button type="button" @click="editor.chain().focus().toggleStrike().run()" :class="['tiptap-btn', { active: editor.isActive('strike') }]" title="Strikethrough">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18M9 6h6M9 18h6"/></svg>
+          </button>
+          
+          <div class="w-px h-5 bg-slate-300 mx-1"></div>
+          <button type="button" @click="editor.chain().focus().toggleBulletList().run()" :class="['tiptap-btn', { active: editor.isActive('bulletList') }]" title="Bullet List">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16M8 6h.01M8 12h.01M8 18h.01"/></svg>
+          </button>
+          <button type="button" @click="editor.chain().focus().toggleOrderedList().run()" :class="['tiptap-btn', { active: editor.isActive('orderedList') }]" title="Numbered List">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h14M7 12h14M7 16h14M3 8h.01M3 12h.01M3 16h.01"/></svg>
+          </button>
+          
+          <div class="w-px h-5 bg-slate-300 mx-1"></div>
+          <button type="button" @click="editor.chain().focus().toggleBlockquote().run()" :class="['tiptap-btn', { active: editor.isActive('blockquote') }]" title="Blockquote">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </button>
+          <button type="button" @click="editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()" class="tiptap-btn" title="Insert Table">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v18H3V3z M3 9h18 M9 3v18 M15 3v18"/></svg>
+          </button>
+
+          <div class="flex-grow"></div>
+          <button type="button" @click="editor.chain().focus().undo().run()" :disabled="!editor.can().undo()" class="tiptap-btn" title="Undo">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+          </button>
+          <button type="button" @click="editor.chain().focus().redo().run()" :disabled="!editor.can().redo()" class="tiptap-btn" title="Redo">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"/></svg>
+          </button>
+        </div>
+        <!-- Editor Content -->
+        <editor-content :editor="editor" class="min-h-[250px] p-4 text-sm bg-white" />
+      </div>
     </div>
 
     <div class="flex justify-end pt-2">
@@ -141,3 +221,76 @@ const printSummary = () => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Tiptap styles */
+.tiptap-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tiptap-btn:hover {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.tiptap-btn.active {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.tiptap-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tiptap-wrapper :deep(.tiptap) {
+  outline: none;
+}
+.tiptap-wrapper :deep(.tiptap p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  float: left;
+  color: #94a3b8;
+  pointer-events: none;
+  height: 0;
+}
+.tiptap-wrapper :deep(.tiptap h2) { font-size: 1.25em; font-weight: 700; margin: 0.5em 0 0.25em; }
+.tiptap-wrapper :deep(.tiptap h3) { font-size: 1.1em; font-weight: 600; margin: 0.5em 0 0.25em; }
+.tiptap-wrapper :deep(.tiptap ul),
+.tiptap-wrapper :deep(.tiptap ol) { padding-left: 1.5em; margin: 0.3em 0; }
+.tiptap-wrapper :deep(.tiptap li) { margin: 0.15em 0; }
+.tiptap-wrapper :deep(.tiptap blockquote) {
+  border-left: 3px solid #e2e8f0;
+  padding-left: 1em;
+  margin-left: 0;
+  color: #64748b;
+  font-style: italic;
+}
+.tiptap-wrapper :deep(.tiptap table) {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+}
+.tiptap-wrapper :deep(.tiptap th),
+.tiptap-wrapper :deep(.tiptap td) {
+  border: 1px solid #cbd5e1;
+  padding: 0.4em 0.8em;
+  min-width: 3em;
+}
+.tiptap-wrapper :deep(.tiptap th) {
+  background-color: #f8fafc;
+  font-weight: bold;
+  text-align: left;
+}
+</style>

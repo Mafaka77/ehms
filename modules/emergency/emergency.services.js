@@ -239,10 +239,12 @@ exports.getEmergencyCharges = async (visitId) => {
         const PatientChargeAddon = require('../common/patient_charge_addon.model');
         const charges = await PatientCharge.find({ emergencyVisitId: visitId })
             .populate('chargeCategoryId')
+            .populate('doctorId', 'fullName name specializationId')
             .sort({ createdAt: -1 });
         
         const chargesWithAddons = await Promise.all(charges.map(async (charge) => {
-            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).populate('doctorId');
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id })
+                .populate('doctorId', 'fullName name specializationId');
             return {
                 ...charge.toObject(),
                 addons
@@ -254,7 +256,7 @@ exports.getEmergencyCharges = async (visitId) => {
     }
 }
 
-exports.createEmergencyCharge = async (visitId, data) => {
+exports.createEmergencyCharge = async (visitId, data, userId) => {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
@@ -286,37 +288,26 @@ exports.createEmergencyCharge = async (visitId, data) => {
             amount,
             isBilled: false,
             doctorId: data.doctorId || null,
+            createdBy: userId || null,
+            updatedBy: userId || null,
             createdAt: chargeDate
         }], { session });
 
-        let addonRecords = [];
+        // Create addons as separate PatientChargeAddon records (amounts stored independently)
         if (data.addons && Array.isArray(data.addons) && data.addons.length > 0) {
-            addonRecords = data.addons.map(addon => ({
+            const addonRecords = data.addons.map(addon => ({
                 patientChargeId: charge._id,
                 itemName: addon.itemName,
                 amount: Number(addon.amount || 0),
                 packageItemId: addon.packageItemId || null,
-                chargeCategoryId: data.chargeCategoryId,
+                chargeCategoryId: addon.chargeCategoryId || data.chargeCategoryId,
                 chargeMasterId: data.chargeMasterId || null,
                 isCustom: !!addon.isCustom,
                 doctorId: addon.doctorId || null,
+                createdBy: userId || null,
+                updatedBy: userId || null,
                 createdAt: chargeDate
             }));
-        } else if (data.doctorId) {
-            addonRecords = [{
-                patientChargeId: charge._id,
-                itemName: data.description,
-                amount: amount,
-                packageItemId: null,
-                chargeCategoryId: data.chargeCategoryId,
-                chargeMasterId: data.chargeMasterId || null,
-                isCustom: true,
-                doctorId: data.doctorId,
-                createdAt: chargeDate
-            }];
-        }
-
-        if (addonRecords.length > 0) {
             await PatientChargeAddon.insertMany(addonRecords, { session });
         }
 
@@ -363,7 +354,7 @@ exports.deleteEmergencyCharge = async (chargeId) => {
         throw error;
     }
 }
-exports.updateEmergencyCharge = async (chargeId, updateData) => {
+exports.updateEmergencyCharge = async (chargeId, updateData, userId) => {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
@@ -384,6 +375,7 @@ exports.updateEmergencyCharge = async (chargeId, updateData) => {
         if (updateData.rate !== undefined) charge.rate = Number(updateData.rate);
         if (updateData.quantity !== undefined) charge.quantity = Number(updateData.quantity);
         charge.amount = charge.rate * charge.quantity;
+        if (userId) charge.updatedBy = userId;
 
         await charge.save({ session });
         await session.commitTransaction();

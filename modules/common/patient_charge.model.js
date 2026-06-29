@@ -91,6 +91,18 @@ const patientChargeSchema = new mongoose.Schema({
     type: String,
     enum: ['Paid', 'Unpaid', 'Partial'],
     default: 'Unpaid'
+  },
+
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
+  updatedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
   }
 
 },{

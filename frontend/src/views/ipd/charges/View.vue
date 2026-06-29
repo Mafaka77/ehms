@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
@@ -17,6 +17,26 @@ const showAddModal = ref(false)
 const submitting = ref(false)
 const editMode = ref(false)
 const editMasterId = ref(null)
+
+// Pagination state
+const currentPage = ref(1)
+const itemsPerPage = ref(10)
+
+const paginatedMasters = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  const end = start + itemsPerPage.value
+  return masters.value.slice(start, end)
+})
+
+const totalPages = computed(() => Math.ceil(masters.value.length / itemsPerPage.value))
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value++
+}
+
+const prevPage = () => {
+  if (currentPage.value > 1) currentPage.value--
+}
 
 // Package item states
 const expandedMasters = ref([])
@@ -71,6 +91,7 @@ const fetchCategoryDetails = async () => {
     const resMasters = await admissionStore.fetchChargeMasters(categoryId)
     if (resMasters.success) {
       masters.value = resMasters.data
+      currentPage.value = 1
     }
   } else {
     snackbarStore.show({ message: resCat.message || 'Category details not found', type: 'error' })
@@ -119,10 +140,6 @@ const toggleApplicable = (optVal) => {
 }
 
 const submitChargeMaster = async () => {
-  if (!form.value.code.trim()) {
-    snackbarStore.show({ message: 'Code is required.', type: 'warning' })
-    return
-  }
   if (!form.value.name.trim()) {
     snackbarStore.show({ message: 'Name is required.', type: 'warning' })
     return
@@ -322,7 +339,7 @@ onMounted(async () => {
                   No billing items have been configured for this category yet.
                 </td>
               </tr>
-              <template v-for="master in masters" :key="master._id">
+              <template v-for="master in paginatedMasters" :key="master._id">
                 <tr class="hover:bg-slate-50/50 transition-colors">
                   <td class="px-4 py-3.5 text-center">
                     <button 
@@ -499,6 +516,34 @@ onMounted(async () => {
             </tbody>
           </table>
         </div>
+
+        <!-- Pagination Controls -->
+        <div v-if="masters.length > 0" class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+          <div class="text-sm text-slate-500">
+            Showing <span class="font-medium text-slate-700">{{ (currentPage - 1) * itemsPerPage + 1 }}</span> to <span class="font-medium text-slate-700">{{ Math.min(currentPage * itemsPerPage, masters.length) }}</span> of <span class="font-medium text-slate-700">{{ masters.length }}</span> entries
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="prevPage" 
+              :disabled="currentPage === 1"
+              class="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-white hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <span class="text-sm font-medium text-slate-700 px-2">Page {{ currentPage }} of {{ totalPages }}</span>
+            <button 
+              @click="nextPage" 
+              :disabled="currentPage === totalPages"
+              class="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-white hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -528,17 +573,20 @@ onMounted(async () => {
         <div class="p-6 space-y-4 overflow-y-auto">
           <!-- Row 1: Code and Name -->
           <div class="grid grid-cols-2 gap-4">
+            <!-- Service Code -->
             <div class="space-y-1">
-              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Service Code</label>
+              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Service/Item Code <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
               <input 
                 type="text" 
                 v-model="form.code"
-                placeholder="E.g. OT_MINOR, CENTRAL_LINE..."
+                placeholder="E.g. OT_MINOR..."
                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all uppercase"
               />
             </div>
+            
+            <!-- Service Name -->
             <div class="space-y-1">
-              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Service/Item Name</label>
+              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Service/Item Name <span class="text-[10px] text-rose-500">*</span></label>
               <input 
                 type="text" 
                 v-model="form.name"

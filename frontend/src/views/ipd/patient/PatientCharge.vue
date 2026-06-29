@@ -3,6 +3,7 @@ import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useDoctorStore } from '../../../stores/doctorStore'
+import { useAuthStore } from '../../../stores/authStore'
 
 const props = defineProps({
   admissionId: {
@@ -18,6 +19,7 @@ const props = defineProps({
 const admissionStore = useIpdAdmissionStore()
 const snackbarStore = useSnackbarStore()
 const doctorStore = useDoctorStore()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 const charges = ref([])
@@ -251,10 +253,10 @@ const updateRateAndDescriptionFromAddons = () => {
     baseRate = selectedMaster.standardRate || 0
   }
 
-  const activeAddons = otPackageItems.value.filter(item => selectedAddons.value.includes(item._id))
-  const totalRate = baseRate + activeAddons.reduce((sum, item) => sum + (item.defaultAmount || 0), 0)
-  chargeForm.value.rate = totalRate
+  // Only set the base rate — addon amounts are stored separately in PatientChargeAddon
+  chargeForm.value.rate = baseRate
 
+  const activeAddons = otPackageItems.value.filter(item => selectedAddons.value.includes(item._id))
   const addonNames = activeAddons.map(item => item.itemName).join(', ')
   const descriptionWithAddons = addonNames ? `${baseName} (${addonNames})` : baseName
 
@@ -304,10 +306,17 @@ const removeCustomAddon = (id) => {
   updateRateAndDescriptionFromAddons()
 }
 
+// Helper: total amount for a charge = base amount + all addon amounts
+const getChargeTotal = (charge) => {
+  const base = charge.amount || 0
+  const addonsTotal = (charge.addons || []).reduce((sum, a) => sum + (a.amount || 0), 0)
+  return base + addonsTotal
+}
+
 const totalUnbilledAmount = computed(() => {
   return charges.value
     .filter(c => !c.isBilled)
-    .reduce((sum, c) => sum + (c.amount || 0), 0)
+    .reduce((sum, c) => sum + getChargeTotal(c), 0)
 })
 
 const expandedGroups = ref({})
@@ -340,7 +349,7 @@ const groupedCharges = computed(() => {
       }
     }
     groups[dateKey].charges.push(charge)
-    groups[dateKey].totalAmount += (charge.amount || 0)
+    groups[dateKey].totalAmount += getChargeTotal(charge)
   })
 
   return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp)
@@ -429,7 +438,13 @@ const submitCharge = async () => {
   submitting.value = true
   
   const payload = {
-    ...chargeForm.value,
+    chargeCategoryId: chargeForm.value.chargeCategoryId,
+    chargeMasterId: chargeForm.value.chargeMasterId || null,
+    description: chargeForm.value.description,
+    rate: chargeForm.value.rate,
+    quantity: chargeForm.value.quantity,
+    chargeDate: chargeForm.value.chargeDate,
+    doctorId: chargeForm.value.doctorId || null,
     addons: otPackageItems.value
       .filter(item => selectedAddons.value.includes(item._id))
       .map(item => ({
@@ -622,7 +637,7 @@ onBeforeUnmount(() => {
                 <th class="px-5 py-2.5 text-center w-24">Qty</th>
                 <th class="px-5 py-2.5 text-right w-28">Total Amount</th>
                 <th class="px-5 py-2.5 text-center w-24">Status</th>
-                <th class="px-5 py-2.5 text-right w-16">Action</th>
+                <th v-if="authStore.hasPermission('ipd.charges.update') || authStore.hasPermission('ipd.charges.delete')" class="px-5 py-2.5 text-right w-16">Action</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100 text-slate-650">
@@ -636,7 +651,7 @@ onBeforeUnmount(() => {
                 <td class="px-5 py-3 font-semibold text-slate-800">
                   <div>{{ charge.description }}</div>
                   
-                  <!-- Addons list if present -->
+                  <!-- Addons list -->
                   <div v-if="charge.addons && charge.addons.length > 0" class="mt-1.5 flex flex-wrap gap-1">
                     <span 
                       v-for="addon in charge.addons" 
@@ -645,9 +660,9 @@ onBeforeUnmount(() => {
                     >
                       <span>{{ addon.itemName }}</span>
                       <span v-if="addon.doctorId" class="px-1 py-0.2 text-[8px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-650 rounded">
-                        Dr. {{ addon.doctorId.fullName || addon.doctorId }}
+                        Dr. {{ addon.doctorId.fullName || addon.doctorId.name || addon.doctorId }}
                       </span>
-                      <span class="text-slate-500 font-extrabold">(₹{{ addon.amount.toLocaleString() }})</span>
+                      <span class="text-slate-500 font-extrabold">(₹{{ addon.amount?.toLocaleString() }})</span>
                     </span>
                   </div>
 
@@ -682,7 +697,7 @@ onBeforeUnmount(() => {
                 </td>
                 <td class="px-5 py-3 text-right font-bold text-slate-900">
                   <span v-if="editingChargeId === charge._id">₹{{ (editingForm.rate * editingForm.quantity).toLocaleString() }}</span>
-                  <span v-else>₹{{ charge.amount?.toLocaleString() }}</span>
+                  <span v-else>₹{{ getChargeTotal(charge).toLocaleString() }}</span>
                 </td>
                 <td class="px-5 py-3 text-center">
                   <span 
@@ -692,7 +707,7 @@ onBeforeUnmount(() => {
                     {{ charge.isBilled ? 'Billed' : 'Unbilled' }}
                   </span>
                 </td>
-                <td class="px-5 py-3 text-right">
+                <td v-if="authStore.hasPermission('ipd.charges.update') || authStore.hasPermission('ipd.charges.delete')" class="px-5 py-3 text-right">
                   <div v-if="editingChargeId === charge._id" class="flex items-center justify-end gap-1">
                     <button 
                       @click.stop="saveCharge(charge)"
@@ -715,6 +730,7 @@ onBeforeUnmount(() => {
                   </div>
                   <div v-else-if="!charge.isBilled" class="flex items-center justify-end gap-1.5">
                     <button 
+                      v-if="authStore.hasPermission('ipd.charges.update')"
                       @click.stop="startEdit(charge)"
                       class="p-1 rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 cursor-pointer transition-all"
                       title="Edit charge"
@@ -724,6 +740,7 @@ onBeforeUnmount(() => {
                       </svg>
                     </button>
                     <button 
+                      v-if="authStore.hasPermission('ipd.charges.delete')"
                       @click.stop="deleteCharge(charge)"
                       class="p-1 rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-slate-50 cursor-pointer transition-all"
                       title="Delete charge line"
@@ -989,12 +1006,11 @@ onBeforeUnmount(() => {
           </div>
 
           <!-- Consulting Doctor Selection -->
-          <div class="space-y-1 relative" v-if="isDoctorCategory">
-            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Consulting Doctor</label>
+          <div class="space-y-1 relative">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Consulting Doctor <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
             <div class="relative">
               <button 
                 type="button"
-                :disabled="isOtCategory"
                 @click.stop="toggleDoctorDropdown"
                 class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all text-left cursor-pointer disabled:opacity-60 disabled:bg-slate-50 disabled:cursor-not-allowed"
               >

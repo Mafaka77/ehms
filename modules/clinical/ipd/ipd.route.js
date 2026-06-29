@@ -42,16 +42,16 @@ module.exports = async (fastify, options) => {
     fastify.delete('/admission/charge/:id', { onRequest: [auth] }, ipdController.deleteAdmissionCharge)
     fastify.put('/admission/charge/:id', { onRequest: [auth] }, ipdController.updateAdmissionCharge)
     fastify.get('/charge-categories', { onRequest: [auth] }, ipdController.getAllChargeCategories)
-    fastify.post('/charge-categories', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.createChargeCategory)
+    fastify.post('/charge-categories', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.createChargeCategory)
     fastify.get('/charge-categories/:id', { onRequest: [auth] }, ipdController.getChargeCategoryById)
-    fastify.delete('/charge-categories/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.deleteChargeCategory)
+    fastify.delete('/charge-categories/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.deleteChargeCategory)
     fastify.get('/charge-categories/:id/charge-masters', { onRequest: [auth] }, ipdController.getChargeMastersByCategory)
-    fastify.post('/charge-categories/:id/charge-masters', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.createChargeMaster)
-    fastify.delete('/charge-masters/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.deleteChargeMaster)
-    fastify.put('/charge-masters/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.updateChargeMaster)
+    fastify.post('/charge-categories/:id/charge-masters', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.createChargeMaster)
+    fastify.delete('/charge-masters/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.deleteChargeMaster)
+    fastify.put('/charge-masters/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.updateChargeMaster)
 
     // Charge Package Items routes
     fastify.get('/charge-masters/:id/package-items', { onRequest: [auth] }, ipdController.getPackageItems)
-    fastify.post('/charge-masters/:id/package-items', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.addPackageItem)
-    fastify.delete('/package-items/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.deletePackageItem)
+    fastify.post('/charge-masters/:id/package-items', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.addPackageItem)
+    fastify.delete('/package-items/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.deletePackageItem)
 }

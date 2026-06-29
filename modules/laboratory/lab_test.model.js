@@ -35,8 +35,40 @@ const labTestSchema = new mongoose.Schema({
     default: 0
   },
 
-  turnaroundTimeHours: Number,
+  turnaroundTimeHours: {
+    type: Number,
+    default: 24
+  },
 
+  methodology: {
+    type: String,
+    default: null
+  },
+
+  physiologicalBasis: {
+    type: String,
+    default: null
+  },
+
+  interpretation: {
+    type: String,
+    default: null
+  },
+
+  reportComment: {
+    type: String,
+    default: null
+  },
+
+  reportNote: {
+    type: String,
+    default: null
+  },
+
+  isPanel: {
+    type: Boolean,
+    default: false
+  },
   isActive: {
     type: Boolean,
     default: true

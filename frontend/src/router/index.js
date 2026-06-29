@@ -231,7 +231,13 @@ const routes = [
           //   name: 'laboratory-test-parameter',
           //   component: () => import('../views/laboratory/testParameter/Index.vue'),
           //   meta: { permission: 'lab.view' }
-          // }
+          // },
+          {
+            path: 'instrument',
+            name: 'laboratory-instrument',
+            component: () => import('../views/laboratory/instrument/Index.vue'),
+            meta: { permission: 'lab.view' }
+          }
         ]
       },
       //RADIOLOGY MODULE

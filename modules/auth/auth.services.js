@@ -75,6 +75,52 @@ exports.getRoles = async () => {
     }
 }
 
+exports.createRole = async (data) => {
+    try {
+        const existingRole = await Role.findOne({ name: data.name })
+        if (existingRole) {
+            const error = new Error('Role name already exists')
+            error.status = 400
+            throw error
+        }
+        const role = new Role({
+            name: data.name,
+            permissions: data.permissions || []
+        })
+        await role.save()
+        return role
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.updateRole = async (id, data) => {
+    try {
+        const role = await Role.findById(id)
+        if (!role) {
+            const error = new Error('Role not found')
+            error.status = 404
+            throw error
+        }
+        if (data.name && data.name !== role.name) {
+            const existingRole = await Role.findOne({ name: data.name, _id: { $ne: id } })
+            if (existingRole) {
+                const error = new Error('Role name already exists')
+                error.status = 400
+                throw error
+            }
+            role.name = data.name
+        }
+        if (data.permissions) {
+            role.permissions = data.permissions
+        }
+        await role.save()
+        return role
+    } catch (error) {
+        throw error
+    }
+}
+
 exports.checkLogin = async (email) => {
     try {
         if (!email) {

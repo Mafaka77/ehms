@@ -718,7 +718,7 @@ exports.getAllIpdOrders = async (query = {}) => {
     }
 }
 
-exports.updateIpdOrderStatus = async (orderId, status) => {
+exports.updateIpdOrderStatus = async (orderId, status, userId) => {
     try {
         const order = await MedicineIpdOrder.findById(orderId)
         if (!order) {
@@ -766,7 +766,9 @@ exports.updateIpdOrderStatus = async (orderId, status) => {
                     quantity: item.quantity,
                     rate: rate,
                     amount: item.quantity * rate,
-                    isBilled: false
+                    isBilled: false,
+                    createdBy: userId || null,
+                    updatedBy: userId || null
                 })
             }
         }

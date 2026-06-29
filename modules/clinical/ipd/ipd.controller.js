@@ -341,7 +341,7 @@ exports.getAdmissionCharges = async (req, res) => {
 
 exports.createAdmissionCharge = async (req, res) => {
     try {
-        const charge = await ipdService.createAdmissionCharge(req.params.id, req.body)
+        const charge = await ipdService.createAdmissionCharge(req.params.id, req.body, req.user?._id)
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Charge added successfully',
             data: charge,
@@ -373,7 +373,7 @@ exports.deleteAdmissionCharge = async (req, res) => {
 
 exports.updateAdmissionCharge = async (req, res) => {
     try {
-        const charge = await ipdService.updateAdmissionCharge(req.params.id, req.body)
+        const charge = await ipdService.updateAdmissionCharge(req.params.id, req.body, req.user?._id)
         return res.code(STATUS_CODES.OK).send({
             message: 'Charge updated successfully',
             data: charge,

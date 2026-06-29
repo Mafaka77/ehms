@@ -5,6 +5,8 @@ const authController = require('./auth.controller')
 module.exports = async function(fastify, opts){
     fastify.post('/login', authController.login)
     fastify.get('/roles', { onRequest: [auth] }, authController.getRoles)
+    fastify.post('/roles', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, authController.createRole)
+    fastify.put('/roles/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, authController.updateRole)
     fastify.get('/check-login', { onRequest: [auth] }, authController.checkLogin)
     fastify.post('/enable-login', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, authController.enableLogin)
     fastify.get('/users', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, authController.getAllUsers)

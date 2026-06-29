@@ -126,9 +126,16 @@ const submitInstallment = async () => {
               <select v-model="newInstallment.chargeId" required class="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500">
                 <option value="">Select Charge</option>
                 <option v-for="c in processedCharges.filter(c => c.balance > 0)" :key="c._id" :value="c._id">
-                  {{ c.description }} (Balance: ₹{{ c.balance }})
+                  {{ c.description }} (Total: ₹{{ c.chargeTotal?.toLocaleString() }} | Balance: ₹{{ c.balance?.toLocaleString() }})
                 </option>
               </select>
+              <!-- Show addons for selected charge -->
+              <div v-if="newInstallment.chargeId" class="mt-2">
+                <div v-for="addon in (processedCharges.find(c => c._id === newInstallment.chargeId)?.addons || [])" :key="addon._id" class="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-semibold bg-teal-50 text-teal-800 border border-teal-100 mr-1 mb-1">
+                  <span>{{ addon.itemName }}</span>
+                  <span class="text-slate-500 font-extrabold">(₹{{ addon.amount?.toLocaleString() }})</span>
+                </div>
+              </div>
             </div>
             
             <div v-if="newInstallment.chargeId">

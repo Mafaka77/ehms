@@ -48,6 +48,14 @@ export const useLabStore = defineStore('lab', {
             page: 1,
             limit: 10,
             pages: 1
+        },
+        instruments: [],
+        instrumentSearchQuery: '',
+        instrumentPagination: {
+            total: 0,
+            page: 1,
+            limit: 10,
+            pages: 1
         }
     }),
     
@@ -513,6 +521,66 @@ export const useLabStore = defineStore('lab', {
                 throw error;
             } finally {
                 this.loading = false;
+            }
+        },
+
+        // --- Lab Instrument Actions ---
+
+        async fetchInstruments(page = 1, limit = 10, search = '') {
+            this.loading = true;
+            this.error = null;
+            try {
+                const response = await api.get('/lab/instrument', {
+                    params: { page, limit, search }
+                });
+                this.instruments = response.data.data;
+                this.instrumentPagination = response.data.pagination || {
+                    total: response.data.data.length,
+                    page,
+                    limit,
+                    pages: 1
+                };
+            } catch (error) {
+                console.error('Error fetching lab instruments:', error);
+                this.error = error.response?.data?.message || 'Failed to fetch lab instruments';
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async createInstrument(data) {
+            this.loading = true;
+            try {
+                const response = await api.post('/lab/instrument', data);
+                return { success: true, data: response.data.data, message: response.data.message };
+            } catch (error) {
+                console.error('Error creating lab instrument:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to create lab instrument' };
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async updateInstrument(id, data) {
+            this.loading = true;
+            try {
+                const response = await api.put(`/lab/instrument/${id}`, data);
+                return { success: true, data: response.data.data, message: response.data.message };
+            } catch (error) {
+                console.error('Error updating lab instrument:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to update lab instrument' };
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        async deleteInstrument(id) {
+            try {
+                const response = await api.delete(`/lab/instrument/${id}`);
+                return { success: true, data: response.data.data, message: response.data.message };
+            } catch (error) {
+                console.error('Error deleting lab instrument:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to delete lab instrument' };
             }
         }
     }

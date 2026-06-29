@@ -450,8 +450,15 @@ exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, disc
             throw error
         }
 
+        const PatientChargeAddon = require('../common/patient_charge_addon.model')
+
         let totalChargesAmount = 0
-        unbilledCharges.forEach(charge => totalChargesAmount += charge.amount)
+        for (const charge of unbilledCharges) {
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).session(session)
+            const addonsTotal = addons.reduce((sum, a) => sum + (a.amount || 0), 0)
+            charge._addonsTotal = addonsTotal
+            totalChargesAmount += charge.amount + addonsTotal
+        }
 
         // 3. Calculate amounts
         const grossAmount = totalChargesAmount
@@ -474,6 +481,7 @@ exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, disc
 
         // 5. Create BillItems for PatientCharges
         for (const charge of unbilledCharges) {
+            const chargeTotal = charge.amount + (charge._addonsTotal || 0)
             await BillItem.create([{
                 billId: bill._id,
                 itemType: charge.chargeCategoryId?.type === 'PROCEDURE' ? 'PROCEDURE' : 
@@ -483,9 +491,9 @@ exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, disc
                 referenceId: charge._id,
                 quantity: charge.quantity,
                 rate: charge.rate,
-                amount: charge.amount,
+                amount: chargeTotal,
                 discountAmount: 0,
-                netAmount: charge.amount
+                netAmount: chargeTotal
             }], { session })
 
             charge.isBilled = true
@@ -618,10 +626,17 @@ exports.generateBillFromDentalAppointment = async (dentalAppointmentId, userId, 
             query._id = specificChargeId;
         }
 
+        const PatientChargeAddon = require('../common/patient_charge_addon.model')
         const unbilledCharges = await PatientCharge.find(query).populate('chargeCategoryId').session(session)
 
         let totalChargesAmount = 0
-        unbilledCharges.forEach(charge => totalChargesAmount += charge.amount)
+        for (const charge of unbilledCharges) {
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).session(session)
+            const addonsTotal = addons.reduce((sum, a) => sum + (a.amount || 0), 0)
+            charge._addons = addons
+            charge._addonsTotal = addonsTotal
+            totalChargesAmount += charge.amount + addonsTotal
+        }
 
         // 3. We only bill the dental procedures here. Consultation fee is handled separately.
         const grossAmount = totalChargesAmount
@@ -655,15 +670,15 @@ exports.generateBillFromDentalAppointment = async (dentalAppointmentId, userId, 
         for (const charge of unbilledCharges) {
             await BillItem.create([{
                 billId: bill._id,
-                itemType: 'PROCEDURE', // Using PROCEDURE
+                itemType: 'PROCEDURE',
                 sourceModule: 'OTHER',
                 description: charge.description,
                 referenceId: charge._id,
                 quantity: charge.quantity,
                 rate: charge.rate,
-                amount: charge.amount,
+                amount: charge.amount + (charge._addonsTotal || 0),
                 discountAmount: 0,
-                netAmount: charge.amount
+                netAmount: charge.amount + (charge._addonsTotal || 0)
             }], { session })
             
             // Mark as billed
@@ -811,7 +826,9 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
                                 rate: item.rate,
                                 amount: item.amount,
                                 billId: txBill._id,
-                                isBilled: true
+                                isBilled: true,
+                                createdBy: userId || null,
+                                updatedBy: userId || null
                             }], { session })
                         }
                     }
@@ -857,7 +874,9 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
                                 rate: item.rate,
                                 amount: item.amount,
                                 billId: txBill._id,
-                                isBilled: true
+                                isBilled: true,
+                                createdBy: userId || null,
+                                updatedBy: userId || null
                             }], { session })
                         }
                     }

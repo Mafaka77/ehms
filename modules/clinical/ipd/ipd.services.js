@@ -869,12 +869,15 @@ exports.getAdmissionCharges = async (admissionId) => {
     try {
         const PatientCharge = require('../../common/patient_charge.model')
         const PatientChargeAddon = require('../../common/patient_charge_addon.model')
+        require('./ipd_charge_category.model') // ensure ChargeCategory schema is registered
         const charges = await PatientCharge.find({ admissionId })
             .populate('chargeCategoryId')
+            .populate('doctorId', 'fullName name specializationId')
             .sort({ createdAt: -1 })
         
         const chargesWithAddons = await Promise.all(charges.map(async (charge) => {
-            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).populate('doctorId')
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id })
+                .populate('doctorId', 'fullName name specializationId')
             return {
                 ...charge.toObject(),
                 addons
@@ -886,13 +889,13 @@ exports.getAdmissionCharges = async (admissionId) => {
     }
 }
 
-exports.createAdmissionCharge = async (admissionId, data) => {
+exports.createAdmissionCharge = async (admissionId, data, userId) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
         const PatientCharge = require('../../common/patient_charge.model')
-        const Admission = require('./admission.model')
         const PatientChargeAddon = require('../../common/patient_charge_addon.model')
+        const Admission = require('./admission.model')
 
         const admission = await Admission.findById(admissionId).session(session)
         if (!admission) {
@@ -906,11 +909,13 @@ exports.createAdmissionCharge = async (admissionId, data) => {
         const amount = rate * quantity
         const chargeDate = data.chargeDate ? new Date(data.chargeDate) : new Date()
 
+        // Create main charge (rate = base rate only, NOT including addon amounts)
         const [charge] = await PatientCharge.create([{
             admissionId,
             sourceType: 'IPD',
             patientId: admission.patientId,
             chargeCategoryId: data.chargeCategoryId,
+            chargeMasterId: data.chargeMasterId || null,
             description: data.description,
             quantity,
             rate,
@@ -918,38 +923,26 @@ exports.createAdmissionCharge = async (admissionId, data) => {
             sourceId: data.sourceId || data.chargeMasterId || null,
             isBilled: false,
             doctorId: data.doctorId || null,
+            createdBy: userId || null,
+            updatedBy: userId || null,
             createdAt: chargeDate
         }], { session })
 
-        // If addons are provided, create them. Or if doctorId is provided, generate a doctor share addon.
-        let addonRecords = []
+        // Create addons as separate PatientChargeAddon records (amounts stored independently)
         if (data.addons && Array.isArray(data.addons) && data.addons.length > 0) {
-            addonRecords = data.addons.map(addon => ({
+            const addonRecords = data.addons.map(addon => ({
                 patientChargeId: charge._id,
                 itemName: addon.itemName,
                 amount: Number(addon.amount || 0),
                 packageItemId: addon.packageItemId || null,
-                chargeCategoryId: data.chargeCategoryId,
+                chargeCategoryId: addon.chargeCategoryId || data.chargeCategoryId,
                 chargeMasterId: data.chargeMasterId || null,
                 isCustom: !!addon.isCustom,
                 doctorId: addon.doctorId || null,
+                createdBy: userId || null,
+                updatedBy: userId || null,
                 createdAt: chargeDate
             }))
-        } else if (data.doctorId) {
-            addonRecords = [{
-                patientChargeId: charge._id,
-                itemName: data.description,
-                amount: amount,
-                packageItemId: null,
-                chargeCategoryId: data.chargeCategoryId,
-                chargeMasterId: data.chargeMasterId || null,
-                isCustom: true,
-                doctorId: data.doctorId,
-                createdAt: chargeDate
-            }]
-        }
-
-        if (addonRecords.length > 0) {
             await PatientChargeAddon.insertMany(addonRecords, { session })
         }
 
@@ -986,7 +979,6 @@ exports.deleteAdmissionCharge = async (chargeId) => {
 
         // Delete all associated addons
         await PatientChargeAddon.deleteMany({ patientChargeId: chargeId }).session(session)
-
         await charge.deleteOne({ session })
 
         await session.commitTransaction()
@@ -999,7 +991,7 @@ exports.deleteAdmissionCharge = async (chargeId) => {
     }
 }
 
-exports.updateAdmissionCharge = async (chargeId, data) => {
+exports.updateAdmissionCharge = async (chargeId, data, userId) => {
     try {
         const PatientCharge = require('../../common/patient_charge.model')
         const charge = await PatientCharge.findById(chargeId)
@@ -1032,6 +1024,7 @@ exports.updateAdmissionCharge = async (chargeId, data) => {
         charge.rate = rate
         charge.quantity = quantity
         charge.amount = rate * quantity
+        if (userId) charge.updatedBy = userId
 
         await charge.save()
         return charge
@@ -1076,17 +1069,32 @@ exports.getChargeMastersByCategory = async (categoryId) => {
 exports.createChargeMaster = async (categoryId, data, userId) => {
     try {
         const ChargeMaster = require('./ipd_charge_master.model')
-        // Check if code is already taken
-        const existing = await ChargeMaster.findOne({ code: data.code.toUpperCase().trim() })
-        if (existing) {
-            const error = new Error(`Charge Master with code "${data.code}" already exists`)
-            error.status = STATUS_CODES.BAD_REQUEST
-            throw error
+        
+        let code = data.code ? data.code.toUpperCase().trim() : ''
+        if (code) {
+            const existing = await ChargeMaster.findOne({ code })
+            if (existing) {
+                const error = new Error(`Charge Master with code "${code}" already exists`)
+                error.status = 400
+                throw error
+            }
+        } else {
+            // Auto-generate code from name
+            let baseCode = data.name.toUpperCase().trim()
+                .replace(/[^A-Z0-9\s]/g, '')
+                .replace(/\s+/g, '_')
+            
+            code = baseCode
+            let suffix = 1
+            while (await ChargeMaster.findOne({ code })) {
+                code = `${baseCode}_${suffix}`
+                suffix++
+            }
         }
 
         const chargeMaster = await ChargeMaster.create({
             categoryId,
-            code: data.code.toUpperCase().trim(),
+            code,
             name: data.name,
             description: data.description || null,
             billingUnit: data.billingUnit || 'ITEM',

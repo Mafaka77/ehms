@@ -264,7 +264,9 @@ exports.createRadiologyOrder = async (data, userId) => {
                     quantity: 1,
                     rate: dbItem.rate,
                     amount: dbItem.amount,
-                    isBilled: false
+                    isBilled: false,
+                    createdBy: userId || null,
+                    updatedBy: userId || null
                 }], { session })
             }
         }

@@ -250,9 +250,10 @@ const updateRateAndDescriptionFromAddons = () => {
     baseRate = selectedMaster.standardRate || 0
   }
 
+  // Only set the base rate — addon amounts are stored separately in PatientChargeAddon
+  chargeForm.value.rate = baseRate
+
   const activeAddons = otPackageItems.value.filter(item => selectedAddons.value.includes(item._id))
-  const totalRate = baseRate + activeAddons.reduce((sum, item) => sum + (item.defaultAmount || 0), 0)
-  chargeForm.value.rate = totalRate
 
   const addonNames = activeAddons.map(item => item.itemName).join(', ')
   const descriptionWithAddons = addonNames ? `${baseName} (${addonNames})` : baseName
@@ -303,9 +304,16 @@ const removeCustomAddon = (id) => {
   updateRateAndDescriptionFromAddons()
 }
 
+// Helper: total amount for a charge = base amount + all addon amounts
+const getChargeTotal = (charge) => {
+  const base = charge.amount || 0
+  const addonsTotal = (charge.addons || []).reduce((sum, a) => sum + (a.amount || 0), 0)
+  return base + addonsTotal
+}
+
 const totalUnbilledAmount = computed(() => {
   return charges.value
-    .reduce((sum, c) => sum + (c.balance || 0), 0)
+    .reduce((sum, c) => sum + ((c.balance || 0) > 0 ? getChargeTotal(c) - (getChargeTotal(c) - (c.balance || 0)) : 0), 0)
 })
 
 const expandedGroups = ref({})
@@ -338,7 +346,7 @@ const groupedCharges = computed(() => {
       }
     }
     groups[dateKey].charges.push(charge)
-    groups[dateKey].totalAmount += (charge.amount || 0)
+    groups[dateKey].totalAmount += getChargeTotal(charge)
   })
 
   return Object.values(groups).sort((a, b) => b.timestamp - a.timestamp)
@@ -431,7 +439,13 @@ const submitCharge = async () => {
   submitting.value = true
   
   const payload = {
-    ...chargeForm.value,
+    chargeCategoryId: chargeForm.value.chargeCategoryId,
+    chargeMasterId: chargeForm.value.chargeMasterId || null,
+    description: chargeForm.value.description,
+    rate: chargeForm.value.rate,
+    quantity: chargeForm.value.quantity,
+    chargeDate: chargeForm.value.chargeDate,
+    doctorId: chargeForm.value.doctorId || null,
     addons: otPackageItems.value
       .filter(item => selectedAddons.value.includes(item._id))
       .map(item => ({
@@ -683,7 +697,7 @@ onBeforeUnmount(() => {
                 </td>
                 <td class="px-5 py-3 text-right font-bold text-slate-900">
                   <span v-if="editingChargeId === charge._id">₹{{ (editingForm.rate * editingForm.quantity).toLocaleString() }}</span>
-                  <span v-else>₹{{ charge.amount?.toLocaleString() }}</span>
+                  <span v-else>₹{{ getChargeTotal(charge).toLocaleString() }}</span>
                 </td>
                 <td class="px-5 py-3 text-center">
                   <span 

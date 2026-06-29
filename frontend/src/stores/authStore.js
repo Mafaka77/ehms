@@ -79,6 +79,26 @@ export const useAuthStore = defineStore('auth', {
         return [];
       }
     },
+
+    async createRole(data) {
+      try {
+        const response = await api.post('/auth/roles', data);
+        return { success: true, data: response.data.data };
+      } catch (err) {
+        const message = err.response?.data?.message || err.message || 'Failed to create role';
+        return { success: false, message };
+      }
+    },
+
+    async updateRole(id, data) {
+      try {
+        const response = await api.put(`/auth/roles/${id}`, data);
+        return { success: true, data: response.data.data };
+      } catch (err) {
+        const message = err.response?.data?.message || err.message || 'Failed to update role';
+        return { success: false, message };
+      }
+    },
     
     async checkLoginStatus(email) {
       try {

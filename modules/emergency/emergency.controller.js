@@ -131,7 +131,7 @@ exports.getPatientCharges = async (req, res) => {
 
 exports.addPatientCharge = async (req, res) => {
     try {
-        const charge = await emergencyService.createEmergencyCharge(req.params.id, req.body);
+        const charge = await emergencyService.createEmergencyCharge(req.params.id, req.body, req.user?._id);
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Patient charge added successfully',
             data: charge,
@@ -163,7 +163,7 @@ exports.deletePatientCharge = async (req, res) => {
 
 exports.updatePatientCharge = async (req, res) => {
     try {
-        const charge = await emergencyService.updateEmergencyCharge(req.params.chargeId, req.body);
+        const charge = await emergencyService.updateEmergencyCharge(req.params.chargeId, req.body, req.user?._id);
         return res.code(STATUS_CODES.OK).send({
             message: 'Patient charge updated successfully',
             data: charge,
