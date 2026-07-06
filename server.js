@@ -14,7 +14,15 @@ connectDB()
 
 // Register Core Plugins
 fastify.register(require('@fastify/helmet'), {
-  crossOriginResourcePolicy: { policy: "cross-origin" }
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      "frame-src": ["'self'", "blob:"],
+      "img-src": ["'self'", "data:", "blob:"],
+      "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"] // Usually needed by Vue
+    }
+  }
 })
 fastify.register(require('@fastify/cors'), {
   origin: '*',
