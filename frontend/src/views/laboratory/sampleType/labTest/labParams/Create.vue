@@ -22,13 +22,18 @@ const labStore = useLabStore()
 
 const form = reactive({
   testId: '',
+  section: null,
+  code: null,
   name: '',
+  resultType: 'NUMBER',
+  options: [],
   unit: '',
   normalRangeMale: '',
   normalRangeFemale: '',
   normalRangeChild: '',
   displayOrder: 0,
-  referenceIntervals: []
+  referenceIntervals: [],
+  isRequired: true
 })
 
 const loading = ref(false)
@@ -40,7 +45,11 @@ watch(() => props.show, (newVal) => {
     if (props.param && props.param._id) {
       // Edit Mode
       form.testId = props.param.testId?._id || props.param.testId || ''
+      form.section = props.param.section || ''
+      form.code = props.param.code || ''
       form.name = props.param.name || ''
+      form.resultType = props.param.resultType || 'NUMBER'
+      form.options = props.param.options ? [...props.param.options] : []
       form.unit = props.param.unit || ''
       form.normalRangeMale = props.param.normalRangeMale || ''
       form.normalRangeFemale = props.param.normalRangeFemale || ''
@@ -49,16 +58,22 @@ watch(() => props.show, (newVal) => {
       form.referenceIntervals = props.param.referenceIntervals 
         ? JSON.parse(JSON.stringify(props.param.referenceIntervals)) 
         : []
+      form.isRequired = props.param.isRequired !== undefined ? props.param.isRequired : true
     } else {
       // Create Mode
       form.testId = props.param?.testId || ''
+      form.section = ''
+      form.code = ''
       form.name = ''
+      form.resultType = 'NUMBER'
+      form.options = []
       form.unit = ''
       form.normalRangeMale = ''
       form.normalRangeFemale = ''
       form.normalRangeChild = ''
       form.displayOrder = 0
       form.referenceIntervals = []
+      form.isRequired = true
     }
     error.value = ''
   }
@@ -71,6 +86,23 @@ const addReferenceInterval = () => {
 const removeReferenceInterval = (index) => {
   form.referenceIntervals.splice(index, 1)
 }
+
+const addOption = () => {
+  form.options.push('')
+}
+
+const removeOption = (index) => {
+  form.options.splice(index, 1)
+}
+
+// custom input v-model logic for options array
+const updateOption = (idx, value) => {
+  form.options[idx] = value
+}
+
+// const removeReferenceInterval = (index) => {
+//   form.referenceIntervals.splice(index, 1)
+// }
 
 const handleClose = () => {
   if (loading.value) return
@@ -173,6 +205,28 @@ const handleSubmit = async () => {
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <!-- Section / Group -->
+              <div>
+                <BaseInput 
+                  v-model="form.section"
+                  id="section"
+                  label="Section / Group"
+                  placeholder="e.g. HEMATOLOGY"
+                  :disabled="loading"
+                />
+              </div>
+
+              <!-- Parameter Code -->
+              <div>
+                <BaseInput 
+                  v-model="form.code"
+                  id="code"
+                  label="Parameter Code"
+                  placeholder="e.g. HB"
+                  :disabled="loading"
+                />
+              </div>
+
               <!-- Parameter Name -->
               <div class="md:col-span-2">
                 <BaseInput 
@@ -183,6 +237,72 @@ const handleSubmit = async () => {
                   required
                   :disabled="loading"
                 />
+              </div>
+
+              <!-- Result Type -->
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Result Type</label>
+                <select 
+                  v-model="form.resultType"
+                  class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all shadow-inner"
+                  :disabled="loading"
+                >
+                  <option value="NUMBER">Number (Numeric Value)</option>
+                  <option value="TEXT">Text (Short/Long Text)</option>
+                  <option value="OPTION">Option (Dropdown Select)</option>
+                  <option value="BOOLEAN">Boolean (Yes/No, Positive/Negative)</option>
+                </select>
+              </div>
+
+              <!-- Is Required -->
+              <div class="flex items-center mt-6">
+                <label class="flex items-center gap-3 cursor-pointer">
+                  <div class="relative">
+                    <input type="checkbox" v-model="form.isRequired" class="sr-only" :disabled="loading">
+                    <div class="block bg-slate-200 w-10 h-6 rounded-full transition-colors" :class="{'bg-indigo-500': form.isRequired}"></div>
+                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform" :class="{'transform translate-x-4': form.isRequired}"></div>
+                  </div>
+                  <span class="text-sm font-semibold text-slate-700">Is Required?</span>
+                </label>
+              </div>
+
+              <!-- Options (if Result Type is OPTION) -->
+              <div v-if="form.resultType === 'OPTION'" class="md:col-span-2 border border-slate-200 rounded-xl p-4 bg-slate-50/50">
+                <div class="flex items-center justify-between mb-3">
+                  <label class="block text-sm font-semibold text-slate-700">Dropdown Options</label>
+                  <button 
+                    type="button"
+                    @click="addOption"
+                    class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-semibold text-xs rounded-lg transition-colors"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
+                    Add Option
+                  </button>
+                </div>
+                
+                <div v-if="form.options.length === 0" class="text-center py-4 border border-dashed border-slate-300 rounded-xl text-xs text-slate-500 bg-white">
+                  No options added. Add options for the dropdown list.
+                </div>
+                
+                <div v-else class="space-y-2">
+                  <div v-for="(opt, idx) in form.options" :key="idx" class="flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+                    <input 
+                      :value="opt"
+                      @input="updateOption(idx, $event.target.value)"
+                      type="text"
+                      placeholder="Option value (e.g. Positive)"
+                      required
+                      class="flex-grow px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                    />
+                    <button 
+                      type="button"
+                      @click="removeOption(idx)"
+                      class="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg transition-colors shrink-0"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <!-- Unit -->

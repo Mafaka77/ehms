@@ -34,14 +34,25 @@ const form = ref({
 const wardTypes = [
   'GENERAL',
   'CABIN',
-  'DYLYSIS/HDU',
+  'HDU',
   'SUPER DELUXE',
   'ICU',
   'NICU',
   'PICU',
   'CCU',
   'EMERGENCY',
-  'DELUXE'
+  'DELUXE',
+  'OPERATION THEATER',
+  'MINOR THEATER',
+  'SPECIAL WARD',
+  'AYUSH',
+  'DIALYSIS',
+  'CARDIAC WARD',
+  'PALLIATIVE CARE WARD',
+  'AYURVEDIC WARD',
+  'ISOLATION WARD',
+  'OPD',
+  'PHYSIOTHERAPY',
 ]
 
 // Load Wards list

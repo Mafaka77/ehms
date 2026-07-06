@@ -5,6 +5,7 @@ const Admission = require('./admission.model')
 const Patient = require('../../patients/patient.model')
 const Doctor = require('../../hr/doctor.model')
 const AdmissionNote = require('./admission_note.model')
+const AdmissionAdvance = require('./admission_advance.model')
 const STATUS_CODES = require('../../../utils/statuscode')
 
 // ==========================================
@@ -1330,3 +1331,59 @@ exports.deleteChargeCategory = async (id) => {
     }
 }
 
+
+// ==========================================
+// Admission Advance Services
+// ==========================================
+
+exports.createAdmissionAdvance = async (admissionId, data, userId) => {
+    try {
+        const admission = await Admission.findById(admissionId)
+        if (!admission) {
+            const error = new Error('Admission not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const advance = new AdmissionAdvance({
+            admissionId,
+            patientId: admission.patientId,
+            amount: data.amount,
+            paymentMode: data.paymentMode,
+            referenceNo: data.referenceNo,
+            remarks: data.remarks,
+            receivedBy: userId
+        })
+
+        await advance.save()
+
+        return { success: true, data: advance, message: 'Advance payment recorded successfully' }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getAdmissionAdvances = async (admissionId) => {
+    try {
+        const advances = await AdmissionAdvance.find({ admissionId })
+            .populate('receivedBy', 'fullName')
+            .sort({ date: -1 })
+            .lean()
+        return { success: true, data: advances }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getAdmissionBills = async (admissionId) => {
+    try {
+        const Bill = mongoose.model('Bill')
+        const bills = await Bill.find({ admissionId, billType: 'IPD' })
+            .populate('generatedBy', 'fullName')
+            .sort({ generatedAt: -1 })
+            .lean()
+        return { success: true, data: bills }
+    } catch (error) {
+        throw error
+    }
+}

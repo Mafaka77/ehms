@@ -5,8 +5,43 @@ const User = require('../auth/user.model')
 const Role = require('../auth/role.model')
 const bcrypt = require('bcrypt')
 
+const fs = require('fs')
+const path = require('path')
+
+const processProfilePhoto = (base64String) => {
+    if (!base64String || !base64String.startsWith('data:image')) return base64String;
+    
+    try {
+        const matches = base64String.match(/^data:image\/([a-zA-Z0-9]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+            const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+            const base64Data = matches[2];
+            const buffer = Buffer.from(base64Data, 'base64');
+            const filename = `emp_${Date.now()}.${ext}`;
+            const uploadDir = path.join(__dirname, '../../uploads/employee_profiles');
+            
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+            
+            const filePath = path.join(uploadDir, filename);
+            fs.writeFileSync(filePath, buffer);
+            
+            // Return the URL path
+            return `/uploads/employee_profiles/${filename}`;
+        }
+    } catch (err) {
+        console.error('[Employee] Error processing profile photo:', err.message);
+    }
+    return base64String;
+}
+
 exports.createEmployee = async (data) => {
     try {
+        if (data.profilePhoto) {
+            data.profilePhoto = processProfilePhoto(data.profilePhoto);
+        }
+        
         const existingEmployee = await Employee.findOne({ mobile: data.mobile })
         if (existingEmployee) {
             const error = new Error('Employee already exists')
@@ -124,6 +159,10 @@ exports.deleteEmployee = async (id) => {
 
 exports.updateEmployee = async (id, data) => {
     try {
+        if (data.profilePhoto) {
+            data.profilePhoto = processProfilePhoto(data.profilePhoto);
+        }
+        
         const employee = await Employee.findByIdAndUpdate(id, data, { new: true })
             .populate('departmentId', 'name')
             .populate('designationId', 'designationName')

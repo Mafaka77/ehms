@@ -159,6 +159,12 @@ const routes = [
             name:'ipd-charges-view',
             component:() => import('../views/ipd/charges/View.vue'),
             meta: { permission: 'ipd.charges.view' }
+          },
+          {
+            path: 'payment',
+            name: 'ipd-payment',
+            component: () => import('../views/ipd/payment/Index.vue'),
+            meta: { permission: 'ipd.payment' }
           }
         ]
       },

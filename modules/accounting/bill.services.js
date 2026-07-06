@@ -791,6 +791,24 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
         txBill.status = txBill.balanceAmount === 0 ? 'PAID' : 'PARTIALLY_PAID'
         await txBill.save({ session })
 
+        // Consume Advance Deposit if applicable
+        if (paymentMode === 'ADVANCE_DEPOSIT' && txBill.billType === 'IPD') {
+            const AdmissionAdvance = require('../clinical/ipd/admission_advance.model')
+            const admission = await mongoose.model('Admission').findById(txBill.admissionId).session(session)
+            if (admission) {
+                const advance = new AdmissionAdvance({
+                    admissionId: admission._id,
+                    patientId: admission.patientId,
+                    amount: -amount,
+                    paymentMode: 'CASH', // Since ADVANCE_DEPOSIT isn't in the schema enum, we can use CASH and add a clear remark
+                    referenceNo: txBill.billNo,
+                    remarks: `Deposit consumed for Bill No. ${txBill.billNo}`,
+                    receivedBy: userId
+                })
+                await advance.save({ session })
+            }
+        }
+
         // Sync LabOrder
         if (txBill.billType === 'LAB' && txBill.labOrderId) {
             const order = await LabOrder.findById(txBill.labOrderId).session(session)
@@ -1154,6 +1172,98 @@ exports.cancelPayment = async (paymentId, userId) => {
         await session.commitTransaction()
         session.endSession()
         return payment
+    } catch (err) {
+        await session.abortTransaction()
+        session.endSession()
+        throw err
+    }
+}
+
+// ---------------------------------------------------------------------------
+// generateBillFromIpdCharges
+
+exports.generateBillFromIpdCharges = async (admissionId, chargeIds, userId) => {
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    try {
+        const Admission = require('../clinical/ipd/admission.model')
+        const admission = await Admission.findById(admissionId).session(session)
+        if (!admission) {
+            const error = new Error('Admission not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const PatientCharge = require('../common/patient_charge.model')
+        const PatientChargeAddon = require('../common/patient_charge_addon.model')
+        
+        // Fetch the specific charges that are unbilled
+        const query = { _id: { $in: chargeIds }, admissionId, isBilled: false }
+        const unbilledCharges = await PatientCharge.find(query).populate('chargeCategoryId').session(session)
+
+        if (unbilledCharges.length === 0) {
+            const error = new Error('No unbilled charges found for the provided selection')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        let totalGrossAmount = 0
+        const billItemsData = []
+
+        for (const charge of unbilledCharges) {
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).session(session)
+            const addonsTotal = addons.reduce((sum, a) => sum + (a.amount || 0), 0)
+            
+            const itemAmount = charge.amount + addonsTotal
+            totalGrossAmount += itemAmount
+
+            billItemsData.push({
+                itemType: 'OTHER', // Can be refined based on sourceType later
+                sourceModule: 'OTHER',
+                referenceId: charge._id,
+                description: charge.description || 'IPD Charge',
+                quantity: charge.quantity || 1,
+                rate: charge.rate,
+                amount: itemAmount,
+                discountAmount: 0,
+                netAmount: itemAmount,
+                patientChargeId: charge._id
+            })
+        }
+
+        // Create the Bill
+        const [bill] = await Bill.create([{
+            patientId: admission.patientId,
+            admissionId: admission._id,
+            billType: 'IPD',
+            grossAmount: totalGrossAmount,
+            discountAmount: 0,
+            netAmount: totalGrossAmount,
+            paidAmount: 0,
+            balanceAmount: totalGrossAmount,
+            status: 'DRAFT',
+            generatedBy: userId,
+            generatedAt: new Date()
+        }], { session })
+
+        // Assign billId to the bill items
+        billItemsData.forEach(item => {
+            item.billId = bill._id
+        })
+
+        await BillItem.insertMany(billItemsData, { session })
+
+        // Update PatientCharges to marked as billed
+        const unbilledChargeIds = unbilledCharges.map(c => c._id)
+        await PatientCharge.updateMany(
+            { _id: { $in: unbilledChargeIds } },
+            { $set: { isBilled: true, billId: bill._id } },
+            { session }
+        )
+
+        await session.commitTransaction()
+        session.endSession()
+        return bill
     } catch (err) {
         await session.abortTransaction()
         session.endSession()

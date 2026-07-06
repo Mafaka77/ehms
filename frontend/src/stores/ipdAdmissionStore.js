@@ -195,6 +195,66 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async addAdmissionAdvance(admissionId, data) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post(`/ipd/admission/${admissionId}/advance`, data)
+        return { success: true, data: response.data.data, message: response.data.message || 'Advance added successfully' }
+      } catch (err) {
+        console.error('Error adding advance:', err)
+        this.error = err.response?.data?.message || 'Failed to add advance'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchAdmissionAdvances(admissionId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get(`/ipd/admission/${admissionId}/advances`)
+        return { success: true, data: response.data.data }
+      } catch (err) {
+        console.error('Error fetching advances:', err)
+        this.error = err.response?.data?.message || 'Failed to fetch advances'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchAdmissionBills(admissionId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get(`/ipd/admission/${admissionId}/bills`)
+        return { success: true, data: response.data.data }
+      } catch (err) {
+        console.error('Error fetching admission bills:', err)
+        this.error = err.response?.data?.message || 'Failed to fetch bills'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async generateIpdBill(payload) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post('/billing/generate-from-ipd-charges', payload)
+        return { success: true, data: response.data.data, message: response.data.message || 'Bill generated successfully' }
+      } catch (err) {
+        console.error('Error generating IPD bill:', err)
+        this.error = err.response?.data?.message || 'Failed to generate IPD bill'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchChargeCategories() {
       this.loading = true
       this.error = null

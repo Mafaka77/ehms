@@ -57,6 +57,10 @@ const employeeSchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  profilePhoto: {
+    type: String,
+    required: false
   }
 
 }, {

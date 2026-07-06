@@ -28,6 +28,12 @@ const form = reactive({
   reportType: 'PARAMETER',
   rate: 0,
   turnaroundTimeHours: '',
+  methodology: '',
+  physiologicalBasis: '',
+  interpretation: '',
+  reportComment: '',
+  reportNote: '',
+  isPanel: false,
   isActive: true
 })
 
@@ -56,15 +62,27 @@ watch(() => props.show, (newVal) => {
       form.reportType = props.test.reportType || 'PARAMETER'
       form.rate = props.test.rate || 0
       form.turnaroundTimeHours = props.test.turnaroundTimeHours || ''
+      form.methodology = props.test.methodology || ''
+      form.physiologicalBasis = props.test.physiologicalBasis || ''
+      form.interpretation = props.test.interpretation || ''
+      form.reportComment = props.test.reportComment || ''
+      form.reportNote = props.test.reportNote || ''
+      form.isPanel = props.test.isPanel !== undefined ? props.test.isPanel : false
       form.isActive = props.test.isActive !== undefined ? props.test.isActive : true
     } else {
-      form.code = ''
+      form.code = props.test?.code || ''
       form.name = ''
       form.categoryId = ''
       form.sampleTypeId = props.test?.sampleTypeId || ''
       form.reportType = 'PARAMETER'
       form.rate = 0
       form.turnaroundTimeHours = ''
+      form.methodology = ''
+      form.physiologicalBasis = ''
+      form.interpretation = ''
+      form.reportComment = ''
+      form.reportNote = ''
+      form.isPanel = false
       form.isActive = true
     }
     error.value = ''
@@ -272,8 +290,81 @@ const handleSubmit = async () => {
                 :disabled="loading"
               />
 
+              <!-- Methodology -->
+              <div class="md:col-span-2">
+                <BaseInput 
+                  v-model="form.methodology"
+                  id="methodology"
+                  label="Methodology"
+                  placeholder="e.g. Immunofluorescence"
+                  :disabled="loading"
+                />
+              </div>
+
+              <!-- Physiological Basis -->
+              <div class="md:col-span-2">
+                <BaseInput 
+                  v-model="form.physiologicalBasis"
+                  id="physiologicalBasis"
+                  label="Physiological Basis"
+                  placeholder="Basic background information"
+                  :disabled="loading"
+                />
+              </div>
+
+              <!-- Interpretation -->
+              <div class="md:col-span-2">
+                <label for="interpretation" class="block text-sm font-medium text-slate-700 mb-1">Interpretation</label>
+                <textarea 
+                  v-model="form.interpretation" 
+                  id="interpretation" 
+                  rows="3" 
+                  class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all shadow-sm" 
+                  :disabled="loading" 
+                  placeholder="Guidelines for interpretation"
+                ></textarea>
+              </div>
+
+              <!-- Report Comment -->
+              <div class="md:col-span-2">
+                <label for="reportComment" class="block text-sm font-medium text-slate-700 mb-1">Report Comment</label>
+                <textarea 
+                  v-model="form.reportComment" 
+                  id="reportComment" 
+                  rows="2" 
+                  class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all shadow-sm" 
+                  :disabled="loading" 
+                  placeholder="Standard report comments"
+                ></textarea>
+              </div>
+
+              <!-- Report Note -->
+              <div class="md:col-span-2">
+                <label for="reportNote" class="block text-sm font-medium text-slate-700 mb-1">Report Note</label>
+                <textarea 
+                  v-model="form.reportNote" 
+                  id="reportNote" 
+                  rows="2" 
+                  class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all shadow-sm" 
+                  :disabled="loading" 
+                  placeholder="Additional notes for report"
+                ></textarea>
+              </div>
+
+              <!-- Is Panel -->
+              <div class="flex items-center pt-2">
+                <input 
+                  id="isPanel" 
+                  type="checkbox" 
+                  v-model="form.isPanel" 
+                  :disabled="loading"
+                  class="w-4 h-4 text-indigo-600 bg-gray-100 border-gray-300 rounded focus:ring-indigo-500 focus:ring-2"
+                >
+                <label for="isPanel" class="ml-2 text-sm font-medium text-slate-700">Is Panel / Profile</label>
+              </div>
+
               <!-- Is Active -->
-              <div class="flex items-center md:col-span-2 pt-2">
+              <div class="flex items-center pt-2">
                 <input 
                   id="isActive" 
                   type="checkbox" 

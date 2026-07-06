@@ -694,22 +694,29 @@ exports.getLabOrderResults = async (orderId) => {
         }
 
         const orderItems = await LabOrderItem.find({ orderId });
+        const LabTest = require('./lab_test.model');
 
         const structuredResults = [];
         for (const item of orderItems) {
             const parameters = await LabTestParameter.find({ testId: item.testId }).sort({ displayOrder: 1 });
             const results = await LabResult.find({ orderItemId: item._id });
+            const testDoc = await LabTest.findById(item.testId);
 
             structuredResults.push({
                 orderItemId: item._id,
                 testId: item.testId,
                 testName: item.testName,
+                methodology: testDoc?.methodology || null,
                 status: item.status,
                 parameters: parameters.map(p => {
                     const matchedResult = results.find(r => r.parameterId.toString() === p._id.toString());
                     return {
                         parameterId: p._id,
                         name: p.name,
+                        section: p.section,
+                        resultType: p.resultType,
+                        options: p.options || [],
+                        isRequired: p.isRequired,
                         unit: p.unit,
                         normalRangeMale: p.normalRangeMale,
                         normalRangeFemale: p.normalRangeFemale,

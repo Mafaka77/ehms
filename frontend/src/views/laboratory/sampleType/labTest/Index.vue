@@ -36,8 +36,27 @@ const fetchTests = async () => {
   }
 }
 
+const generateCode = (name, code) => {
+  if (code) return code + '-' + Math.floor(100 + Math.random() * 900)
+  
+  if (!name) return 'TEST-' + Math.floor(100 + Math.random() * 900)
+  
+  const words = name.split(/[\s_-]+/)
+  let shortForm = ''
+  if (words.length > 1) {
+    shortForm = words.map(w => w[0]).join('').toUpperCase()
+  } else {
+    shortForm = name.substring(0, 3).toUpperCase()
+  }
+  
+  return shortForm + '-' + Math.floor(100 + Math.random() * 900)
+}
+
 const openAddModal = () => {
-  selectedTest.value = { sampleTypeId: sampleTypeId }
+  selectedTest.value = { 
+    sampleTypeId: sampleTypeId,
+    code: generateCode(currentSampleType.value?.name, currentSampleType.value?.code)
+  }
   isCreateModalOpen.value = true
 }
 

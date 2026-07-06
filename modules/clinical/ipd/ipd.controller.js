@@ -706,5 +706,43 @@ exports.deleteChargeCategory = async (req, res) => {
     }
 }
 
+// ==========================================
+// Admission Advance Controllers
+// ==========================================
 
+exports.createAdmissionAdvance = async (req, res) => {
+    try {
+        const result = await ipdService.createAdmissionAdvance(req.params.id, req.body, req.user?._id)
+        return res.code(STATUS_CODES.CREATED).send(result)
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.getAdmissionAdvances = async (req, res) => {
+    try {
+        const result = await ipdService.getAdmissionAdvances(req.params.id)
+        return res.code(STATUS_CODES.OK).send(result)
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.getAdmissionBills = async (req, res) => {
+    try {
+        const result = await ipdService.getAdmissionBills(req.params.id)
+        return res.code(STATUS_CODES.OK).send(result)
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
 

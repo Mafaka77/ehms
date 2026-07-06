@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch,computed } from 'vue'
 import { useLabStore } from '../../../stores/labStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 
@@ -23,7 +23,26 @@ const loading = ref(false)
 const orderData = ref(null)
 const tests = ref([])
 
+const testsWithSections = computed(() => {
+  return tests.value.map(test => {
+    const groups = {}
+    test.parameters.forEach(param => {
+      const sec = param.section || 'General'
+      if (!groups[sec]) groups[sec] = []
+      groups[sec].push(param)
+    })
+    
+    const groupedParams = Object.keys(groups).map(section => ({
+      section,
+      params: groups[section]
+    })).sort((a, b) => a.section.localeCompare(b.section))
 
+    return {
+      ...test,
+      groupedParams
+    }
+  })
+})
 const fetchResults = async () => {
   if (!props.order?._id) return
   loading.value = true
@@ -61,10 +80,28 @@ const saveResults = async () => {
       })
     })
 
-    // Check if any results were empty
-    const emptyResults = resultsData.filter(r => !r.measuredValue.trim())
-    if (emptyResults.length > 0) {
-      if (!confirm('Some parameter results are empty. Do you want to save anyway?')) {
+    // Validation for empty and required fields
+    let hasEmptyRequired = false
+    let hasEmptyOptional = false
+
+    tests.value.forEach(test => {
+      test.parameters.forEach(param => {
+        const val = param.measuredValue ? param.measuredValue.toString().trim() : ''
+        if (!val) {
+          if (param.isRequired) hasEmptyRequired = true
+          else hasEmptyOptional = true
+        }
+      })
+    })
+
+    if (hasEmptyRequired) {
+      snackbarStore.show({ message: 'Please fill in all required parameters.', type: 'error' })
+      loading.value = false
+      return
+    }
+
+    if (hasEmptyOptional) {
+      if (!confirm('Some optional parameter results are empty. Do you want to save anyway?')) {
         loading.value = false;
         return
       }
@@ -144,12 +181,7 @@ const formatDate = (dateString) => {
 
         <!-- Form Fields grouped by Test -->
         <div class="space-y-6">
-          <div v-for="test in tests" :key="test.testId" class="border border-slate-100 rounded-xl overflow-hidden shadow-sm bg-white">
-            <!-- Test Title Banner -->
-            <div class="bg-slate-50/50 border-b border-slate-100 px-5 py-3">
-              <h4 class="text-sm font-bold text-slate-800">{{ test.testName }}</h4>
-            </div>
-
+          <div v-for="test in testsWithSections" :key="test.testId" class="border border-slate-100 rounded-xl overflow-hidden shadow-sm bg-white">
             <!-- Parameters table/list -->
             <div class="p-5">
               <div v-if="test.parameters.length === 0" class="text-center py-4 text-xs text-slate-400">
@@ -165,26 +197,72 @@ const formatDate = (dateString) => {
                   <div class="col-span-1 text-center">Out of Range</div>
                 </div>
 
-                <!-- Parameter Entry Row -->
-                <div 
-                  v-for="param in test.parameters" 
-                  :key="param.parameterId"
-                  class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center py-2 border-b border-slate-50 last:border-b-0"
-                >
-                  <!-- Name -->
-                  <div class="col-span-1 md:col-span-4">
-                    <span class="text-sm font-semibold text-slate-700">{{ param.name }}</span>
-                  </div>
+                <!-- Lab Test Name Row -->
+                <div class="col-span-12 bg-indigo-50/60 px-4 py-2.5 text-sm font-bold text-indigo-900 uppercase tracking-widest border-b border-indigo-100 text-center">
+                  {{ test.testName }}
+                </div>
 
-                  <!-- Value Input -->
-                  <div class="col-span-1 md:col-span-3">
-                    <input 
-                      v-model="param.measuredValue"
-                      type="text"
-                      placeholder="Enter value"
-                      class="w-full text-center py-2 px-3 bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all font-mono"
-                    />
+                <template v-for="group in test.groupedParams" :key="group.section">
+                  <!-- Section Header Row -->
+                  <div class="hidden md:block col-span-12 bg-slate-50/80 px-3 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider border-y border-slate-100/80 mt-2 first:mt-0">
+                    {{ group.section }}
                   </div>
+                  
+                  <!-- Parameter Entry Row -->
+                  <div 
+                    v-for="param in group.params" 
+                    :key="param.parameterId"
+                    class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center py-2 border-b border-slate-50 last:border-b-0"
+                  >
+                    <!-- Name -->
+                    <div class="col-span-1 md:col-span-4">
+                      <span class="text-sm font-semibold text-slate-700">{{ param.name }}</span>
+                      <span v-if="param.isRequired" class="text-rose-500 ml-1" title="Required">*</span>
+                    </div>
+
+                    <!-- Value Input -->
+                    <div class="col-span-1 md:col-span-3">
+                      <template v-if="param.resultType === 'OPTION'">
+                        <select 
+                          v-model="param.measuredValue"
+                          class="w-full text-center py-2 px-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all font-semibold"
+                        >
+                          <option value="">Select</option>
+                          <option v-for="opt in param.options" :key="opt" :value="opt">{{ opt }}</option>
+                        </select>
+                      </template>
+                      
+                      <template v-else-if="param.resultType === 'BOOLEAN'">
+                        <select 
+                          v-model="param.measuredValue"
+                          class="w-full text-center py-2 px-3 bg-white border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all font-semibold"
+                        >
+                          <option value="">Select</option>
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                          <option value="Positive">Positive</option>
+                          <option value="Negative">Negative</option>
+                        </select>
+                      </template>
+                      
+                      <template v-else-if="param.resultType === 'TEXT'">
+                        <input 
+                          v-model="param.measuredValue"
+                          type="text"
+                          placeholder="Enter text"
+                          class="w-full text-center py-2 px-3 bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                        />
+                      </template>
+                      
+                      <template v-else>
+                        <input 
+                          v-model="param.measuredValue"
+                          type="text"
+                          placeholder="Enter value"
+                          class="w-full text-center py-2 px-3 bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all font-mono"
+                        />
+                      </template>
+                    </div>
 
                   <!-- Unit -->
                   <div class="col-span-1 md:col-span-1 text-center text-xs font-semibold text-slate-500">
@@ -207,18 +285,19 @@ const formatDate = (dateString) => {
                     </template>
                   </div>
 
-                  <!-- Out of Range Toggle -->
-                  <div class="col-span-1 md:col-span-1 flex justify-center">
-                    <label class="relative inline-flex items-center cursor-pointer select-none">
-                      <input 
-                        type="checkbox" 
-                        v-model="param.isOutOfRange"
-                        class="sr-only peer"
-                      />
-                      <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500"></div>
-                    </label>
+                    <!-- Out of Range Toggle -->
+                    <div class="col-span-1 md:col-span-1 flex justify-center">
+                      <label class="relative inline-flex items-center cursor-pointer select-none">
+                        <input 
+                          type="checkbox" 
+                          v-model="param.isOutOfRange"
+                          class="sr-only peer"
+                        />
+                        <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-500"></div>
+                      </label>
+                    </div>
                   </div>
-                </div>
+                </template>
               </div>
             </div>
           </div>

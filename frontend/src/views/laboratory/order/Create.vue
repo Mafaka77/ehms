@@ -225,9 +225,9 @@ const totalAmount = computed(() => {
 })
 
 const fetchTests = async () => {
-  if (labStore.tests.length === 0) {
-    await labStore.fetchTests(1, 1000)
-  }
+  // Always fetch up to 1000 to ensure we have the full list for selection, 
+  // bypassing any small limits (e.g. limit 10) from other pages.
+  await labStore.fetchTests(1, 1000)
 }
 
 const addTest = (test) => {

@@ -37,7 +37,8 @@ const bedTypes = [
   'VENTILATOR',
   'DELUXE',
   'SEMI_PRIVATE',
-  'PRIVATE'
+  'PRIVATE',
+  'SUPER DELUXE'
 ]
 
 const bedStatuses = [

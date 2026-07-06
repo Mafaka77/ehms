@@ -333,7 +333,7 @@ const getPaymentStatusColor = (status) => {
       </div>
 
       <!-- Discount Configuration (Only if bill not generated yet) -->
-      <div v-if="!order.billId && order.paymentStatus === 'UNPAID'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
+      <div v-if="false && !order.billId && order.paymentStatus === 'UNPAID'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 uppercase select-none">
             <input type="checkbox" v-model="showDiscount" class="text-indigo-600 focus:ring-indigo-500 rounded border-slate-300">

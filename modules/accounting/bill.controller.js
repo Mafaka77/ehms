@@ -278,3 +278,33 @@ exports.cancelPayment = async (req, res) => {
     }
 }
 
+exports.generateBillFromIpdCharges = async (req, res) => {
+    try {
+        const { admissionId, chargeIds } = req.body
+        const userId = req.user._id
+
+        if (!admissionId || !chargeIds || chargeIds.length === 0) {
+            return res.code(STATUS_CODES.BAD_REQUEST).send({
+                message: 'Admission ID and Charge IDs are required',
+                status: STATUS_CODES.BAD_REQUEST
+            })
+        }
+
+        const bill = await billService.generateBillFromIpdCharges(
+            admissionId,
+            chargeIds,
+            userId
+        )
+
+        return res.code(STATUS_CODES.CREATED).send({
+            message: 'IPD Bill generated successfully',
+            data: bill,
+            status: STATUS_CODES.CREATED
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}

@@ -1,7 +1,18 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useLabStore } from '../../../stores/labStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useEditor, EditorContent } from '@tiptap/vue-3'
+import { Extension } from '@tiptap/core'
+import { TextStyle } from '@tiptap/extension-text-style'
+import StarterKit from '@tiptap/starter-kit'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import {TextAlign} from '@tiptap/extension-text-align'
+import html2canvas from 'html2canvas-pro'
+import jsPDF from 'jspdf'
 
 const props = defineProps({
   show: {
@@ -24,6 +35,10 @@ const printingPDF = ref(false)
 const orderData = ref(null)
 const tests = ref([])
 
+const viewMode = ref('edit')
+const pdfPreviewUrl = ref(null)
+const currentFilename = ref('')
+
 const fetchResults = async () => {
   if (!props.order?._id) return
   loading.value = true
@@ -31,6 +46,10 @@ const fetchResults = async () => {
     const res = await labStore.fetchOrderResults(props.order._id)
     orderData.value = res.order
     tests.value = res.tests
+    
+    if (editor.value) {
+      editor.value.commands.setContent(generateEditorContent())
+    }
   } catch (error) {
     console.error('Error fetching results:', error)
     snackbarStore.show({ message: 'Failed to load report data', type: 'error' })
@@ -39,14 +58,267 @@ const fetchResults = async () => {
   }
 }
 
-watch(() => props.show, (newVal) => {
-  if (newVal) {
-    fetchResults()
+const generateEditorContent = () => {
+  let html = '<table><tbody><tr><th>Test Name</th><th>Result</th><th>Unit</th><th>Reference Ranges</th></tr>'
+
+  tests.value.forEach(test => {
+    html += `<tr><td colspan="4"><strong>${test.testName.toUpperCase()}</strong></td></tr>`
+
+    const groups = {}
+    test.parameters.forEach(param => {
+      const sec = param.section || 'General'
+      if (!groups[sec]) groups[sec] = []
+      groups[sec].push(param)
+    })
+    
+    const sortedSections = Object.keys(groups).sort((a,b) => a.localeCompare(b))
+    
+    sortedSections.forEach(section => {
+      html += `<tr><td colspan="4" class="section-header"><strong>${section.toUpperCase()}</strong></td></tr>`
+      
+      groups[section].sort((a,b) => (a.displayOrder||0) - (b.displayOrder||0)).forEach(param => {
+         let rangeStr = ''
+         if (param.referenceIntervals && param.referenceIntervals.length > 0) {
+            rangeStr = param.referenceIntervals.map(i => `${i.label}: ${i.range}`).join(' | ')
+         } else {
+            const arr = []
+            if (param.normalRangeMale) arr.push(`M: ${param.normalRangeMale}`)
+            if (param.normalRangeFemale) arr.push(`F: ${param.normalRangeFemale}`)
+            if (param.normalRangeChild) arr.push(`C: ${param.normalRangeChild}`)
+            rangeStr = arr.join(' | ') || '-'
+         }
+         
+         const valueStr = param.measuredValue || '-'
+         const outOfRangeStar = param.isOutOfRange ? ' <span style="color:red">*</span>' : ''
+         
+         html += `<tr>`
+         html += `<td>${param.name}</td>`
+         html += `<td><strong>${valueStr}</strong>${outOfRangeStar}</td>`
+         html += `<td>${param.unit || '-'}</td>`
+         html += `<td>${rangeStr}</td>`
+         html += `</tr>`
+      })
+    })
+  })
+  
+  html += '</tbody></table>'
+  
+  const methods = tests.value.filter(t => t.methodology).map(t => `<strong>${t.testName}</strong>: ${t.methodology}`)
+  if (methods.length > 0) {
+    html += '<p></p><p><strong>Methods:</strong></p>'
+    if (methods.length === 1 && tests.value.length === 1) {
+      html += `<p>${tests.value[0].methodology}</p>`
+    } else {
+      html += `<ul>${methods.map(m => `<li>${m}</li>`).join('')}</ul>`
+    }
+  }
+
+  html += '<p></p><p><strong>Remarks:</strong> </p>'
+  
+  return html
+}
+
+const FontSize = Extension.create({
+  name: 'fontSize',
+  addOptions() {
+    return {
+      types: ['textStyle'],
+    }
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: element => element.style.fontSize.replace(/['"]+/g, ''),
+            renderHTML: attributes => {
+              if (!attributes.fontSize) return {}
+              return { style: `font-size: ${attributes.fontSize}` }
+            },
+          },
+        },
+      },
+    ]
+  },
+  addCommands() {
+    return {
+      setFontSize: fontSize => ({ chain }) => {
+        return chain().setMark('textStyle', { fontSize }).run()
+      },
+      unsetFontSize: () => ({ chain }) => {
+        return chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run()
+      },
+    }
+  },
+})
+
+const editor = useEditor({
+  extensions: [
+    StarterKit,
+    TextStyle,
+    FontSize,
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
+    TextAlign.configure({
+      types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
+    }),
+  ],
+  content: '',
+})
+
+onBeforeUnmount(() => {
+  if (editor.value) {
+    editor.value.destroy()
   }
 })
 
-const printReportPDF = () => {
-  window.print()
+watch(() => props.show, (newVal) => {
+  if (newVal) {
+    viewMode.value = 'edit'
+    if (pdfPreviewUrl.value) {
+      URL.revokeObjectURL(pdfPreviewUrl.value)
+      pdfPreviewUrl.value = null
+    }
+    fetchResults()
+  } else {
+    editor.value?.commands.setContent('')
+  }
+})
+
+const generateReportPDF = async (preview = false) => {
+  if (printingPDF.value) return
+  printingPDF.value = true
+  
+  try {
+    const wasPreview = viewMode.value === 'preview'
+    if (wasPreview) {
+      viewMode.value = 'edit'
+      await new Promise(resolve => setTimeout(resolve, 50))
+    }
+    
+    // Wait for Vue to update the DOM (hide toolbar etc)
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    const element = document.querySelector('.print-report-container')
+    if (!element) throw new Error('Report container not found')
+    
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    })
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.98)
+    
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    
+    // Grab the sections to calculate pixel heights
+    const tbody = element.querySelector('tbody')
+    const tfoot = element.querySelector('tfoot')
+    
+    const contRect = element.getBoundingClientRect()
+    const tbodyRect = tbody.getBoundingClientRect()
+    const tfootRect = tfoot.getBoundingClientRect()
+    
+    const headerY = 0
+    const headerH = Math.round(tbodyRect.top - contRect.top)
+    
+    const bodyY = headerH
+    const bodyH = Math.round(tfootRect.top - tbodyRect.top)
+    
+    const footerY = bodyY + bodyH
+    const footerH = Math.round(tfootRect.bottom - tfootRect.top)
+    
+    const cropCanvas = (y, h) => {
+      const c = document.createElement('canvas')
+      c.width = canvas.width
+      const sy = Math.max(0, y * 2)
+      const sh = Math.max(0, Math.min(h * 2, canvas.height - sy))
+      c.height = sh || 1 // prevent 0 height canvas
+      const ctx = c.getContext('2d')
+      if (sh > 0) {
+        ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh)
+      }
+      return c.toDataURL('image/jpeg', 0.98)
+    }
+    
+    const headerData = cropCanvas(headerY, headerH)
+    const bodyData = cropCanvas(bodyY, bodyH)
+    const footerData = cropCanvas(footerY, footerH)
+    
+    const ratio = pdfWidth / canvas.width
+    const headerPdfH = (headerH * 2) * ratio
+    const bodyPdfH = (bodyH * 2) * ratio
+    const footerPdfH = (footerH * 2) * ratio
+    
+    const bodyAvailableSpace = pageHeight - headerPdfH - footerPdfH
+    let bodyHeightLeft = bodyPdfH
+    let bodyOffset = 0
+    
+    const totalPages = Math.max(1, Math.ceil(bodyPdfH / bodyAvailableSpace))
+    let currentPage = 1
+    
+    const drawPageFrame = (offset, pageNum, total) => {
+      // Draw body in the middle
+      pdf.addImage(bodyData, 'JPEG', 0, headerPdfH - offset, pdfWidth, bodyPdfH)
+      
+      // Cover overflow with solid white rectangles
+      pdf.setFillColor(255, 255, 255)
+      pdf.rect(0, 0, pdfWidth, headerPdfH, 'F')
+      pdf.rect(0, pageHeight - footerPdfH, pdfWidth, footerPdfH + 2, 'F')
+      
+      // Draw header at the top
+      pdf.addImage(headerData, 'JPEG', 0, 0, pdfWidth, headerPdfH)
+      // Draw footer at the absolute bottom
+      pdf.addImage(footerData, 'JPEG', 0, pageHeight - footerPdfH, pdfWidth, footerPdfH)
+      
+      // Draw page number at the bottom left (within the bottom margin)
+      pdf.setFontSize(8)
+      pdf.setTextColor(148, 163, 184) // slate-400
+      const pageText = `Page ${pageNum} of ${total}`
+      pdf.text(pageText, 15, pageHeight - 8)
+    }
+    
+    drawPageFrame(bodyOffset, currentPage, totalPages)
+    bodyHeightLeft -= bodyAvailableSpace
+    
+    while (bodyHeightLeft > 0) {
+      bodyOffset += bodyAvailableSpace
+      currentPage++
+      pdf.addPage()
+      drawPageFrame(bodyOffset, currentPage, totalPages)
+      bodyHeightLeft -= bodyAvailableSpace
+    }
+    
+    const patientName = props.order?.patientId?.fullName?.replace(/\s+/g, '_') || 'Patient'
+    const orderNo = props.order?.orderNo || 'Report'
+    const filename = `${patientName}_${orderNo}.pdf`
+    currentFilename.value = filename
+    
+    if (preview) {
+      const blob = pdf.output('blob')
+      if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value)
+      pdfPreviewUrl.value = URL.createObjectURL(blob)
+      viewMode.value = 'preview'
+    } else {
+      pdf.save(filename)
+      if (wasPreview) viewMode.value = 'preview'
+    }
+  } catch (error) {
+    console.error('Error generating PDF:', error)
+    snackbarStore.show({ message: 'Failed to generate PDF', type: 'error' })
+    if (viewMode.value === 'preview') viewMode.value = 'edit'
+  } finally {
+    printingPDF.value = false
+  }
 }
 
 const formatDate = (dateString) => {
@@ -58,28 +330,39 @@ const formatDate = (dateString) => {
 </script>
 
 <template>
-  <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print:p-0 print:items-start print:justify-start">
-    <!-- Backdrop -->
+  <Teleport to="body">
+    <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 print:p-0 print:items-start print:justify-start print:relative print:w-full print:block">
+      <!-- Backdrop -->
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="emit('close')"></div>
 
     <!-- Modal Wrapper -->
-    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
+    <div :class="[
+      'relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl animate-in zoom-in-95 duration-200 flex flex-col print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none print:block',
+      printingPDF ? 'max-h-none overflow-visible' : 'max-h-[90vh] overflow-hidden'
+    ]">
       
-      <!-- Preview Area -->
-      <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block">
+      <!-- Preview Area (Edit Mode) -->
+      <div v-show="viewMode === 'edit'" :class="[
+        'p-6 flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block',
+        printingPDF ? 'overflow-visible' : 'overflow-y-auto'
+      ]">
         <!-- A4 Page representation on screen -->
         <div class="print-report-container select-none">
-          <div class="report-content">
-            <!-- Header Brand -->
-            <div class="report-header">
-              <h1>EHMS LABORATORY & DIAGNOSTIC CENTRE</h1>
-              <p>123 Health Care Avenue, Medical City</p>
-              <p>Mob: +91 98765 43210 | Email: diagnostics@ehms.com</p>
-              <hr class="report-divider" />
-              <h2>LABORATORY INVESTIGATION REPORT</h2>
-            </div>
+          <table class="w-full report-table">
+            <thead>
+              <tr>
+                <td>
+                  <!-- Header Brand -->
+                  <div class="report-header">
+                    <h1 style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 16px;">Emmanuel Hospital</h1>
+                    <p>Luangmual Near Appollo School of Nursing, Aizawl, Mizoram - 796009</p>
+                    <p>Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
+                    <p>GSTIN: 15CDTPN0612H1ZK</p>
+                    <hr class="report-divider" />
+                    <h2>LABORATORY INVESTIGATION REPORT</h2>
+                  </div>
 
-            <!-- Demographics Block -->
+                  <!-- Demographics Block -->
             <div class="demographics">
               <div>
                 <p><strong>Patient Name:</strong> {{ order.patientId?.fullName }}</p>
@@ -94,112 +377,208 @@ const formatDate = (dateString) => {
                 <p><strong>Ref. Clinician:</strong> Dr. {{ order.doctorId?.fullName || 'Self/Referral' }}</p>
               </div>
             </div>
+                </td>
+              </tr>
+            </thead>
 
-            <!-- Parameters results list -->
-            <div class="results-table-container">
-              <table class="results-table">
-                <thead>
-                  <tr>
-                    <th>Test / Parameter Name</th>
-                    <th class="text-center">Measured Value</th>
-                    <th class="text-center">Unit</th>
-                    <th class="text-center">Reference Ranges</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <template v-for="test in tests" :key="test.testId">
-                    <!-- Test Category Header -->
-                    <tr class="test-header-row">
-                      <td colspan="4" class="font-bold uppercase text-slate-800 text-xs py-2 bg-slate-50/50">
-                        {{ test.testName }}
-                      </td>
-                    </tr>
-                    <!-- Parameters -->
-                    <tr 
-                      v-for="param in test.parameters" 
-                      :key="param.parameterId"
-                      class="param-row"
-                    >
-                      <td class="pl-4 font-medium">{{ param.name }}</td>
-                      <td class="text-center font-mono" :class="{ 'out-of-range': param.isOutOfRange }">
-                        {{ param.measuredValue || '-' }}
-                        <span v-if="param.isOutOfRange" class="out-of-range-tag font-bold ml-1">*</span>
-                      </td>
-                      <td class="text-center font-semibold text-slate-500">{{ param.unit || '-' }}</td>
-                      <td class="text-center text-[10px] text-slate-500">
-                        <template v-if="param.referenceIntervals && param.referenceIntervals.length > 0">
-                          <span v-for="(interval, idx) in param.referenceIntervals" :key="idx">
-                            {{ interval.label }}: {{ interval.range }}<span v-if="idx < param.referenceIntervals.length - 1"> | </span>
-                          </span>
-                        </template>
-                        <template v-else>
-                          <span v-if="param.normalRangeMale">M: {{ param.normalRangeMale }}<span v-if="param.normalRangeFemale || param.normalRangeChild"> | </span></span>
-                          <span v-if="param.normalRangeFemale">F: {{ param.normalRangeFemale }}<span v-if="param.normalRangeChild"> | </span></span>
-                          <span v-if="param.normalRangeChild">C: {{ param.normalRangeChild }}</span>
-                          <span v-if="!param.normalRangeMale && !param.normalRangeFemale && !param.normalRangeChild">-</span>
-                        </template>
-                      </td>
-                    </tr>
-                  </template>
-                </tbody>
-              </table>
-            </div>
+            <tbody>
+              <tr>
+                <td>
+                  <!-- Parameters results list rendered in Editor -->
+                  <div class="mb-6">
+              <!-- Editor Toolbar (hidden on print) -->
+              <div v-if="editor" v-show="!printingPDF" class="flex flex-wrap items-center gap-1 p-1.5 bg-slate-50 border border-slate-200 border-b-0 rounded-t-lg print:hidden">
+                <button @click="editor.chain().focus().toggleBold().run()" :class="{ 'bg-slate-200 text-indigo-700 font-extrabold': editor.isActive('bold') }" class="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-700 font-bold transition-colors" title="Bold">
+                  B
+                </button>
+                <button @click="editor.chain().focus().toggleItalic().run()" :class="{ 'bg-slate-200 text-indigo-700 font-bold': editor.isActive('italic') }" class="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-700 italic font-serif transition-colors" title="Italic">
+                  I
+                </button>
+                <button @click="editor.chain().focus().toggleStrike().run()" :class="{ 'bg-slate-200 text-indigo-700': editor.isActive('strike') }" class="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-700 line-through transition-colors" title="Strikethrough">
+                  S
+                </button>
+                
+                <div class="w-px h-4 bg-slate-300 mx-1"></div>
 
-            <!-- Signatures Section -->
+                <button @click="editor.chain().focus().setTextAlign('left').run()" :class="{ 'bg-slate-200 text-indigo-700': editor.isActive({ textAlign: 'left' }) }" class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition-colors" title="Align Left">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h16" /></svg>
+                </button>
+                <button @click="editor.chain().focus().setTextAlign('center').run()" :class="{ 'bg-slate-200 text-indigo-700': editor.isActive({ textAlign: 'center' }) }" class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition-colors" title="Align Center">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M4 18h16" /></svg>
+                </button>
+                <button @click="editor.chain().focus().setTextAlign('right').run()" :class="{ 'bg-slate-200 text-indigo-700': editor.isActive({ textAlign: 'right' }) }" class="p-1.5 rounded hover:bg-slate-200 text-slate-700 transition-colors" title="Align Right">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M4 18h16" /></svg>
+                </button>
+                
+                <div class="w-px h-4 bg-slate-300 mx-1"></div>
+                
+                <select 
+                  class="bg-white border border-slate-200 rounded text-slate-700 text-xs px-1.5 py-1 focus:outline-none focus:border-indigo-400 font-semibold cursor-pointer"
+                  :value="editor.getAttributes('textStyle').fontSize || ''"
+                  @change="(e) => {
+                    const size = e.target.value;
+                    if (size) editor.chain().focus().setFontSize(size).run();
+                    else editor.chain().focus().unsetFontSize().run();
+                  }"
+                  title="Font Size"
+                >
+                  <option value="">Default Size</option>
+                  <option value="10px">10px</option>
+                  <option value="11px">11px</option>
+                  <option value="12px">12px</option>
+                  <option value="14px">14px</option>
+                  <option value="16px">16px</option>
+                  <option value="18px">18px</option>
+                  <option value="20px">20px</option>
+                  <option value="24px">24px</option>
+                </select>
+                
+                <div class="w-px h-4 bg-slate-300 mx-1"></div>
+                
+                <button @click="editor.chain().focus().addRowAfter().run()" class="px-2 py-1 rounded hover:bg-slate-200 text-slate-600 text-xs font-semibold" title="Add Row Below">
+                  + Row
+                </button>
+                <button @click="editor.chain().focus().deleteRow().run()" class="px-2 py-1 rounded hover:bg-slate-200 text-slate-600 text-xs font-semibold" title="Delete Row">
+                  - Row
+                </button>
+                <button @click="editor.chain().focus().mergeCells().run()" class="px-2 py-1 rounded hover:bg-slate-200 text-slate-600 text-xs font-semibold" title="Merge Cells">
+                  Merge
+                </button>
+                <button @click="editor.chain().focus().splitCell().run()" class="px-2 py-1 rounded hover:bg-slate-200 text-slate-600 text-xs font-semibold" title="Split Cell">
+                  Split
+                </button>
+              </div>
+
+              <!-- Lab Test Names -->
+              <!-- <div class="bg-white border-x border-t border-slate-200 px-4 py-3 text-center print:border-none print:px-0">
+                <h3 class="font-bold text-lg text-slate-800 uppercase tracking-widest">
+                  {{ tests.map(t => t.testName).join(', ') }}
+                </h3>
+              </div> -->
+
+              <!-- Editor Content -->
+              <div class="results-table-container print:border-none print:rounded-none print:shadow-none bg-white border border-slate-200 rounded-b-lg p-2 print:p-0 border-t-0">
+                <editor-content :editor="editor" class="tiptap-editor" />
+              </div>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+
+            <tfoot>
+              <tr>
+                <td>
+                  <!-- Signatures Section -->
             <div class="signatures">
               <div>
-                <p>Prepared By:</p>
-                <p class="operator-name">Lab Technician</p>
+               
               </div>
               <div class="text-right">
                 <span class="sig-line">Authorized Signatory / Pathologist</span>
               </div>
             </div>
 
-            <!-- Computer Generated Notice -->
             <div class="notice">
               <p>*** End of Report ***</p>
               <p class="wish">This is a computer-verified diagnostic report and does not require a physical signature.</p>
+              
+              <!-- For browsers that support CSS page counters -->
+              <div v-show="!printingPDF" class="page-number-placeholder screen-only print:hidden">Page numbers will be generated by the browser during print</div>
             </div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      
+      <!-- PDF Real Preview Mode -->
+      <div v-if="viewMode === 'preview'" class="flex-grow bg-slate-600 flex flex-col relative min-h-[60vh]">
+        <div v-if="printingPDF" class="absolute inset-0 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm z-10">
+          <div class="flex flex-col items-center">
+            <span class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent mb-3"></span>
+            <span class="text-white font-medium shadow-sm">Generating Preview...</span>
           </div>
         </div>
+        <iframe :src="pdfPreviewUrl" class="w-full h-full flex-grow border-0" title="PDF Preview"></iframe>
       </div>
 
       <!-- Action Footer -->
-      <div class="p-4 bg-white border-t border-slate-100 flex justify-end gap-3 screen-only">
-        <button 
-          @click="emit('close')"
-          class="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-        >
-          Close
-        </button>
-        <button 
-          @click="printReportPDF"
-          :disabled="printingPDF"
-          class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center gap-1.5 disabled:opacity-50"
-        >
-          <span v-if="printingPDF" class="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span>
-          <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-          </svg>
-          Print Report
-        </button>
+      <div class="p-4 bg-white border-t border-slate-100 flex justify-between items-center gap-3 screen-only">
+        <div>
+          <button 
+            v-if="viewMode === 'edit'"
+            @click="generateReportPDF(true)"
+            :disabled="printingPDF"
+            class="px-4 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span v-if="printingPDF" class="animate-spin rounded-full h-3 w-3 border-2 border-indigo-600 border-t-transparent"></span>
+            <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            Preview PDF
+          </button>
+          
+          <button 
+            v-if="viewMode === 'preview'"
+            @click="viewMode = 'edit'"
+            :disabled="printingPDF"
+            class="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Editor
+          </button>
+        </div>
+        
+        <div class="flex gap-3">
+          <button 
+            @click="emit('close')"
+            class="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            Close
+          </button>
+          
+          <a v-if="viewMode === 'preview' && pdfPreviewUrl" :href="pdfPreviewUrl" :download="currentFilename" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-100 transition-all flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Download PDF
+          </a>
+          
+          <button 
+            v-else
+            @click="generateReportPDF(false)"
+            :disabled="printingPDF"
+            class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center gap-1.5 disabled:opacity-50"
+          >
+            <span v-if="printingPDF" class="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span>
+            <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            Print & Download
+          </button>
+        </div>
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <style scoped>
 /* Scoped custom styling using standard hex colors to bypass Tailwind v4 oklch() color issues in html2canvas-pro */
 .print-report-container {
   width: 210mm;
-  height: 297mm;
+  min-height: 297mm;
+  height: max-content;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
   border: 1px dashed #cbd5e1;
   color: #0f172a;
-  padding: 20mm 15mm;
+  padding: 10mm 15mm 15mm 15mm;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -220,7 +599,7 @@ const formatDate = (dateString) => {
 }
 
 .report-header h1 {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: -0.025em;
@@ -229,7 +608,7 @@ const formatDate = (dateString) => {
 }
 
 .report-header p {
-  font-size: 11px;
+  font-size: 9px;
   color: #64748b;
   margin: 0;
   line-height: 1.4;
@@ -238,15 +617,15 @@ const formatDate = (dateString) => {
 .report-divider {
   border: 0;
   border-top: 2px solid #1e3a8a;
-  margin: 12px 0;
+  margin: 10px 0;
 }
 
 .report-header h2 {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: bold;
   letter-spacing: 0.05em;
   color: #0f172a;
-  margin: 8px 0 0 0;
+  margin: 6px 0 0 0;
 }
 
 .demographics {
@@ -254,9 +633,9 @@ const formatDate = (dateString) => {
   grid-template-columns: 1.2fr 0.8fr;
   column-gap: 24px;
   row-gap: 6px;
-  font-size: 12px;
-  margin-bottom: 24px;
-  padding: 14px;
+  font-size: 10px;
+  margin-bottom: 20px;
+  padding: 12px;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background-color: #f8fafc;
@@ -277,13 +656,25 @@ const formatDate = (dateString) => {
   margin-bottom: 30px;
 }
 
-.results-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+.tiptap-editor {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-.results-table th {
+.tiptap-editor :deep(.tiptap) {
+  outline: none;
+  flex-grow: 1;
+  font-size: 10px;
+}
+
+.tiptap-editor :deep(.tiptap table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.tiptap-editor :deep(.tiptap th) {
   border-top: 2px solid #475569;
   border-bottom: 2px solid #475569;
   font-weight: bold;
@@ -292,29 +683,35 @@ const formatDate = (dateString) => {
   text-align: left;
 }
 
-.results-table th:nth-child(2),
-.results-table th:nth-child(3),
-.results-table th:nth-child(4) {
+.tiptap-editor :deep(.tiptap th:nth-child(2)),
+.tiptap-editor :deep(.tiptap th:nth-child(3)),
+.tiptap-editor :deep(.tiptap th:nth-child(4)) {
   text-align: center;
 }
 
-.test-header-row td {
-  padding: 10px 4px 6px 4px;
-}
-
-.param-row td {
+.tiptap-editor :deep(.tiptap td) {
   border-bottom: 1px solid #f1f5f9;
   padding: 8px 6px;
   color: #334155;
+  vertical-align: top;
 }
 
-.out-of-range {
-  color: #dc2626 !important;
-  font-weight: bold;
+.tiptap-editor :deep(.tiptap td:nth-child(2)),
+.tiptap-editor :deep(.tiptap td:nth-child(3)),
+.tiptap-editor :deep(.tiptap td:nth-child(4)) {
+  text-align: center;
 }
 
-.out-of-range-tag {
-  color: #dc2626;
+.tiptap-editor :deep(.tiptap td p) {
+  margin: 0;
+}
+
+.tiptap-editor :deep(.tiptap strong) {
+  color: #0f172a;
+}
+
+.tiptap-editor :deep(.tiptap td.section-header) {
+  background-color: #f8fafc;
 }
 
 .signatures {
@@ -322,7 +719,7 @@ const formatDate = (dateString) => {
   padding-top: 40px;
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 9px;
   color: #475569;
 }
 
@@ -341,8 +738,8 @@ const formatDate = (dateString) => {
 
 .notice {
   text-align: center;
-  margin-top: 30px;
-  font-size: 10px;
+  margin-top: 20px;
+  font-size: 8px;
   color: #94a3b8;
   line-height: 1.4;
 }
@@ -359,26 +756,49 @@ const formatDate = (dateString) => {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 10mm 15mm;
   }
-  body * {
-    visibility: hidden;
+  
+  #app {
+    display: none !important;
   }
-  .print-report-container, .print-report-container * {
-    visibility: visible;
+
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
   }
+
+  /* Reset flex to block to allow natural pagination */
+  .print-report-container,
+  .tiptap-editor,
+  .results-table-container,
+  .print-report-container :deep(.tiptap) {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Ensures that table sections repeat correctly across pages */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+  tr { page-break-inside: avoid; }
+
   .print-report-container {
-    position: fixed;
-    left: 0;
-    top: 0;
-    width: 210mm;
-    height: 297mm;
-    margin: 0;
-    padding: 20mm 15mm;
-    box-shadow: none;
-    border: none;
-    z-index: 999999;
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
     background-color: white !important;
+    overflow: visible !important;
+  }
+  
+  .screen-only {
+    display: none !important;
   }
 }
 </style>

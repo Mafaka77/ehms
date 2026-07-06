@@ -9,6 +9,7 @@ import PatientCharge from './PatientCharge.vue'
 
 import PatientFiles from './PatientFIles.vue'
 import Test from './Test.vue'
+import Transactions from './Transactions.vue'
 import { useIpdWardStore } from '../../../stores/ipdWardStore'
 
 const props = defineProps({
@@ -25,7 +26,8 @@ const wardStore = useIpdWardStore()
 
 const loading = ref(true)
 const admission = ref(null)
-const activeTab = ref('charges') // charges, pharmacy, doctor_charges, files, bed_history
+const activeTab = ref('charges') // charges, pharmacy, doctor_charges, files, bed_history, transactions
+const transactionsRef = ref(null)
 
 // Transfer Bed Modal States
 const showTransferModal = ref(false)
@@ -77,6 +79,47 @@ const submitTransfer = async () => {
     snackbarStore.show({ message: res.message, type: 'error' })
   }
   transferSubmitting.value = false
+}
+
+// Add Advance Modal States
+const showAdvanceModal = ref(false)
+const advanceSubmitting = ref(false)
+const advanceForm = ref({
+  amount: null,
+  paymentMode: 'CASH',
+  referenceNo: '',
+  remarks: ''
+})
+
+const openAdvanceModal = () => {
+  advanceForm.value = {
+    amount: null,
+    paymentMode: 'CASH',
+    referenceNo: '',
+    remarks: ''
+  }
+  showAdvanceModal.value = true
+}
+
+const submitAdvance = async () => {
+  if (!advanceForm.value.amount || advanceForm.value.amount <= 0) {
+    snackbarStore.show({ message: 'Please enter a valid amount.', type: 'warning' })
+    return
+  }
+  advanceSubmitting.value = true
+  const res = await admissionStore.addAdmissionAdvance(admission.value._id, advanceForm.value)
+
+  if (res.success) {
+    snackbarStore.show({ message: 'Advance payment recorded successfully.', type: 'success' })
+    showAdvanceModal.value = false
+    await fetchAdmissionDetails()
+    if (transactionsRef.value) {
+      transactionsRef.value.refresh()
+    }
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
+  advanceSubmitting.value = false
 }
 
 // Fetch Admission details
@@ -208,6 +251,15 @@ onMounted(async () => {
               </span>
             </p>
           </div>
+          <button 
+            @click="openAdvanceModal"
+            class="mt-3 w-full py-1.5 border border-emerald-100 hover:border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Advance
+          </button>
         </div>
 
         <!-- Column 3: Bed & Location -->
@@ -307,6 +359,16 @@ onMounted(async () => {
           </svg>
           Bed History
         </button>
+        <button 
+          @click="activeTab = 'transactions'"
+          class="flex-1 sm:flex-initial px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
+          :class="activeTab === 'transactions' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Transactions
+        </button>
       </div>
 
       <!-- Tab Content Area -->
@@ -336,6 +398,11 @@ onMounted(async () => {
         <!-- Tab: Bed History -->
         <div v-else-if="activeTab === 'bed_history'" class="space-y-4 animate-in fade-in duration-200">
           <BedHistory :admissionId="admission._id" :admission="admission" />
+        </div>
+
+        <!-- Tab: Transactions -->
+        <div v-else-if="activeTab === 'transactions'" class="space-y-4 animate-in fade-in duration-200">
+          <Transactions ref="transactionsRef" :admissionId="admission._id" :admission="admission" />
         </div>
 
       </div>
@@ -443,5 +510,94 @@ onMounted(async () => {
       </div>
     </div>
   </div>
+    
+    <!-- Add Advance Modal -->
+    <div v-if="showAdvanceModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h3 class="font-bold text-slate-800 flex items-center gap-2">
+            <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Record Advance Payment
+          </h3>
+          <button @click="showAdvanceModal = false" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4">
+          <!-- Amount -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Amount (₹) *</label>
+            <input 
+              v-model="advanceForm.amount" 
+              type="number"
+              min="1"
+              placeholder="0.00"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-mono"
+            >
+          </div>
+
+          <!-- Payment Mode -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Payment Mode *</label>
+            <select 
+              v-model="advanceForm.paymentMode"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium text-slate-700"
+            >
+              <option value="CASH">Cash</option>
+              <option value="UPI">UPI</option>
+              <option value="CARD">Card</option>
+              <option value="BANK_TRANSFER">Bank Transfer</option>
+              <option value="CHEQUE">Cheque</option>
+            </select>
+          </div>
+
+          <!-- Reference Number -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Reference No. (Optional)</label>
+            <input 
+              v-model="advanceForm.referenceNo" 
+              type="text"
+              placeholder="e.g. UTR or Cheque Number"
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all uppercase placeholder:normal-case"
+            >
+          </div>
+
+          <!-- Remarks -->
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1.5">Remarks (Optional)</label>
+            <textarea 
+              v-model="advanceForm.remarks" 
+              rows="2"
+              placeholder="Any additional notes..."
+              class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-none"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
+          <button 
+            @click="showAdvanceModal = false"
+            class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="submitAdvance"
+            :disabled="advanceSubmitting"
+            class="px-5 py-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <svg v-if="advanceSubmitting" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span v-else>Save Advance</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>

@@ -54,4 +54,11 @@ module.exports = async (fastify, options) => {
     fastify.get('/charge-masters/:id/package-items', { onRequest: [auth] }, ipdController.getPackageItems)
     fastify.post('/charge-masters/:id/package-items', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.addPackageItem)
     fastify.delete('/package-items/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin','Nurse'])] }, ipdController.deletePackageItem)
+
+    // Admission Advances routes
+    fastify.post('/admission/:id/advance', { onRequest: [auth] }, ipdController.createAdmissionAdvance)
+    fastify.get('/admission/:id/advances', { onRequest: [auth] }, ipdController.getAdmissionAdvances)
+
+    // Admission Bills
+    fastify.get('/admission/:id/bills', { onRequest: [auth] }, ipdController.getAdmissionBills)
 }

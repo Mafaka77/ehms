@@ -63,8 +63,20 @@ const handleParamUpdated = (updatedParam) => {
   fetchTestParameters()
 }
 
-const filteredParams = computed(() => {
-  return labStore.testParameters
+const groupedParams = computed(() => {
+  const groups = {}
+  labStore.testParameters.forEach(param => {
+    const section = param.section || 'General'
+    if (!groups[section]) groups[section] = []
+    groups[section].push(param)
+  })
+  
+  return Object.keys(groups).map(section => {
+    return {
+      section,
+      params: groups[section].sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+    }
+  }).sort((a, b) => a.section.localeCompare(b.section))
 })
 
 let debounceTimer = null
@@ -181,7 +193,7 @@ onMounted(() => {
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="filteredTests?.length === 0 || filteredParams?.length === 0" class="p-6 text-center text-slate-500 py-24">
+      <div v-else-if="filteredTests?.length === 0 || groupedParams?.length === 0" class="p-6 text-center text-slate-500 py-24">
         <svg class="w-16 h-16 mx-auto text-slate-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
@@ -213,11 +225,17 @@ onMounted(() => {
               <th class="text-slate-500 font-semibold text-xs uppercase px-6 py-4.5 tracking-wider text-center">Actions</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody v-for="group in groupedParams" :key="group.section" class="divide-y divide-slate-100 border-b-[3px] border-slate-100/80">
+            <!-- Group Header -->
+            <tr class="bg-slate-50/80">
+              <td colspan="5" class="px-6 py-2 text-xs font-bold text-slate-700 uppercase tracking-wider border-y border-slate-200">
+                {{ group.section }}
+              </td>
+            </tr>
             <tr 
-              v-for="param in filteredParams" 
+              v-for="param in group.params" 
               :key="param._id"
-              class="hover:bg-slate-50/50 transition-colors group"
+              class="hover:bg-slate-50/50 transition-colors group bg-white"
             >
               <!-- Order -->
               <td class="px-6 py-4 text-center">

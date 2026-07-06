@@ -10,6 +10,7 @@ module.exports = async function (fastify, opts) {
     fastify.post('/generate-from-emergency-charges', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.generateBillFromEmergencyCharges)
     fastify.post('/generate-from-dental-appointment', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.generateBillFromDentalAppointment)
     fastify.post('/generate-from-dental-consultation', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.generateBillFromDentalConsultation)
+    fastify.post('/generate-from-ipd-charges', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, billController.generateBillFromIpdCharges)
     fastify.post('/bills/:id/pay', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.processPayment)
     fastify.post('/bills/:id/cancel', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.cancelBill)
     fastify.get('/bills/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.getBillById)

@@ -105,6 +105,7 @@ const form = reactive({
   employmentType: 'Permanent',
   basicSalary: '',
   isActive: true,
+  profilePhoto: '',
   bankDetails: {
     bankName: '',
     accountName: '',
@@ -114,6 +115,24 @@ const form = reactive({
   }
 })
 
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('data:')) return path;
+  return import.meta.env.VITE_IMAGE_URL + (path.startsWith('/') ? path : '/' + path);
+}
+
+const handlePhotoUpload = (event) => {
+  const file = event.target.files[0]
+  if (file) {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      form.profilePhoto = e.target.result
+    }
+    reader.readAsDataURL(file)
+  }
+}
+
+const isPasswordModalOpen = ref(false)
 const loading = ref(false)
 const error = ref('')
 
@@ -144,8 +163,10 @@ const populateEmployee = async () => {
       form.designationId = emp.designationId?._id || emp.designationId || ''
       form.joiningDate = emp.joiningDate ? emp.joiningDate.split('T')[0] : ''
       form.employmentType = emp.employmentType || 'Permanent'
-      form.basicSalary = emp.basicSalary || ''
-      form.isActive = emp.isActive !== false
+      form.basicSalary = emp.basicSalary
+      form.isActive = emp.isActive
+      form.profilePhoto = emp.profilePhoto || ''
+
       if (emp.bankDetails) {
         form.bankDetails.bankName = emp.bankDetails.bankName || ''
         form.bankDetails.accountName = emp.bankDetails.accountName || ''
@@ -303,6 +324,38 @@ const handleSubmit = async () => {
         <!-- Section 1: Basic Information -->
         <div>
           <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-2 mb-4">Basic Information</h3>
+          
+          <!-- Profile Photo Upload -->
+          <div class="mb-6 flex flex-col sm:flex-row items-center gap-6 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
+            <div class="w-24 h-24 rounded-full bg-white border-2 border-dashed border-slate-300 flex items-center justify-center overflow-hidden flex-shrink-0 relative group shadow-sm">
+              <img v-if="form.profilePhoto" :src="getImageUrl(form.profilePhoto)" class="w-full h-full object-cover" alt="Profile Photo" />
+              <div v-else class="text-slate-400">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+              </div>
+              
+              <!-- Hover Overlay to change photo -->
+              <label v-if="form.profilePhoto && !loading" for="profilePhotoUpload" class="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <span class="text-[10px] font-semibold tracking-wide uppercase">Change</span>
+              </label>
+            </div>
+            
+            <div class="flex-grow text-center sm:text-left">
+              <h4 class="text-sm font-semibold text-slate-800 mb-1">Employee Photo</h4>
+              <p class="text-xs text-slate-500 mb-3 max-w-sm">Upload a professional photograph for the employee's profile and ID card. Supported formats: JPG, PNG.</p>
+              
+              <div class="flex flex-wrap gap-3 justify-center sm:justify-start">
+                <label for="profilePhotoUpload" :class="['inline-block px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 hover:text-indigo-600 transition-colors shadow-sm select-none', loading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95']">
+                  {{ form.profilePhoto ? 'Upload New Photo' : 'Choose File' }}
+                </label>
+                <button v-if="form.profilePhoto" type="button" @click="form.profilePhoto = ''" :disabled="loading" class="inline-block px-4 py-2 bg-white border border-rose-100 text-rose-600 text-sm font-medium rounded-lg hover:bg-rose-50 hover:border-rose-200 transition-colors cursor-pointer shadow-sm active:scale-95 select-none disabled:opacity-50 disabled:cursor-not-allowed">
+                  Remove
+                </button>
+              </div>
+              <input type="file" id="profilePhotoUpload" accept="image/png, image/jpeg" class="hidden" @change="handlePhotoUpload" :disabled="loading" />
+            </div>
+          </div>
+          
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <BaseInput 
               v-model="form.fullName"

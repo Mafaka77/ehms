@@ -1,36 +1,94 @@
 const mongoose = require('mongoose')
-const labTestParameterSchema =
-new mongoose.Schema({
+
+const labTestParameterSchema = new mongoose.Schema({
 
   testId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'LabTest'
+    ref: 'LabTest',
+    required: true,
+    index: true
   },
 
-  name: String,
+  // Group/Section
+  section: {
+    type: String,
+    default: null
+    // HEMATOLOGY
+    // PHYSICAL
+    // CHEMICAL
+    // MICROSCOPIC
+    // DIFFERENTIAL
+  },
 
-  unit: String,
+  // Parameter
+  code: {
+    type: String,
+    default: null
+  },
 
-  normalRangeMale: String,
+  name: {
+    type: String,
+    required: true
+  },
 
-  normalRangeFemale: String,
+  // How result will be entered
+  resultType: {
+    type: String,
+    enum: [
+      'NUMBER',
+      'TEXT',
+      'OPTION',
+      'BOOLEAN'
+    ],
+    default: 'NUMBER'
+  },
 
-  normalRangeChild: String,
+  // Used when resultType = OPTION
+  options: [{
+    type: String
+  }],
 
-  displayOrder: Number,
+  unit: {
+    type: String,
+    default: null
+  },
+
+  displayOrder: {
+    type: Number,
+    default: 0
+  },
+
+  // Normal ranges
+  normalRangeMale: {
+    type: String,
+    default: null
+  },
+
+  normalRangeFemale: {
+    type: String,
+    default: null
+  },
+
+  normalRangeChild: {
+    type: String,
+    default: null
+  },
 
   referenceIntervals: [{
-    label: {
-      type: String,
-      required: true
-    },
-    range: {
-      type: String,
-      required: true
-    }
-  }]
+    label: String,
+    range: String
+  }],
 
-}, { timestamps: true })
+  isRequired: {
+    type: Boolean,
+    default: true
+  }
 
-module.exports = mongoose.model('LabTestParameter', labTestParameterSchema)
+},{
+  timestamps:true
+})
 
+module.exports = mongoose.model(
+  'LabTestParameter',
+  labTestParameterSchema
+)

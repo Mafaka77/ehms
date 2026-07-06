@@ -57,6 +57,12 @@ const openEditPage = (emp) => {
   router.push(`/employee/edit/${emp._id}`)
 }
 
+const getImageUrl = (path) => {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('data:')) return path;
+  return import.meta.env.VITE_IMAGE_URL + (path.startsWith('/') ? path : '/' + path);
+}
+
 const handleDelete = async (emp) => {
   if (confirm(`Are you sure you want to remove employee ${emp.fullName} (${emp.employeeCode})?`)) {
     const response = await employeeStore.deleteEmployee(emp._id)
@@ -238,7 +244,10 @@ onMounted(async () => {
               <!-- Name & Contact -->
               <td class="px-6 py-4">
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-semibold text-sm group-hover:bg-indigo-100 transition-colors">
+                  <div v-if="emp.profilePhoto" class="w-9 h-9 rounded-xl overflow-hidden shadow-sm flex-shrink-0 border border-slate-200">
+                    <img :src="getImageUrl(emp.profilePhoto)" class="w-full h-full object-cover" :alt="emp.fullName" />
+                  </div>
+                  <div v-else class="w-9 h-9 rounded-xl bg-indigo-50 flex-shrink-0 flex items-center justify-center text-indigo-600 font-semibold text-sm group-hover:bg-indigo-100 transition-colors">
                     {{ emp.fullName.charAt(0).toUpperCase() }}
                   </div>
                   <div>

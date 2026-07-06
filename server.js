@@ -13,7 +13,9 @@ const connectDB = require('./config/db')
 connectDB()
 
 // Register Core Plugins
-fastify.register(require('@fastify/helmet'))
+fastify.register(require('@fastify/helmet'), {
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+})
 fastify.register(require('@fastify/cors'), {
   origin: '*',
   methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS']
@@ -38,6 +40,12 @@ const frontendPath = path.join(__dirname, 'dist');
 fastify.register(require('@fastify/static'), {
   root: frontendPath,
   wildcard: false
+})
+
+fastify.register(require('@fastify/static'), {
+  root: path.join(__dirname, 'uploads'),
+  prefix: '/uploads/',
+  decorateReply: false
 })
 
 // Serve index.html for all other unmatched non-API routes (SPA fallback)

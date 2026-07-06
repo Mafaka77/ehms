@@ -35,7 +35,8 @@ new mongoose.Schema({
       'CARD',
       'BANK_TRANSFER',
       'CHEQUE',
-      'INSURANCE'
+      'INSURANCE',
+      'ADVANCE_DEPOSIT'
     ],
     required: true
   },

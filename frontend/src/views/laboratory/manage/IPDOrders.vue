@@ -45,7 +45,7 @@ const onResultsSaved = async () => {
 }
 
 const fetchOrders = async () => {
-  await labStore.fetchOrders(currentPage.value, limit.value, searchQuery.value, 'PAID_AND_IPD', { admissionId: 'not-null' })
+  await labStore.fetchOrders(currentPage.value, limit.value, searchQuery.value, '', { admissionId: 'not-null' })
 }
 
 const updateOrderStatus = async (orderId, newStatus) => {
@@ -178,7 +178,10 @@ onMounted(async () => {
         <div 
           v-for="order in labStore.orders" 
           :key="order._id" 
-          class="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between p-5 relative overflow-hidden group"
+          :class="[
+            'bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between p-5 relative overflow-hidden group',
+            order.paymentStatus === 'UNPAID' || order.paymentStatus === 'PENDING' ? 'opacity-60 grayscale bg-slate-50' : 'hover:shadow-md transition-all'
+          ]"
         >
           <!-- Top Priority Stripe -->
           <div :class="[
@@ -195,15 +198,28 @@ onMounted(async () => {
                 {{ formatDate(order.orderDate) }}
               </div>
             </div>
-            
-            <span :class="[
-              'text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border',
-              order.priority === 'STAT' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-              order.priority === 'URGENT' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-              'bg-slate-50 text-slate-600 border-slate-200'
-            ]">
-              {{ order.priority }}
-            </span>
+            <div class="flex gap-2">
+              <span v-if="order.paymentStatus === 'UNPAID' || order.paymentStatus === 'PENDING'" class="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border bg-red-50 text-red-600 border-red-200">
+                UNPAID
+              </span>
+              <span :class="[
+                'text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border',
+                order.priority === 'STAT' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                order.priority === 'URGENT' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                'bg-slate-50 text-slate-600 border-slate-200'
+              ]">
+                {{ order.priority }}
+              </span>
+            </div>
+          </div>
+          
+          <!-- Unpaid Watermark Overlay -->
+          <div v-if="order.paymentStatus === 'UNPAID' || order.paymentStatus === 'PENDING'" class="absolute inset-0 flex items-center justify-center z-10 pointer-events-auto">
+            <!-- Intercepts clicks but we leave it somewhat transparent -->
+            <div class="absolute inset-0 z-20 cursor-not-allowed"></div>
+            <div class="transform -rotate-12 border-4 border-slate-500 text-slate-500 font-bold text-4xl py-2 px-6 rounded-xl opacity-10 uppercase tracking-widest z-10 select-none">
+               Unpaid
+            </div>
           </div>
           
           <!-- Patient / Doctor demographics -->
