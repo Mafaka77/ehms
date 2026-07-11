@@ -27,7 +27,10 @@ const bedSchema = new mongoose.Schema({
       'VENTILATOR',
       'DELUXE',
       'SEMI_PRIVATE',
-      'PRIVATE'
+      'PRIVATE',
+      'SUPER DELUXE',
+      'NICU',
+      'HDU'
     ],
     default: 'GENERAL'
   },

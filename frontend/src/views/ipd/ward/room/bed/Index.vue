@@ -32,13 +32,15 @@ const form = ref({
 })
 
 const bedTypes = [
-  'GENERAL',
-  'ICU',
-  'VENTILATOR',
-  'DELUXE',
-  'SEMI_PRIVATE',
-  'PRIVATE',
-  'SUPER DELUXE'
+      'GENERAL',
+      'ICU',
+      'VENTILATOR',
+      'DELUXE',
+      'SEMI_PRIVATE',
+      'PRIVATE',
+      'SUPER DELUXE',
+      'NICU',
+      'HDU'
 ]
 
 const bedStatuses = [
