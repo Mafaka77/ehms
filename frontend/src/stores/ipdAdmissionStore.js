@@ -215,6 +215,7 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       this.error = null
       try {
         const response = await api.get(`/ipd/admission/${admissionId}/advances`)
+        console.log(response.data.data)
         return { success: true, data: response.data.data }
       } catch (err) {
         console.error('Error fetching advances:', err)

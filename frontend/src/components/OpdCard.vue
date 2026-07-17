@@ -46,34 +46,16 @@ const patientAge = computed(() => {
 <template>
   <div class="print-container bg-white text-black mx-auto border-2 border-slate-800 flex flex-col justify-between">
     <div>
-      <!-- Hospital Header -->
-      <div class="flex items-center justify-between border-b-2 border-slate-800 pb-2 mb-2">
-        <!-- Simple Logo -->
-        <div class="w-24 flex justify-center">
-          <div class="w-16 h-16 border-2 border-slate-800 rounded-full flex items-center justify-center bg-slate-50">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-slate-800" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 10.5h-5.5V5h-3v5.5H5v3h5.5V19h3v-5.5H19v-3z"/>
-            </svg>
-          </div>
-        </div>
+      <!-- Space for pre-printed letterhead -->
+      <div class="h-25"></div>
+      
+      <!-- Card Title -->
+      <div class="flex justify-center border-b-1 border-slate-800 pb-4 mb-2">
         
-        <div class="flex-1 text-center">
-          <h1 class="text-2xl font-black uppercase tracking-widest text-slate-900">Emmanuel Hospital</h1>
-          <p class="text-xs font-semibold mt-1">Luangmual Near Appollo School of Nursing</p>
-          <p class="text-xs font-semibold mt-1">Aizawl, Mizoram - 796009</p>
-          <p class="text-xs font-semibold">Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
-          <p class="text-xs font-semibold">GSTIN: 15CDTPN0612H1ZK</p>
-          <div class="mt-3 text-xs inline-block bg-slate-900 text-white px-5 py-1 rounded-full font-bold uppercase tracking-widest">
-            Out-Patient Department Card
-          </div>
-        </div>
-        
-        <!-- Spacer for centering -->
-        <div class="w-24"></div>
       </div>
 
       <!-- Details Grid -->
-      <div class="grid grid-cols-2 gap-6 mb-6 border-b-2 border-slate-800 pb-4">
+      <div class="grid grid-cols-2 gap-6 mb-6 border-b-1 border-slate-800 pb-2">
         
         <!-- Patient Details -->
         <div>
@@ -118,8 +100,8 @@ const patientAge = computed(() => {
                 <td class="py-1 font-bold">Dr. {{ doctor.fullName || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 font-semibold">Department:</td>
-                <td class="py-1 font-bold">{{ specialization }}</td>
+                <td class="py-1 font-semibold"></td>
+                <td class="py-1 font-bold">{{ doctor.qualification || '-' }}</td>
               </tr>
             </tbody>
           </table>
@@ -135,13 +117,8 @@ const patientAge = computed(() => {
     </div>
 
     <!-- Footer Signatures -->
-    <div class="mt-auto grid grid-cols-2 pt-8 border-slate-800">
-      <div class="text-center">
-        <div class="border-t border-slate-400 w-48 mx-auto pt-2 text-xs font-semibold">Patient/Attendant Signature</div>
-      </div>
-      <div class="text-center">
-        <div class="border-t border-slate-400 w-48 mx-auto pt-2 text-xs font-semibold">Doctor Signature & Stamp</div>
-      </div>
+    <div class="mt-auto grid grid-cols-2 pt-8 border-slate-800 border-b-1">
+     
     </div>
 
   </div>

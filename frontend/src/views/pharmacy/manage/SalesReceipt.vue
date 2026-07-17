@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const props = defineProps({
   show: {
@@ -17,6 +17,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+const cgst = computed(() => (props.sale?.totalAmount * 2.5) / 100 || 0)
+const sgst = computed(() => (props.sale?.totalAmount * 2.5) / 100 || 0)
+const netPayable = computed(() => (props.sale?.totalAmount || 0) + cgst.value + sgst.value)
 
 const printingPDF = ref(false)
 
@@ -90,11 +94,13 @@ const numberToWords = (num) => {
           <div class="receipt-content">
             <!-- Header Brand -->
             <div class="receipt-header">
-              <h1 class="uppercase tracking-widest text-slate-900">Emmanuel Hospital</h1>
-              <p>Luangmual Near Appollo School of Nursing</p>
-              <p>Aizawl, Mizoram - 796009</p>
-              <p>Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
-              <p>GSTIN: 15CDTPN0612H1ZK</p>
+              <div class="flex items-center justify-between mb-2">
+                <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
+                <div class="text-right">
+                   <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                    <p>Phone: 0389-2913340 / 8974326872</p>
+                </div>
+              </div>
               <hr class="receipt-divider" />
               <h2>PHARMACY BILL / INVOICE</h2>
             </div>
@@ -148,9 +154,9 @@ const numberToWords = (num) => {
                   <td class="text-center font-mono text-[9px]">{{ item.quantity }}</td>
                   <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.rate) }}</td>
                   <td class="text-right font-mono text-[9px]">2.50%</td>
-                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 105) }}</td>
+                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 100) }}</td>
                   <td class="text-right font-mono text-[9px]">2.50%</td>
-                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 105) }}</td>
+                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 100) }}</td>
                   <td class="text-right font-mono font-semibold text-[9px]">{{ formatCurrency(item.amount) }}</td>
                 </tr>
               </tbody>
@@ -160,20 +166,28 @@ const numberToWords = (num) => {
             <div class="financials-summary-container flex justify-between mt-3">
               <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%]">
                 <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
-                {{ numberToWords(sale.totalAmount) }}
+                {{ numberToWords(netPayable) }}
               </div>
               <div class="financials-summary w-48">
                 <div class="flex justify-between">
                   <span>Gross Total:</span>
                   <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
                 </div>
+                <div class="flex justify-between">
+                  <span>CGST (2.50%):</span>
+                  <span class="font-mono">{{ formatCurrency(cgst) }}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span>SGST (2.50%):</span>
+                  <span class="font-mono">{{ formatCurrency(sgst) }}</span>
+                </div>
                 <div class="flex justify-between net-payable">
                   <span>Net Payable:</span>
-                  <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+                  <span class="font-mono">{{ formatCurrency(netPayable) }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span>Paid Amount:</span>
-                  <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+                  <span class="font-mono">{{ formatCurrency(netPayable) }}</span>
                 </div>
               </div>
             </div>
@@ -233,7 +247,7 @@ const numberToWords = (num) => {
   box-sizing: border-box;
   background-color: #ffffff;
   border: 1px dashed #cbd5e1;
-  color: #0f172a;
+  color: #000000;
   padding: 24px;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -250,19 +264,19 @@ const numberToWords = (num) => {
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: -0.025em;
-  color: #0f172a;
+  color: #000000;
   margin: 0 0 4px 0;
 }
 
 .receipt-header p {
   font-size: 10px;
-  color: #64748b;
+  color: #000000;
   margin: 0;
 }
 
 .receipt-divider {
   border: 0;
-  border-top: 1px dashed #cbd5e1;
+  border-top: 1px dashed #94a3b8;
   margin: 8px 0;
 }
 
@@ -270,7 +284,7 @@ const numberToWords = (num) => {
   font-size: 11px;
   font-weight: bold;
   letter-spacing: 0.05em;
-  color: #1e293b;
+  color: #000000;
   margin: 4px 0 0 0;
 }
 
@@ -286,11 +300,11 @@ const numberToWords = (num) => {
 
 .demographics p {
   margin: 0;
-  color: #334155;
+  color: #000000;
 }
 
 .demographics .patient-name {
-  color: #0f172a;
+  color: #000000;
   font-weight: bold;
 }
 
@@ -302,24 +316,24 @@ const numberToWords = (num) => {
 }
 
 .items-table th {
-  border-top: 1px dashed #cbd5e1;
-  border-bottom: 1px dashed #cbd5e1;
+  border-top: 1px dashed #94a3b8;
+  border-bottom: 1px dashed #94a3b8;
   font-weight: bold;
   padding: 6px 0;
-  color: #475569;
+  color: #000000;
 }
 
 .items-table td {
-  border-bottom: 1px dashed #f1f5f9;
+  border-bottom: 1px dashed #cbd5e1;
   padding: 6px 0;
-  color: #334155;
+  color: #000000;
 }
 
 .financials-summary {
   width: 50%;
   margin-left: auto;
   font-size: 10px;
-  border-top: 1px dashed #cbd5e1;
+  border-top: 1px dashed #94a3b8;
   padding-top: 8px;
   line-height: 1.25;
 }
@@ -329,9 +343,9 @@ const numberToWords = (num) => {
 }
 
 .financials-summary .net-payable {
-  border-top: 1px dashed #e2e8f0;
+  border-top: 1px dashed #94a3b8;
   padding-top: 4px;
-  color: #1e1b4b;
+  color: #000000;
   font-size: 11px;
   font-weight: bold;
 }
@@ -341,18 +355,18 @@ const numberToWords = (num) => {
   display: flex;
   justify-content: space-between;
   font-size: 8px;
-  color: #64748b;
+  color: #000000;
   line-height: 1.25;
 }
 
 .signatures .operator-name {
   font-weight: bold;
-  color: #1e293b;
+  color: #000000;
   margin: 2px 0 0 0;
 }
 
 .signatures .sig-line {
-  border-top: 1px dotted #cbd5e1;
+  border-top: 1px dotted #64748b;
   padding-top: 4px;
   display: inline-block;
 }
@@ -361,7 +375,7 @@ const numberToWords = (num) => {
   text-align: center;
   margin-top: 16px;
   font-size: 8px;
-  color: #94a3b8;
+  color: #000000;
   font-style: italic;
   line-height: 1.25;
 }
@@ -372,7 +386,7 @@ const numberToWords = (num) => {
 
 .notice .wish {
   font-weight: bold;
-  color: #475569;
+  color: #000000;
   margin-top: 2px;
 }
 
@@ -409,7 +423,13 @@ const numberToWords = (num) => {
     box-shadow: none !important;
     border: none !important;
     background-color: white !important;
+    color: #000000 !important;
   }
+
+  .print-receipt-container * {
+    color: #000000 !important;
+  }
+
   .items-table tr {
     page-break-inside: avoid;
   }

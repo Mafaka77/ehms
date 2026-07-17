@@ -1,0 +1,1 @@
+var e=`/assets/logo_final-BCI6J9Nt.png`;export{e as t};

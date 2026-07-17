@@ -69,7 +69,7 @@ exports.getAppointments = async (query) => {
             .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
@@ -135,7 +135,7 @@ exports.createAppointment = async (data) => {
             .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
@@ -168,7 +168,7 @@ exports.getAppointmentById = async (id) => {
             .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
@@ -221,7 +221,7 @@ exports.getAppointmentsReport = async (query) => {
             .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'

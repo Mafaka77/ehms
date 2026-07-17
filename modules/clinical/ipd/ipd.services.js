@@ -1378,10 +1378,16 @@ exports.getAdmissionAdvances = async (admissionId) => {
 exports.getAdmissionBills = async (admissionId) => {
     try {
         const Bill = mongoose.model('Bill')
+        const Payment = mongoose.model('Payment')
         const bills = await Bill.find({ admissionId, billType: 'IPD' })
             .populate('generatedBy', 'fullName')
             .sort({ generatedAt: -1 })
             .lean()
+
+        for (let bill of bills) {
+            bill.payments = await Payment.find({ billId: bill._id }).lean()
+        }
+
         return { success: true, data: bills }
     } catch (error) {
         throw error

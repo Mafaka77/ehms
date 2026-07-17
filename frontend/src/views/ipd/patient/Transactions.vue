@@ -99,6 +99,21 @@ const getChargeTotal = (charge) => {
   return base + addonsTotal
 }
 
+const formatPaymentModes = (bill) => {
+  if (!bill.payments || bill.payments.length === 0) return null
+  const modeNames = {
+    'CASH': 'Cash',
+    'UPI': 'UPI',
+    'CARD': 'Card',
+    'BANK_TRANSFER': 'Bank Transfer',
+    'CHEQUE': 'Cheque',
+    'INSURANCE': 'Insurance',
+    'ADVANCE_DEPOSIT': 'Advance'
+  }
+  const modes = [...new Set(bill.payments.map(p => modeNames[p.paymentMode] || p.paymentMode))]
+  return modes.join(' + ')
+}
+
 onMounted(() => {
   fetchAdvancesAndBills()
 })
@@ -193,16 +208,21 @@ onMounted(() => {
               <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Bill No</span>
               <h4 class="font-bold font-mono text-indigo-600">{{ bill.billNo }}</h4>
             </div>
-            <span 
-              class="px-2.5 py-1 rounded-md text-[10px] font-bold border"
-              :class="{
-                'bg-emerald-50 text-emerald-700 border-emerald-200': bill.status === 'PAID',
-                'bg-amber-50 text-amber-700 border-amber-200': bill.status === 'PARTIALLY_PAID',
-                'bg-rose-50 text-rose-700 border-rose-200': bill.status === 'DRAFT' || bill.status === 'UNPAID',
-              }"
-            >
-              {{ bill.status }}
-            </span>
+            <div class="flex flex-col items-end gap-1">
+              <span 
+                class="px-2.5 py-1 rounded-md text-[10px] font-bold border"
+                :class="{
+                  'bg-emerald-50 text-emerald-700 border-emerald-200': bill.status === 'PAID',
+                  'bg-amber-50 text-amber-700 border-amber-200': bill.status === 'PARTIALLY_PAID',
+                  'bg-rose-50 text-rose-700 border-rose-200': bill.status === 'DRAFT' || bill.status === 'UNPAID',
+                }"
+              >
+                {{ bill.status }}
+              </span>
+              <span v-if="formatPaymentModes(bill)" class="text-[10px] text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                Via {{ formatPaymentModes(bill) }}
+              </span>
+            </div>
           </div>
           
           <div class="flex justify-between items-end">

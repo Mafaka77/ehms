@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useLabStore } from '../../../stores/labStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
@@ -38,6 +38,29 @@ const tests = ref([])
 const viewMode = ref('edit')
 const pdfPreviewUrl = ref(null)
 const currentFilename = ref('')
+
+const patientAge = computed(() => {
+  const patient = props.order?.patientId
+  if (patient && patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth)
+    const today = new Date()
+    
+    let years = today.getFullYear() - dob.getFullYear()
+    let months = today.getMonth() - dob.getMonth()
+    let days = today.getDate() - dob.getDate()
+    
+    if (months < 0 || (months === 0 && days < 0)) {
+      years--
+    }
+    
+    const lastBirthday = new Date(dob.getFullYear() + years, dob.getMonth(), dob.getDate())
+    const diffTime = Math.abs(today.getTime() - lastBirthday.getTime())
+    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24))
+    
+    return years > 0 ? `${years}Y ${diffDays}D` : `${diffDays}D`
+  }
+  return props.order?.patientId?.age ? `${props.order.patientId.age}Y` : '-'
+})
 
 const fetchResults = async () => {
   if (!props.order?._id) return
@@ -354,10 +377,15 @@ const formatDate = (dateString) => {
                 <td>
                   <!-- Header Brand -->
                   <div class="report-header">
-                    <h1 style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 16px;">Emmanuel Hospital</h1>
-                    <p>Luangmual Near Appollo School of Nursing, Aizawl, Mizoram - 796009</p>
-                    <p>Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
-                    <p>GSTIN: 15CDTPN0612H1ZK</p>
+                    <div class="relative mb-2 flex items-center justify-center">
+                      <img src="../../../assets/logo_final.png" alt="Logo" class="absolute left-0 h-16 w-auto object-contain" />
+                      <div class="text-center">
+                        <h1 style="text-transform: uppercase; letter-spacing: 0.1em; font-size: 16px;"><span class="text-[#006400]">Emmanuel</span> <span class="text-[#8b0000]">Hospital</span></h1>
+                        <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                        <p>Phone: 0389-2913340 / 8974326872</p>
+                        <p>Reg No: A-0766/26</p>
+                      </div>
+                    </div>
                     <hr class="report-divider" />
                     <h2>LABORATORY INVESTIGATION REPORT</h2>
                   </div>
@@ -367,7 +395,7 @@ const formatDate = (dateString) => {
               <div>
                 <p><strong>Patient Name:</strong> {{ order.patientId?.fullName }}</p>
                 <p><strong>Patient ID / Code:</strong> <span class="font-mono">{{ order.patientId?.patientCode || 'N/A' }}</span></p>
-                <p><strong>Age / Gender:</strong> {{ order.patientId?.age }} Yrs / {{ order.patientId?.gender }}</p>
+                <p><strong>Age / Gender:</strong> {{ patientAge }} / {{ order.patientId?.gender }}</p>
                 <p><strong>Contact No:</strong> {{ order.patientId?.mobileNo }}</p>
               </div>
               <div class="text-right">
