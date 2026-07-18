@@ -51,8 +51,8 @@ watch(() => props.order, (newOrder) => {
 }, { immediate: true })
 
 const showDiscount = ref(false)
-const discountMode = ref('employee') // 'employee', 'percentage', 'amount'
-const discountInputVal = ref(20) // percentage or flat amount value
+const discountMode = ref('percentage') // only 'percentage' now
+const discountInputVal = ref(0) // percentage or flat amount value
 const discountRemarks = ref('')
 
 // Compute final discount amount
@@ -117,23 +117,9 @@ const clearEmployee = () => {
 
 // Reset/Auto-detect discount when order changes
 watch(() => props.order, (newOrder) => {
-  if (newOrder && !newOrder.billId && newOrder.patientId?.isEmployee) {
-    showDiscount.value = true
-    discountMode.value = 'employee'
-    discountInputVal.value = 20
-    selectedEmployee.value = {
-      _id: newOrder.patientId.employeeId,
-      fullName: newOrder.patientId.fullName,
-      employeeCode: newOrder.patientId.employeeCode
-    }
-    employeeSearchQuery.value = newOrder.patientId.fullName
-  } else {
-    showDiscount.value = false
-    discountMode.value = 'employee'
-    discountInputVal.value = 20
-    selectedEmployee.value = null
-    employeeSearchQuery.value = ''
-  }
+  showDiscount.value = false
+  discountMode.value = 'percentage'
+  discountInputVal.value = 0
   discountRemarks.value = ''
 })
 
@@ -333,7 +319,7 @@ const getPaymentStatusColor = (status) => {
       </div>
 
       <!-- Discount Configuration (Only if bill not generated yet) -->
-      <div v-if="false && !order.billId && order.paymentStatus === 'UNPAID'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
+      <div v-if="!order.billId && order.paymentStatus === 'UNPAID'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 uppercase select-none">
             <input type="checkbox" v-model="showDiscount" class="text-indigo-600 focus:ring-indigo-500 rounded border-slate-300">
@@ -345,66 +331,17 @@ const getPaymentStatusColor = (status) => {
         </div>
 
         <div v-if="showDiscount" class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/50">
-          <div class="col-span-2 sm:col-span-1">
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Discount Type</label>
-            <select 
-              v-model="discountMode"
-              class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
-            >
-              <option value="employee">Employee Discount (20%)</option>
-              <option value="percentage">Custom Percentage (%)</option>
-              <option value="amount">Custom Flat Amount (₹)</option>
-            </select>
-          </div>
-
-          <div v-if="discountMode !== 'employee'" class="col-span-2 sm:col-span-1">
+          <div class="col-span-2">
             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-              {{ discountMode === 'percentage' ? 'Percentage (%)' : 'Amount (INR)' }}
+              Percentage (%)
             </label>
             <input 
               v-model.number="discountInputVal"
               type="number"
               min="0"
+              max="100"
               class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 font-mono"
             />
-          </div>
-
-          <!-- Employee Search Select -->
-          <div v-else class="col-span-2 sm:col-span-1 relative">
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Search Employee <span class="text-rose-500">*</span></label>
-            
-            <div v-if="selectedEmployee" class="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
-              <div class="flex flex-col overflow-hidden w-full">
-                <span class="text-xs font-bold text-indigo-900 truncate">{{ selectedEmployee.fullName }}</span>
-                <span class="text-[9px] text-indigo-700 font-mono truncate">{{ selectedEmployee.employeeCode }}</span>
-              </div>
-              <button type="button" @click="clearEmployee" class="text-indigo-400 hover:text-indigo-600 focus:outline-none ml-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            
-            <div v-else>
-              <input 
-                v-model="employeeSearchQuery"
-                type="text" 
-                placeholder="Name or employee code..." 
-                class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              <!-- Dropdown Results -->
-              <div v-if="employeeSearchResults.length > 0" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                <ul class="py-0.5 divide-y divide-slate-50">
-                  <li 
-                    v-for="emp in employeeSearchResults" 
-                    :key="emp._id"
-                    @click="selectEmployee(emp)"
-                    class="px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer flex flex-col"
-                  >
-                    <span class="text-xs font-semibold text-slate-800">{{ emp.fullName }}</span>
-                    <span class="text-[10px] text-slate-500 font-mono">{{ emp.employeeCode }}</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
           </div>
 
           <!-- Reason/Remarks Input -->

@@ -53,9 +53,13 @@ const formatCurrency = (val) => {
           <div class="receipt-content">
             <!-- Header Brand -->
             <div class="receipt-header">
-              <h1>EHMS Hospital & Research Centre</h1>
-              <p>123 Health Care Avenue, Medical City</p>
-              <p>Mob: +91 98765 43210 | Email: billing@ehms.com</p>
+              <div class="flex items-center justify-between mb-2">
+                <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
+                <div class="text-right">
+                   <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                   <p>Phone: 0389-2913340 / 8974326872</p>
+                </div>
+              </div>
               <hr class="receipt-divider" />
               <h2>LABORATORY BILL / INVOICE</h2>
             </div>

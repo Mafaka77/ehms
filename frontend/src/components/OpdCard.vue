@@ -47,7 +47,7 @@ const patientAge = computed(() => {
   <div class="print-container bg-white text-black mx-auto border-2 border-slate-800 flex flex-col justify-between">
     <div>
       <!-- Space for pre-printed letterhead -->
-      <div class="h-25"></div>
+      <div class="h-20"></div>
       
       <!-- Card Title -->
       <div class="flex justify-center border-b-1 border-slate-800 pb-4 mb-2">
@@ -97,7 +97,7 @@ const patientAge = computed(() => {
               </tr>
               <tr>
                 <td class="py-1 font-semibold">Doctor:</td>
-                <td class="py-1 font-bold">Dr. {{ doctor.fullName || '-' }}</td>
+                <td class="py-1 font-bold">{{ doctor.fullName || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 font-semibold"></td>
