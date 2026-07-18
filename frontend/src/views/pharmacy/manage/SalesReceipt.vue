@@ -18,9 +18,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const cgst = computed(() => (props.sale?.totalAmount * 2.5) / 100 || 0)
-const sgst = computed(() => (props.sale?.totalAmount * 2.5) / 100 || 0)
-const netPayable = computed(() => (props.sale?.totalAmount || 0) + cgst.value + sgst.value)
+const netPayable = computed(() => props.sale?.totalAmount || 0)
 
 const printingPDF = ref(false)
 
@@ -136,10 +134,6 @@ const numberToWords = (num) => {
                   <th class="text-center">Exp. Dt</th>
                   <th class="text-center">Qty</th>
                   <th class="text-right">Rate</th>
-                  <th class="text-right">CGST 2.50%</th>
-                  <th class="text-right">CGST Amt</th>
-                  <th class="text-right">SGST 2.50%</th>
-                  <th class="text-right">SGST Amt</th>
                   <th class="text-right">Amount</th>
                 </tr>
               </thead>
@@ -153,10 +147,6 @@ const numberToWords = (num) => {
                   <td class="text-center font-mono text-[9px]">{{ formatDateShort(item.batchId?.expiryDate) }}</td>
                   <td class="text-center font-mono text-[9px]">{{ item.quantity }}</td>
                   <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.rate) }}</td>
-                  <td class="text-right font-mono text-[9px]">2.50%</td>
-                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 100) }}</td>
-                  <td class="text-right font-mono text-[9px]">2.50%</td>
-                  <td class="text-right font-mono text-[9px]">{{ formatCurrency((item.amount * 2.5) / 100) }}</td>
                   <td class="text-right font-mono font-semibold text-[9px]">{{ formatCurrency(item.amount) }}</td>
                 </tr>
               </tbody>
@@ -172,14 +162,6 @@ const numberToWords = (num) => {
                 <div class="flex justify-between">
                   <span>Gross Total:</span>
                   <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span>CGST (2.50%):</span>
-                  <span class="font-mono">{{ formatCurrency(cgst) }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span>SGST (2.50%):</span>
-                  <span class="font-mono">{{ formatCurrency(sgst) }}</span>
                 </div>
                 <div class="flex justify-between net-payable">
                   <span>Net Payable:</span>
