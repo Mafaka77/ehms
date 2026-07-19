@@ -23,6 +23,24 @@ const loading = ref(false)
 const orderData = ref(null)
 const tests = ref([])
 
+const calculateAge = (patient) => {
+  if (!patient) return '-'
+  if (patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth)
+    const today = new Date()
+    let years = today.getFullYear() - dob.getFullYear()
+    let months = today.getMonth() - dob.getMonth()
+    let days = today.getDate() - dob.getDate()
+    if (months < 0 || (months === 0 && days < 0)) years--
+    
+    const lastBirthday = new Date(dob.getFullYear() + years, dob.getMonth(), dob.getDate())
+    const diffTime = Math.abs(today.getTime() - lastBirthday.getTime())
+    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24))
+    return years > 0 ? `${years}Y ${diffDays}D` : `${diffDays}D`
+  }
+  return patient.age ? `${patient.age}Y` : '-'
+}
+
 const testsWithSections = computed(() => {
   return tests.value.map(test => {
     const groups = {}
@@ -167,7 +185,7 @@ const formatDate = (dateString) => {
           </div>
           <div>
             <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Age / Gender</div>
-            <div class="font-semibold text-slate-800 mt-1">{{ order.patientId?.age }} Yrs / {{ order.patientId?.gender }}</div>
+            <div class="font-semibold text-slate-800 mt-1">{{ calculateAge(order.patientId) }} / {{ order.patientId?.gender }}</div>
           </div>
           <div>
             <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Referring Doctor</div>

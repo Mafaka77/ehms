@@ -256,6 +256,36 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async updateIpdBill(billId, payload) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.put(`/billing/ipd-bills/${billId}`, payload)
+        return { success: true, data: response.data.data, message: response.data.message || 'Bill updated successfully' }
+      } catch (err) {
+        console.error('Error updating IPD bill:', err)
+        this.error = err.response?.data?.message || 'Failed to update IPD bill'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteIpdBill(billId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.delete(`/billing/bills/${billId}`)
+        return { success: true, message: response.data.message || 'Bill deleted successfully' }
+      } catch (err) {
+        console.error('Error deleting IPD bill:', err)
+        this.error = err.response?.data?.message || 'Failed to delete IPD bill'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchChargeCategories() {
       this.loading = true
       this.error = null

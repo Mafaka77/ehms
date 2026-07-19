@@ -26,7 +26,7 @@ fastify.register(require('@fastify/helmet'), {
 })
 fastify.register(require('@fastify/cors'), {
   origin: '*',
-  methods: ['GET', 'PUT', 'POST', 'DELETE', 'OPTIONS']
+  methods: ['GET', 'PUT', 'POST', 'DELETE', 'PATCH', 'OPTIONS']
 })
 fastify.register(require('@fastify/cookie'))
 fastify.register(require('@fastify/multipart'))

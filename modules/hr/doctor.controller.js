@@ -54,6 +54,22 @@ exports.getDoctorById = async (req, res) => {
     }
 }
 
+exports.updateDoctor = async (req, res) => {
+    try {
+        const doctor = await doctorService.updateDoctor(req.params.id, req.body);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Doctor updated successfully',
+            data: doctor,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
 exports.getRemunerationRules = async (req, res) => {
     try {
         const rules = await doctorService.getRemunerationRules(req.params.id);

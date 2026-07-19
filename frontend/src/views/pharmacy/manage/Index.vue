@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import Sales from './Sales.vue'
 import Stocks from './Stocks.vue'
 import IPDOrder from './IPDOrder.vue'
+import Indent from './Indent.vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
 
 const pharmacyStore = usePharmacyStore()
@@ -65,6 +66,12 @@ watch(activeTab, refreshPendingCount)
           <span class="relative">{{ pharmacyStore.pendingIpdOrdersCount }}</span>
         </span>
       </button>
+      <button 
+        @click="activeTab = 'indent'"
+        :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none flex items-center gap-2', activeTab === 'indent' ? 'border-teal-600 text-teal-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
+      >
+        <span>Indent</span>
+      </button>
     </div>
 
     <!-- Tab Contents -->
@@ -72,6 +79,7 @@ watch(activeTab, refreshPendingCount)
       <Sales v-if="activeTab === 'sales'" />
       <Stocks v-else-if="activeTab === 'stock'" />
       <IPDOrder v-else-if="activeTab === 'orders'" />
+      <Indent v-else-if="activeTab === 'indent'" />
     </div>
   </div>
 </template>

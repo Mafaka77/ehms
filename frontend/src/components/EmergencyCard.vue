@@ -20,45 +20,63 @@ const formatDate = (dateStr) => {
 const patient = computed(() => props.visit.patientId || {})
 const doctor = computed(() => props.visit.doctorId || {})
 const specialization = computed(() => doctor.value.specializationId?.name || 'General Medicine')
+
+const patientAge = computed(() => {
+  if (patient.value.dateOfBirth) {
+    const dob = new Date(patient.value.dateOfBirth)
+    const today = new Date()
+    
+    let years = today.getFullYear() - dob.getFullYear()
+    let months = today.getMonth() - dob.getMonth()
+    let days = today.getDate() - dob.getDate()
+    
+    if (months < 0 || (months === 0 && days < 0)) {
+      years--
+    }
+    
+    const lastBirthday = new Date(dob.getFullYear() + years, dob.getMonth(), dob.getDate())
+    const diffTime = Math.abs(today.getTime() - lastBirthday.getTime())
+    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24))
+    
+    return years > 0 ? `${years}Y ${diffDays}D` : `${diffDays}D`
+  }
+  return patient.value.age ? `${patient.value.age}Y` : '-'
+})
 </script>
 
 <template>
-  <div class="print-container bg-white text-black mx-auto border border-slate-800 flex flex-col justify-between">
+  <div class="print-container bg-white text-black mx-auto  border-slate-800 flex flex-col justify-between">
     <div>
-      <!-- Hospital Header -->
-      <div class="text-center border-b border-slate-800 pb-5 mb-5">
-        <h1 class="text-2xl font-bold uppercase tracking-widest text-slate-900">Emmanuel Hospital</h1>
-        <p class="text-xs text-slate-700 mt-1">Luangmual Near Appollo School of Nursing</p>
-        <p class="text-xs text-slate-700 mt-0.5">Aizawl, Mizoram - 796009</p>
-        <p class="text-xs text-slate-700 mt-0.5">Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
-        <p class="text-xs text-slate-700 mt-0.5">GSTIN: 15CDTPN0612H1ZK</p>
-        <div class="mt-3 inline-block bg-rose-600 text-white px-5 py-1 rounded-full text-xs font-bold uppercase tracking-widest border border-rose-700 print-exact-color">
-          Emergency Visit Card
-        </div>
+      <!-- Space for pre-printed letterhead -->
+      <div class="h-20"></div>
+      
+      <!-- Card Title -->
+      <div class="flex justify-center border-b-1 border-slate-800 pb-4 mb-2">
+        
       </div>
 
       <!-- Details Grid -->
-      <div class="grid grid-cols-2 gap-4 mb-6 border-b border-slate-800 pb-5">
+      <div class="grid grid-cols-2 gap-6 mb-6 border-b-1 border-slate-800 pb-2">
         
         <!-- Patient Details -->
         <div>
-          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-2">Patient Details</h2>
+          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[11px] mb-2">Patient Details</h2>
           <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-slate-600 w-1/3">Patient Name:</td>
+                <td class="py-1 font-semibold w-1/3">Patient Name:</td>
                 <td class="py-1 font-bold">{{ patient.fullName || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 text-slate-600">Patient ID:</td>
+                <td class="py-1 font-semibold">Patient ID:</td>
                 <td class="py-1 font-bold">{{ patient.patientCode || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 text-slate-600">Age / Gender:</td>
-                <td class="py-1 font-bold">{{ patient.age || '-' }} / {{ patient.gender || '-' }}</td>
+                <td class="py-1 font-semibold">Age / Gender:</td>
+                <td class="py-1 font-bold">{{ patientAge }} / {{ patient.gender || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 text-slate-600">Contact:</td>
+                <td class="py-1 font-semibold">Contact:</td>
                 <td class="py-1 font-bold">{{ patient.mobileNo || '-' }}</td>
               </tr>
             </tbody>
@@ -67,28 +85,43 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
 
         <!-- Visit Details -->
         <div>
-          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[10px] mb-2">Visit Details</h2>
+          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[11px] mb-2">Visit Details</h2>
           <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-slate-600 w-1/3">Visit No:</td>
-                <td class="py-1 font-bold font-mono text-indigo-700 print-exact-text">{{ visit.visitNo || '-' }}</td>
+                <td class="py-1 font-semibold w-1/3">Visit No:</td>
+                <td class="py-1 font-bold">{{ visit.visitNo || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 text-slate-600">Arrival Time:</td>
+                <td class="py-1 font-semibold">Date:</td>
                 <td class="py-1 font-bold">{{ formatDate(visit.arrivalDateTime) }}</td>
+              </tr>
+              <tr>
+                <td class="py-1 font-semibold">Doctor:</td>
+                <td class="py-1 font-bold">{{ doctor.fullName || '-' }}</td>
+              </tr>
+              <tr>
+                <td class="py-1 font-semibold"></td>
+                <td class="py-1 font-bold">{{ doctor.qualification || '-' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
+
+      <!-- Prescription Area -->
+      <div class="flex-grow">
+        <!-- The blank area for doctor to write -->
+        <div class="h-[400px]"></div>
+      </div>
     </div>
 
     <!-- Footer Signatures -->
-    <div class="grid grid-cols-2 pt-10 mt-6">
-      <div class="text-center col-start-2">
-        <div class="border-t border-slate-400 w-40 mx-auto pt-2 text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Doctor Signature & Stamp</div>
+    <div class="mt-auto pt-8">
+      <div class="grid grid-cols-2">
+       
       </div>
+      <hr class="border-slate-800 mt-8" />
     </div>
 
   </div>
@@ -100,7 +133,7 @@ const specialization = computed(() => doctor.value.specializationId?.name || 'Ge
   box-sizing: border-box;
   width: 210mm;
   height: 297mm;
-  padding: 15mm;
+  padding: 8mm 15mm 15mm 15mm;
   box-shadow: 0 0 15px rgba(0,0,0,0.1);
   margin: 0 auto;
   background-color: white;

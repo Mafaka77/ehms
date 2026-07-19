@@ -48,7 +48,7 @@ exports.getEmergencyVisits = async (query) => {
         }
 
         const visits = await EmergencyVisit.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo gender age')
+            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',
@@ -105,7 +105,7 @@ exports.createEmergencyVisit = async (data) => {
         const visit = await EmergencyVisit.create(visitData);
         
         const populatedVisit = await EmergencyVisit.findById(visit._id)
-            .populate('patientId', 'fullName patientCode mobileNo age gender')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',
@@ -155,7 +155,7 @@ exports.dischargeEmergencyVisit = async (id) => {
 exports.getEmergencyVisitById = async (id) => {
     try {
         const visit = await EmergencyVisit.findById(id)
-            .populate('patientId', 'fullName patientCode mobileNo gender age')
+            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',
@@ -216,7 +216,7 @@ exports.getEmergencyVisitsReport = async (query) => {
         }
 
         const visits = await EmergencyVisit.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo age gender')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',

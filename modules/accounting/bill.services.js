@@ -932,10 +932,16 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
         }
 
         // Sync EmergencyVisit
-        if (txBill.billType === 'EMERGENCY' && txBill.emergencyVisitId) {
+        if (txBill.emergencyVisitId && (txBill.billType === 'EMERGENCY' || txBill.billType === 'EMERGENCY_CONSULTATION')) {
             const visit = await mongoose.model('EmergencyVisit').findById(txBill.emergencyVisitId).session(session)
             if (visit) {
-                visit.paymentStatus = txBill.status === 'PAID' ? 'Paid' : 'Unpaid'
+                if (txBill.billType === 'EMERGENCY_CONSULTATION') {
+                    if (txBill.status === 'PAID') visit.paymentStatus = 'Partially Paid'
+                    else if (visit.paymentStatus === 'Partially Paid') visit.paymentStatus = 'Unpaid'
+                } else if (txBill.billType === 'EMERGENCY') {
+                    if (txBill.status === 'PAID') visit.paymentStatus = 'Paid'
+                    else if (visit.paymentStatus === 'Paid') visit.paymentStatus = 'Partially Paid'
+                }
                 await visit.save({ session })
             }
         }
@@ -1033,13 +1039,25 @@ exports.cancelBill = async (billId) => {
         }
 
         // Revert associated Emergency visit status
-        if (bill.billType === 'EMERGENCY' && bill.emergencyVisitId) {
+        if (bill.emergencyVisitId && (bill.billType === 'EMERGENCY' || bill.billType === 'EMERGENCY_CONSULTATION')) {
             const visit = await mongoose.model('EmergencyVisit').findById(bill.emergencyVisitId).session(session)
             if (visit) {
-                visit.paymentStatus = 'Unpaid'
+                if (bill.billType === 'EMERGENCY') {
+                    visit.paymentStatus = 'Partially Paid' // Fallback to Partially Paid since Consultation might be paid
+                } else if (bill.billType === 'EMERGENCY_CONSULTATION') {
+                    visit.paymentStatus = 'Unpaid'
+                }
                 await visit.save({ session })
             }
         }
+
+        // Revert associated IPD PatientCharges status
+        const PatientChargeModel = require('../common/patient_charge.model')
+        await PatientChargeModel.updateMany(
+            { billId: bill._id },
+            { $set: { isBilled: false, billId: null } },
+            { session }
+        )
 
         // Delete bill items, discounts, and the bill
         await BillItem.deleteMany({ billId }).session(session)
@@ -1160,10 +1178,14 @@ exports.cancelPayment = async (paymentId, userId) => {
             }
 
             // Sync EmergencyVisit
-            if (bill.billType === 'EMERGENCY' && bill.emergencyVisitId) {
+            if (bill.emergencyVisitId && (bill.billType === 'EMERGENCY' || bill.billType === 'EMERGENCY_CONSULTATION')) {
                 const visit = await mongoose.model('EmergencyVisit').findById(bill.emergencyVisitId).session(session)
                 if (visit) {
-                    visit.paymentStatus = bill.status === 'PAID' ? 'Paid' : 'Unpaid'
+                    if (bill.billType === 'EMERGENCY_CONSULTATION') {
+                        visit.paymentStatus = bill.status === 'PAID' ? 'Partially Paid' : 'Unpaid'
+                    } else if (bill.billType === 'EMERGENCY') {
+                        visit.paymentStatus = bill.status === 'PAID' ? 'Paid' : 'Partially Paid'
+                    }
                     await visit.save({ session })
                 }
             }
@@ -1260,6 +1282,95 @@ exports.generateBillFromIpdCharges = async (admissionId, chargeIds, userId) => {
             { $set: { isBilled: true, billId: bill._id } },
             { session }
         )
+
+        await session.commitTransaction()
+        session.endSession()
+        return bill
+    } catch (err) {
+        await session.abortTransaction()
+        session.endSession()
+        throw err
+    }
+}
+
+// ---------------------------------------------------------------------------
+// updateIpdBill
+// ---------------------------------------------------------------------------
+exports.updateIpdBill = async (billId, { chargeIds = [], discountAmount = 0 }, userId) => {
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    try {
+        const bill = await Bill.findById(billId).session(session)
+        if (!bill) {
+            const error = new Error('Bill not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const PatientCharge = require('../common/patient_charge.model')
+        const PatientChargeAddon = require('../common/patient_charge_addon.model')
+
+        // Revert previously billed charges for this bill
+        await PatientCharge.updateMany(
+            { billId: bill._id },
+            { $set: { isBilled: false, billId: null } },
+            { session }
+        )
+
+        // Delete existing BillItems
+        await BillItem.deleteMany({ billId: bill._id }).session(session)
+
+        // Fetch selected charges
+        const charges = await PatientCharge.find({ _id: { $in: chargeIds }, admissionId: bill.admissionId }).session(session)
+        if (charges.length === 0) {
+            const error = new Error('Please select at least one charge for the bill')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        let totalGrossAmount = 0
+        const billItemsData = []
+
+        for (const charge of charges) {
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).session(session)
+            const addonsTotal = addons.reduce((sum, a) => sum + (a.amount || 0), 0)
+            
+            const itemAmount = charge.amount + addonsTotal
+            totalGrossAmount += itemAmount
+
+            billItemsData.push({
+                billId: bill._id,
+                itemType: 'OTHER',
+                sourceModule: 'OTHER',
+                referenceId: charge._id,
+                description: charge.description || 'IPD Charge',
+                quantity: charge.quantity || 1,
+                rate: charge.rate,
+                amount: itemAmount,
+                discountAmount: 0,
+                netAmount: itemAmount,
+                patientChargeId: charge._id
+            })
+        }
+
+        await BillItem.insertMany(billItemsData, { session })
+
+        // Mark charges as billed
+        const selectedIds = charges.map(c => c._id)
+        await PatientCharge.updateMany(
+            { _id: { $in: selectedIds } },
+            { $set: { isBilled: true, billId: bill._id } },
+            { session }
+        )
+
+        const finalDiscount = Number(discountAmount || 0)
+        const netAmt = Math.max(0, totalGrossAmount - finalDiscount)
+
+        bill.grossAmount = totalGrossAmount
+        bill.discountAmount = finalDiscount
+        bill.netAmount = netAmt
+        bill.balanceAmount = Math.max(0, netAmt - (bill.paidAmount || 0))
+        await bill.save({ session })
 
         await session.commitTransaction()
         session.endSession()

@@ -373,8 +373,37 @@ const getPaymentStatusColor = (status) => {
         </div>
       </div>
 
+      <!-- Bill summary skeleton -->
+      <div v-if="loadingBill && !billDetails" class="space-y-3 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/50 animate-pulse">
+        <div class="flex justify-between items-center border-b border-indigo-100/50 pb-2">
+          <div>
+            <div class="h-3 bg-indigo-200/70 rounded w-28 mb-1.5"></div>
+            <div class="h-4 bg-indigo-200/70 rounded w-20"></div>
+          </div>
+          <div class="h-5 bg-indigo-200/70 rounded w-16"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3 mt-1">
+          <div>
+            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
+            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
+          </div>
+          <div>
+            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
+            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
+          </div>
+          <div>
+            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
+            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
+          </div>
+          <div>
+            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
+            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
+          </div>
+        </div>
+      </div>
+
       <!-- Bill summary if generated -->
-      <div v-if="billDetails" class="space-y-3 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/50">
+      <div v-else-if="billDetails" class="space-y-3 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/50">
         <div class="flex justify-between items-center border-b border-indigo-100/50 pb-2">
           <div>
             <h4 class="text-xs font-bold uppercase text-indigo-500">Associated Bill Info</h4>

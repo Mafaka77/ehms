@@ -53,6 +53,27 @@ export const useDoctorStore = defineStore('doctor', {
             }
         },
 
+        async updateDoctor(id, doctorData) {
+            this.loading = true;
+            try {
+                const response = await api.put(`/doctors/${id}`, doctorData);
+                const updatedDoctor = response.data.data;
+                const index = this.doctors.findIndex(d => d._id === id);
+                if (index !== -1) {
+                    this.doctors[index] = updatedDoctor;
+                }
+                if (this.currentDoctor?._id === id) {
+                    this.currentDoctor = updatedDoctor;
+                }
+                return { success: true, message: response.data.message };
+            } catch (error) {
+                const message = error.response?.data?.message || error.message || 'Failed to update doctor';
+                return { success: false, message };
+            } finally {
+                this.loading = false;
+            }
+        },
+
         async fetchDoctorById(id) {
             this.loading = true;
             try {

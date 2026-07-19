@@ -1,5 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, watch, computed } from 'vue'
+import html2canvas from 'html2canvas-pro'
+import jsPDF from 'jspdf'
 
 const props = defineProps({
   show: {
@@ -21,10 +23,62 @@ const emit = defineEmits(['close'])
 const netPayable = computed(() => props.sale?.totalAmount || 0)
 
 const printingPDF = ref(false)
+const pdfPreviewUrl = ref(null)
+const currentFilename = ref('')
+const receiptRef = ref(null)
 
-const printInvoicePDF = () => {
-  window.print()
+const generateInvoicePDF = async () => {
+  if (printingPDF.value) return
+  printingPDF.value = true
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    const element = receiptRef.value
+    if (!element) throw new Error('Receipt container not found')
+    
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    })
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.98)
+    
+    const pdf = new jsPDF('l', 'mm', 'a5')
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const ratio = pdfWidth / canvas.width
+    const imgHeight = canvas.height * ratio
+    
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight)
+    
+    const patientName = props.sale?.patientId?.fullName?.replace(/\s+/g, '_') || props.sale?.customerName?.replace(/\s+/g, '_') || 'Customer'
+    const filename = `Pharmacy_Receipt_${patientName}.pdf`
+    currentFilename.value = filename
+    
+    const blob = pdf.output('blob')
+    if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value)
+    pdfPreviewUrl.value = URL.createObjectURL(blob)
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error)
+  } finally {
+    printingPDF.value = false
+  }
 }
+
+watch(() => props.show, (newVal) => {
+  if (newVal && props.sale) {
+    generateInvoicePDF()
+  } else {
+    if (pdfPreviewUrl.value) {
+      URL.revokeObjectURL(pdfPreviewUrl.value)
+      pdfPreviewUrl.value = null
+    }
+  }
+}, { immediate: true })
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
@@ -85,113 +139,128 @@ const numberToWords = (num) => {
     <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:static print:block print:max-w-none print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
       
       <!-- Preview Area -->
-      <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block">
-        <!-- Receipt Mockup Sheet (Sized to 210mm x 148mm ratio on screen) -->
-        <div class="print-receipt-container select-none">
-          <!-- Receipt Content -->
-          <div class="receipt-content">
-            <!-- Header Brand -->
-            <div class="receipt-header">
-              <div class="flex items-center justify-between mb-2">
-                <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
+      <div class="flex-grow flex flex-col relative bg-slate-600 min-h-[500px]">
+        
+        <!-- Loading State -->
+        <div v-if="printingPDF" class="absolute inset-0 flex items-center justify-center bg-slate-800 z-50">
+          <div class="flex flex-col items-center">
+            <span class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-400 border-t-transparent mb-3"></span>
+            <span class="text-white font-medium shadow-sm">Generating PDF Preview...</span>
+          </div>
+        </div>
+
+        <!-- Hidden DOM for html2canvas -->
+        <div v-show="!pdfPreviewUrl" class="absolute inset-0 overflow-y-auto bg-slate-200 p-8 flex justify-center z-0">
+          <div ref="receiptRef" class="print-receipt-container select-none bg-white">
+            <!-- Receipt Content -->
+            <div class="receipt-content">
+              <!-- Header Brand -->
+              <div class="receipt-header">
+                <div class="flex items-center justify-between mb-2">
+                  <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
+                  <div class="text-right">
+                     <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                      <p>Phone: 0389-2913340 / 8974326872</p>
+                  </div>
+                </div>
+                <hr class="receipt-divider" />
+                <h2>PHARMACY BILL / INVOICE</h2>
+              </div>
+
+              <!-- Demographics Block -->
+              <div class="demographics">
+                <div>
+                  <p><strong>Bill No:</strong> <span class="font-mono">{{ sale.saleNo }}</span></p>
+                  <p><strong>Date:</strong> {{ formatDate(sale.createdAt) }}</p>
+                  <p><strong>Status:</strong> <span class="uppercase font-bold text-emerald-600">PAID</span></p>
+                  <p><strong>Payment Mode:</strong> <span class="font-mono uppercase">{{ sale.paymentMode || sale.paymentMethod || 'CASH' }}</span></p>
+                </div>
+                <div class="text-right font-sans">
+                  <div v-if="sale.patientId">
+                    <p class="patient-name truncate font-bold text-slate-900"><strong>Patient:</strong> {{ sale.patientId.fullName }}</p>
+                    <p><strong>Code:</strong> <span class="font-mono">{{ sale.patientId.patientCode }}</span></p>
+                    <p><strong>Age/Gender:</strong> {{ sale.patientId.age || '—' }} Yrs / {{ sale.patientId.gender || '—' }}</p>
+                    <p><strong>Contact:</strong> {{ sale.patientId.mobileNo }}</p>
+                  </div>
+                  <div v-else>
+                    <p class="patient-name truncate font-bold text-slate-900"><strong>Customer:</strong> {{ sale.customerName || 'Walk-in' }}</p>
+                    <p v-if="sale.customerPhone"><strong>Contact:</strong> {{ sale.customerPhone }}</p>
+                    <p v-else>—</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Itemized Table -->
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th class="text-left">Medicine Name</th>
+                    <th class="text-center">Batch No</th>
+                    <th class="text-center">Exp. Dt</th>
+                    <th class="text-center">Qty</th>
+                    <th class="text-right">Rate</th>
+                    <th class="text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in items" :key="item._id">
+                    <td class="font-medium truncate max-w-[150px]">
+                      {{ item.medicineId?.medicineName }}
+                      <span v-if="item.medicineId?.brandName" class="text-[8px] text-slate-500 font-normal ml-1">({{ item.medicineId.brandName }})</span>
+                    </td>
+                    <td class="text-center font-mono font-bold text-[9px]">{{ item.batchId?.batchNo || '—' }}</td>
+                    <td class="text-center font-mono text-[9px]">{{ formatDateShort(item.batchId?.expiryDate) }}</td>
+                    <td class="text-center font-mono text-[9px]">{{ item.quantity }}</td>
+                    <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.rate) }}</td>
+                    <td class="text-right font-mono font-semibold text-[9px]">{{ formatCurrency(item.amount) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Financials Summary -->
+              <div class="financials-summary-container flex justify-between mt-3">
+                <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%]">
+                  <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
+                  {{ numberToWords(netPayable) }}
+                </div>
+                <div class="financials-summary w-48">
+                  <div class="flex justify-between">
+                    <span>Gross Total:</span>
+                    <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+                  </div>
+                  <div class="flex justify-between net-payable">
+                    <span>Net Payable:</span>
+                    <span class="font-mono">{{ formatCurrency(netPayable) }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span>Paid Amount:</span>
+                    <span class="font-mono">{{ formatCurrency(netPayable) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Signatures Operator info -->
+              <div class="signatures">
+                <div>
+                  <p>Dispensed By:</p>
+                  <p class="operator-name">{{ sale.createdBy?.fullName || 'Pharmacist' }}</p>
+                </div>
                 <div class="text-right">
-                   <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
-                    <p>Phone: 0389-2913340 / 8974326872</p>
+                  <span class="sig-line">Authorized Signatory</span>
                 </div>
               </div>
-              <hr class="receipt-divider" />
-              <h2>PHARMACY BILL / INVOICE</h2>
-            </div>
 
-            <!-- Demographics Block -->
-            <div class="demographics">
-              <div>
-                <p><strong>Bill No:</strong> <span class="font-mono">{{ sale.saleNo }}</span></p>
-                <p><strong>Date:</strong> {{ formatDate(sale.createdAt) }}</p>
-                <p><strong>Status:</strong> <span class="uppercase font-bold text-emerald-600">PAID</span></p>
+              <!-- Computer Generated Notice -->
+              <div class="notice">
+                <p>This is a computer-generated invoice and does not require a physical signature.</p>
+                <p class="wish">*** Thank You for Visiting ***</p>
               </div>
-              <div class="text-right font-sans">
-                <div v-if="sale.patientId">
-                  <p class="patient-name truncate font-bold text-slate-900"><strong>Patient:</strong> {{ sale.patientId.fullName }}</p>
-                  <p><strong>Code:</strong> <span class="font-mono">{{ sale.patientId.patientCode }}</span></p>
-                  <p><strong>Age/Gender:</strong> {{ sale.patientId.age || '—' }} Yrs / {{ sale.patientId.gender || '—' }}</p>
-                  <p><strong>Contact:</strong> {{ sale.patientId.mobileNo }}</p>
-                </div>
-                <div v-else>
-                  <p class="patient-name truncate font-bold text-slate-900"><strong>Customer:</strong> {{ sale.customerName || 'Walk-in' }}</p>
-                  <p v-if="sale.customerPhone"><strong>Contact:</strong> {{ sale.customerPhone }}</p>
-                  <p v-else>—</p>
-                </div>
-              </div>
-            </div>
-
-            <!-- Itemized Table -->
-            <table class="items-table">
-              <thead>
-                <tr>
-                  <th class="text-left">Medicine Name</th>
-                  <th class="text-center">Batch No</th>
-                  <th class="text-center">Exp. Dt</th>
-                  <th class="text-center">Qty</th>
-                  <th class="text-right">Rate</th>
-                  <th class="text-right">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in items" :key="item._id">
-                  <td class="font-medium truncate max-w-[150px]">
-                    {{ item.medicineId?.medicineName }}
-                    <span v-if="item.medicineId?.brandName" class="text-[8px] text-slate-500 font-normal ml-1">({{ item.medicineId.brandName }})</span>
-                  </td>
-                  <td class="text-center font-mono font-bold text-[9px]">{{ item.batchId?.batchNo || '—' }}</td>
-                  <td class="text-center font-mono text-[9px]">{{ formatDateShort(item.batchId?.expiryDate) }}</td>
-                  <td class="text-center font-mono text-[9px]">{{ item.quantity }}</td>
-                  <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.rate) }}</td>
-                  <td class="text-right font-mono font-semibold text-[9px]">{{ formatCurrency(item.amount) }}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <!-- Financials Summary -->
-            <div class="financials-summary-container flex justify-between mt-3">
-              <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%]">
-                <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
-                {{ numberToWords(netPayable) }}
-              </div>
-              <div class="financials-summary w-48">
-                <div class="flex justify-between">
-                  <span>Gross Total:</span>
-                  <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
-                </div>
-                <div class="flex justify-between net-payable">
-                  <span>Net Payable:</span>
-                  <span class="font-mono">{{ formatCurrency(netPayable) }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span>Paid Amount:</span>
-                  <span class="font-mono">{{ formatCurrency(netPayable) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Signatures Operator info -->
-            <div class="signatures">
-              <div>
-                <p>Dispensed By:</p>
-                <p class="operator-name">{{ sale.createdBy?.fullName || 'Pharmacist' }}</p>
-              </div>
-              <div class="text-right">
-                <span class="sig-line">Authorized Signatory</span>
-              </div>
-            </div>
-
-            <!-- Computer Generated Notice -->
-            <div class="notice">
-              <p>This is a computer-generated invoice and does not require a physical signature.</p>
-              <p class="wish">*** Get Well Soon ***</p>
             </div>
           </div>
         </div>
+
+        <!-- PDF Preview Iframe -->
+        <iframe v-if="pdfPreviewUrl" :src="pdfPreviewUrl" class="absolute inset-0 w-full h-full border-0 z-10" title="PDF Preview"></iframe>
       </div>
 
       <!-- Action Footer -->
@@ -202,17 +271,18 @@ const numberToWords = (num) => {
         >
           Close
         </button>
-        <button 
-          @click="printInvoicePDF"
-          :disabled="printingPDF"
-          class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-lg shadow-teal-100 transition-all flex items-center gap-1.5 disabled:opacity-50"
+
+        <a 
+          v-if="pdfPreviewUrl" 
+          :href="pdfPreviewUrl" 
+          :download="currentFilename" 
+          class="px-5 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl shadow-lg shadow-teal-100 transition-all flex items-center gap-1.5 cursor-pointer"
         >
-          <span v-if="printingPDF" class="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span>
-          <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Print Invoice
-        </button>
+          Download PDF
+        </a>
       </div>
     </div>
     </div>

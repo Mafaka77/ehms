@@ -143,6 +143,31 @@ exports.getDoctorById = async (id) => {
     }
 }
 
+exports.updateDoctor = async (id, data) => {
+    try {
+        const updateData = { ...data };
+        delete updateData.doctorCode; // prevent overwriting the code
+        delete updateData.employeeId; // prevent changing the employee link
+
+        const doctor = await Doctor.findByIdAndUpdate(
+            id,
+            updateData,
+            { new: true, runValidators: true }
+        ).populate('specializationId', 'name').populate('employeeId');
+
+        if (!doctor) {
+            const error = new Error('Doctor not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        return doctor;
+    } catch (error) {
+        throw error;
+    }
+}
+
+
 // Remuneration Rules Services
 exports.getRemunerationRules = async (doctorId) => {
     try {

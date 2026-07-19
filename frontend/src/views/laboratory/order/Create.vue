@@ -32,7 +32,7 @@ const showPatientModal = ref(false)
 const newPatient = reactive({
   fullName: '',
   mobileNo: '',
-  age: '',
+  dateOfBirth: '',
   gender: 'Male',
   address: ''
 })
@@ -666,12 +666,12 @@ onMounted(() => {
               required
               :disabled="isCreatingPatient"
             />
-            <div class="grid grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 gap-4">
               <BaseInput 
-                v-model.number="newPatient.age"
-                id="newPatientAge"
-                label="Age (Years)"
-                type="number"
+                v-model="newPatient.dateOfBirth"
+                id="newPatientDOB"
+                label="Date of Birth"
+                type="date"
                 :disabled="isCreatingPatient"
               />
               <div>
@@ -686,13 +686,14 @@ onMounted(() => {
                   <option value="Other">Other</option>
                 </select>
               </div>
-              <BaseInput 
+              
+            </div>
+            <BaseInput 
                 v-model="newPatient.address"
                 id="newPatientAddress"
                 label="Address"
                 :disabled="isCreatingPatient"
               />
-            </div>
             <div class="pt-4 flex justify-end gap-3">
               <button type="button" @click="showPatientModal = false" class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
               <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700" :disabled="isCreatingPatient">

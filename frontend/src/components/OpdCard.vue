@@ -44,7 +44,7 @@ const patientAge = computed(() => {
 </script>
 
 <template>
-  <div class="print-container bg-white text-black mx-auto border-2 border-slate-800 flex flex-col justify-between">
+  <div class="print-container bg-white text-black mx-auto  border-slate-800 flex flex-col justify-between">
     <div>
       <!-- Space for pre-printed letterhead -->
       <div class="h-20"></div>

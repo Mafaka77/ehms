@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
@@ -24,184 +24,77 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const printingPDF = ref(false)
-const viewMode = ref('edit')
 const pdfPreviewUrl = ref(null)
 const currentFilename = ref('')
+const receiptRef = ref(null)
 
-const generateInvoicePDF = async (preview = false) => {
+const generateInvoicePDF = async () => {
   if (printingPDF.value) return
   printingPDF.value = true
   
   try {
-    const wasPreview = viewMode.value === 'preview'
-    if (wasPreview) {
-      viewMode.value = 'edit'
-      await new Promise(resolve => setTimeout(resolve, 50))
-    }
+    await new Promise(resolve => setTimeout(resolve, 300))
     
-    // Wait for Vue to update the DOM
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
-    const element = document.querySelector('.opd-print-receipt-container')
+    const element = receiptRef.value
     if (!element) throw new Error('Receipt container not found')
     
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
       logging: false,
-      windowWidth: element.scrollWidth,
-      windowHeight: element.scrollHeight
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+      windowWidth: element.offsetWidth,
+      windowHeight: element.offsetHeight
     })
     
     const imgData = canvas.toDataURL('image/jpeg', 0.98)
     
-    // Create A5 Landscape PDF (210mm x 148.5mm)
-    const pdf = new jsPDF('l', 'mm', 'a5')
+    const pdf = new jsPDF('p', 'mm', 'a4')
     const pdfWidth = pdf.internal.pageSize.getWidth()
-    const pageHeight = pdf.internal.pageSize.getHeight()
+    const pdfHeight = pdf.internal.pageSize.getHeight()
     
-    // Grab the sections to calculate pixel heights
-    const tbody = element.querySelector('.main-tbody')
-    const tfoot = element.querySelector('.main-tfoot')
+    const imgWidth = pdfWidth
+    const imgHeight = (canvas.height * pdfWidth) / canvas.width
     
-    const contRect = element.getBoundingClientRect()
-    const tbodyRect = tbody.getBoundingClientRect()
-    const tfootRect = tfoot.getBoundingClientRect()
-    
-    const headerY = 0
-    const headerH = Math.round(tbodyRect.top - contRect.top)
-    
-    const bodyY = headerH
-    const bodyH = Math.round(tfootRect.top - tbodyRect.top)
-    
-    const footerY = bodyY + bodyH
-    const footerH = Math.round(tfootRect.bottom - tfootRect.top)
-    
-    const cropCanvas = (y, h) => {
-      const c = document.createElement('canvas')
-      c.width = canvas.width
-      const sy = Math.max(0, y * 2)
-      const sh = Math.max(0, Math.min(h * 2, canvas.height - sy))
-      c.height = sh || 1 // prevent 0 height canvas
-      const ctx = c.getContext('2d')
-      if (sh > 0) {
-        ctx.drawImage(canvas, 0, sy, canvas.width, sh, 0, 0, canvas.width, sh)
-      }
-      return c.toDataURL('image/jpeg', 0.98)
+    let heightLeft = imgHeight
+    let position = 0
+
+    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+    heightLeft -= pdfHeight
+
+    while (heightLeft > 15) {
+      position -= pdfHeight
+      pdf.addPage()
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pdfHeight
     }
-    
-    const headerData = cropCanvas(headerY, headerH)
-    const bodyData = cropCanvas(bodyY, bodyH) // Not used entirely anymore, but we can keep cropCanvas
-    const footerData = cropCanvas(footerY, footerH)
-    
-    const ratio = pdfWidth / canvas.width
-    const headerPdfH = (headerH * 2) * ratio
-    const footerPdfH = (footerH * 2) * ratio
-    
-    const pdfToDom = 1 / (2 * ratio)
-    const maxDomH_Standard = (pageHeight - headerPdfH - 8) * pdfToDom
-    const maxDomH_LastPage = (pageHeight - headerPdfH - footerPdfH - 8) * pdfToDom
-    
-    // Find all breakable items
-    const breakableElements = Array.from(element.querySelectorAll('.items-table tbody tr, .financials-summary'))
-    const breaks = breakableElements.map(el => {
-      const rect = el.getBoundingClientRect()
-      return {
-        top: rect.top - tbodyRect.top,
-        bottom: rect.bottom - tbodyRect.top
-      }
-    })
-    
-    let currentDomOffset = 0
-    const totalDomHeight = bodyH
-    let pages = []
-    
-    while (currentDomOffset < totalDomHeight) {
-      let remainingHeight = totalDomHeight - currentDomOffset
-      
-      // Check if the rest of the body fits with the footer
-      if (remainingHeight <= maxDomH_LastPage) {
-        pages.push({
-          offset: currentDomOffset,
-          height: remainingHeight,
-          isLast: true
-        })
-        break
-      }
-      
-      let nextOffset = currentDomOffset + maxDomH_Standard
-      let breakPoint = nextOffset
-      
-      // Find a clean break
-      for (let i = breaks.length - 1; i >= 0; i--) {
-        if (breaks[i].bottom <= nextOffset && breaks[i].bottom > currentDomOffset) {
-          breakPoint = breaks[i].bottom
-          break
-        }
-      }
-      
-      if (breakPoint === currentDomOffset) breakPoint = nextOffset
-      
-      pages.push({
-        offset: currentDomOffset,
-        height: breakPoint - currentDomOffset,
-        isLast: false
-      })
-      currentDomOffset = breakPoint
-    }
-    
-    pages.forEach((page, index) => {
-      if (index > 0) pdf.addPage()
-      const pageNum = index + 1
-      const total = pages.length
-      
-      const pageBodyPdfH = page.height * 2 * ratio
-      
-      // Crop this specific chunk of the body
-      const chunkData = cropCanvas(bodyY + page.offset, page.height)
-      pdf.addImage(chunkData, 'JPEG', 0, headerPdfH, pdfWidth, pageBodyPdfH)
-      
-      // Cover remaining space with white just in case
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(0, 0, pdfWidth, headerPdfH, 'F')
-      pdf.rect(0, headerPdfH + pageBodyPdfH, pdfWidth, pageHeight - (headerPdfH + pageBodyPdfH), 'F')
-      
-      // Draw header
-      pdf.addImage(headerData, 'JPEG', 0, 0, pdfWidth, headerPdfH)
-      
-      // Draw footer only if it's the last page
-      if (page.isLast) {
-        pdf.addImage(footerData, 'JPEG', 0, pageHeight - footerPdfH, pdfWidth, footerPdfH)
-      }
-      
-      // Page number
-      pdf.setFontSize(8)
-      pdf.setTextColor(148, 163, 184)
-      pdf.text(`Page ${pageNum} of ${total}`, 15, pageHeight - 8)
-    })
     
     const patientName = props.admission?.patientId?.fullName?.replace(/\s+/g, '_') || 'Patient'
-    const billNo = props.billDetails?.billNo || 'Invoice'
-    const filename = `${patientName}_${billNo}.pdf`
+    const filename = `IPD_Invoice_${patientName}.pdf`
     currentFilename.value = filename
     
-    if (preview) {
-      const blob = pdf.output('blob')
-      if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value)
-      pdfPreviewUrl.value = URL.createObjectURL(blob)
-      viewMode.value = 'preview'
-    } else {
-      pdf.save(filename)
-      if (wasPreview) viewMode.value = 'preview'
-    }
+    const blob = pdf.output('blob')
+    if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value)
+    pdfPreviewUrl.value = URL.createObjectURL(blob)
+    
   } catch (error) {
     console.error('Error generating PDF:', error)
-    snackbarStore.show({ message: 'Failed to generate PDF', type: 'error' })
-    if (viewMode.value === 'preview') viewMode.value = 'edit'
   } finally {
     printingPDF.value = false
   }
 }
+
+watch(() => props.show, (newVal) => {
+  if (newVal && props.billDetails) {
+    generateInvoicePDF()
+  } else {
+    if (pdfPreviewUrl.value) {
+      URL.revokeObjectURL(pdfPreviewUrl.value)
+      pdfPreviewUrl.value = null
+    }
+  }
+}, { immediate: true })
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
@@ -221,28 +114,35 @@ const formatCurrency = (val) => {
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="emit('close')"></div>
 
     <!-- Modal Wrapper -->
-    <div :class="[
-      'relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl animate-in zoom-in-95 duration-200 flex flex-col print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none print:block',
-      printingPDF ? 'max-h-none overflow-visible' : 'max-h-[90vh] overflow-hidden'
-    ]">
+    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
       
       <!-- Preview Area -->
-      <div v-show="viewMode === 'edit'" :class="[
-        'p-6 flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block',
-        printingPDF ? 'overflow-visible' : 'overflow-y-auto'
-      ]">
-        <!-- Receipt Mockup Sheet (210mm x 148mm ratio) -->
-        <div class="opd-print-receipt-container select-none">
+      <div class="flex-grow flex flex-col relative bg-slate-600 min-h-[500px]">
+        
+        <!-- Loading State -->
+        <div v-if="printingPDF" class="absolute inset-0 flex items-center justify-center bg-slate-800 z-50">
+          <div class="flex flex-col items-center">
+            <span class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-400 border-t-transparent mb-3"></span>
+            <span class="text-white font-medium shadow-sm">Generating PDF Preview...</span>
+          </div>
+        </div>
+
+        <!-- Hidden DOM for html2canvas -->
+        <div v-show="!pdfPreviewUrl" class="fixed -left-[9999px] top-0 z-0">
+          <div ref="receiptRef" class="opd-print-receipt-container select-none bg-white">
           <table class="w-full receipt-table">
             <thead class="main-thead">
               <tr>
                 <td>
                   <!-- Header Brand -->
                   <div class="receipt-header">
-                    <h1>Emmanuel Hospital</h1>
-                    <p>Luangmual Near Appollo School of Nursing, Aizawl, Mizoram - 796009</p>
-                    <p>Phone: +91 8974326872 | Email: emmanuelhospital4@gmail.com</p>
-                    <p>GSTIN: 15CDTPN0612H1ZK</p>
+                    <div class="flex items-center justify-between mb-2">
+                      <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
+                      <div class="text-right">
+                         <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                         <p>Phone: 0389-2913340 / 8974326872</p>
+                      </div>
+                    </div>
                     <hr class="receipt-divider" />
                     <h2>IPD BILL / INVOICE</h2>
                   </div>
@@ -254,6 +154,7 @@ const formatCurrency = (val) => {
                       <p><strong>Date:</strong> {{ formatDate(billDetails.generatedAt || billDetails.createdAt) }}</p>
                       <p><strong>Status:</strong> <span class="uppercase font-bold">{{ billDetails.status }}</span></p>
                       <p><strong>Admission No:</strong> <span class="font-mono">{{ admission.admissionNo }}</span></p>
+                      <p><strong>Payment Mode:</strong> <span class="font-mono uppercase">{{ billDetails.payments?.[0]?.paymentMode || 'N/A' }}</span></p>
                     </div>
                     <div class="text-right">
                       <p class="patient-name truncate"><strong>Patient:</strong> {{ admission.patientId?.fullName }}</p>
@@ -280,7 +181,7 @@ const formatCurrency = (val) => {
                     </thead>
                     <tbody>
                       <tr v-for="item in billDetails.items" :key="item._id">
-                        <td class="font-medium truncate max-w-[200px]">{{ item.description }}</td>
+                        <td class="font-medium break-words max-w-[280px]">{{ item.description }}</td>
                         <td class="text-right font-mono">{{ formatCurrency(item.rate) }}</td>
                         <td class="text-center font-mono">{{ item.quantity }}</td>
                         <td class="text-right font-mono font-semibold">{{ formatCurrency(item.amount) }}</td>
@@ -292,7 +193,7 @@ const formatCurrency = (val) => {
                   <div class="financials-summary">
                     <div class="flex justify-between">
                       <span>Gross Total:</span>
-                      <span class="font-mono">{{ formatCurrency(billDetails.grossAmount) }}</span>
+                      <span class="font-mono">{{ formatCurrency(billDetails.grossAmount ?? billDetails.totalAmount) }}</span>
                     </div>
                     <div class="flex justify-between discount-col font-medium" v-if="billDetails.discountAmount > 0">
                       <span>Discount:</span>
@@ -302,17 +203,9 @@ const formatCurrency = (val) => {
                       <span>Tax:</span>
                       <span class="font-mono">{{ formatCurrency(billDetails.taxAmount) }}</span>
                     </div>
-                    <div class="flex justify-between net-payable">
-                      <span>Net Payable:</span>
-                      <span class="font-mono">{{ formatCurrency(billDetails.netAmount) }}</span>
-                    </div>
                     <div class="flex justify-between">
                       <span>Paid Amount:</span>
                       <span class="font-mono">{{ formatCurrency(billDetails.paidAmount) }}</span>
-                    </div>
-                    <div class="flex justify-between balance-due">
-                      <span>Balance Due:</span>
-                      <span class="font-mono">{{ formatCurrency(billDetails.balanceAmount) }}</span>
                     </div>
                   </div>
                 </td>
@@ -335,7 +228,7 @@ const formatCurrency = (val) => {
                   <!-- Notice -->
                   <div class="notice">
                     <p>This is a computer-generated invoice and does not require a physical signature.</p>
-                    <p class="wish">*** Thank You for Visiting EHMS ***</p>
+                    <p class="wish">*** Thank You for Visiting ***</p>
                   </div>
                 </td>
               </tr>
@@ -344,75 +237,30 @@ const formatCurrency = (val) => {
         </div>
       </div>
       
-      <!-- PDF Real Preview Mode -->
-      <div v-if="viewMode === 'preview'" class="flex-grow bg-slate-600 flex flex-col relative min-h-[60vh]">
-        <div v-if="printingPDF" class="absolute inset-0 flex items-center justify-center bg-slate-900/20 backdrop-blur-sm z-10">
-          <div class="flex flex-col items-center">
-            <span class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent mb-3"></span>
-            <span class="text-white font-medium shadow-sm">Generating Preview...</span>
-          </div>
-        </div>
-        <iframe :src="pdfPreviewUrl" class="w-full h-full flex-grow border-0" title="PDF Preview"></iframe>
+      <!-- PDF Preview Iframe -->
+      <iframe v-if="pdfPreviewUrl" :src="pdfPreviewUrl" class="absolute inset-0 w-full h-full border-0 z-10" title="PDF Preview"></iframe>
       </div>
 
       <!-- Action Footer -->
-      <div class="p-4 bg-white border-t border-slate-100 flex justify-between items-center gap-3 screen-only">
-        <div>
-          <button 
-            v-if="viewMode === 'edit'"
-            @click="generateInvoicePDF(true)"
-            :disabled="printingPDF"
-            class="px-4 py-2 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <span v-if="printingPDF" class="animate-spin rounded-full h-3 w-3 border-2 border-indigo-600 border-t-transparent"></span>
-            <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-            </svg>
-            Preview PDF
-          </button>
-          
-          <button 
-            v-if="viewMode === 'preview'"
-            @click="viewMode = 'edit'"
-            :disabled="printingPDF"
-            class="px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 border border-slate-200 rounded-xl hover:bg-slate-200 transition-colors flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Invoice
-          </button>
-        </div>
+      <div class="p-4 bg-white border-t border-slate-100 flex justify-end gap-3 screen-only">
+        <button 
+          @click="emit('close')"
+          class="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+        >
+          Close
+        </button>
         
-        <div class="flex gap-3">
-          <button 
-            @click="emit('close')"
-            class="px-4 py-2 text-xs font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
-          >
-            Close
-          </button>
-          
-          <a v-if="viewMode === 'preview' && pdfPreviewUrl" :href="pdfPreviewUrl" :download="currentFilename" class="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-lg shadow-emerald-100 transition-all flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Download PDF
-          </a>
-          
-          <button 
-            v-else
-            @click="generateInvoicePDF(false)"
-            :disabled="printingPDF"
-            class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center gap-1.5 disabled:opacity-50"
-          >
-            <span v-if="printingPDF" class="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span>
-            <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Print & Download
-          </button>
-        </div>
+        <a 
+          v-if="pdfPreviewUrl" 
+          :href="pdfPreviewUrl" 
+          :download="currentFilename" 
+          class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Download PDF
+        </a>
       </div>
     </div>
   </div>
@@ -422,9 +270,8 @@ const formatCurrency = (val) => {
 /* Using explicit hex colors to avoid oklch() issues in html2canvas */
 .opd-print-receipt-container {
   width: 210mm;
-  min-height: 148mm;
-  height: max-content;
-  overflow: hidden;
+  height: auto;
+  overflow: visible;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
@@ -620,8 +467,8 @@ const formatCurrency = (val) => {
     left: 0 !important;
     top: 0 !important;
     width: 210mm !important;
-    min-height: 297mm !important;
-    overflow: hidden !important;
+    height: auto !important;
+    overflow: visible !important;
     margin: 0 !important;
     padding: 10mm !important;
     box-shadow: none !important;

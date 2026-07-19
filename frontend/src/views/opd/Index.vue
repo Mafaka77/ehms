@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useOpdStore } from '../../stores/opdStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
 import OpdCard from '../../components/OpdCard.vue'
+import html2canvas from 'html2canvas-pro'
+import jsPDF from 'jspdf'
 
 const router = useRouter()
 const opdStore = useOpdStore()
@@ -14,6 +16,9 @@ const loading = ref(false)
 // Print Modal State
 const showCardModal = ref(false)
 const selectedAppointmentForPrint = ref(null)
+const pdfPreviewUrl = ref(null)
+const currentFilename = ref('')
+const printingPDF = ref(false)
 
 // Filters State
 const filters = ref({
@@ -72,22 +77,66 @@ const handleDelete = async (id) => {
   }
 }
 
-const openPrintModal = (app) => {
+const openPrintModal = async (app) => {
   selectedAppointmentForPrint.value = app
+  pdfPreviewUrl.value = null
   showCardModal.value = true
+  
+  await generateCardPDF()
 }
 
 const closeModal = () => {
   showCardModal.value = false
+  if (pdfPreviewUrl.value) {
+    URL.revokeObjectURL(pdfPreviewUrl.value)
+    pdfPreviewUrl.value = null
+  }
   setTimeout(() => {
     selectedAppointmentForPrint.value = null
   }, 200)
 }
 
-const printingPDF = ref(false)
-
-const handlePrintCard = () => {
-  window.print()
+const generateCardPDF = async () => {
+  if (printingPDF.value) return
+  printingPDF.value = true
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 150))
+    
+    const element = document.querySelector('.print-card-wrapper')
+    if (!element) throw new Error('Card container not found')
+    
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    })
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.98)
+    
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const ratio = pdfWidth / canvas.width
+    const imgHeight = canvas.height * ratio
+    
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight)
+    
+    const patientName = selectedAppointmentForPrint.value?.patientId?.fullName?.replace(/\s+/g, '_') || 'Patient'
+    const filename = `OPD_Card_${patientName}.pdf`
+    currentFilename.value = filename
+    
+    const blob = pdf.output('blob')
+    if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value)
+    pdfPreviewUrl.value = URL.createObjectURL(blob)
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error)
+    snackbarStore.show({ message: 'Failed to generate PDF Preview', type: 'error' })
+  } finally {
+    printingPDF.value = false
+  }
 }
 
 const getStatusColor = (status) => {
@@ -423,16 +472,15 @@ const exportToExcel = (reportData) => {
     </div>
     
     <!-- Print Modal Overlay -->
-    <!-- Print Modal Overlay -->
-    <div v-if="showCardModal && selectedAppointmentForPrint" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 print:p-0 print:items-start print:justify-start">
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="closeModal"></div>
+    <div v-if="showCardModal && selectedAppointmentForPrint" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeModal"></div>
       
-      <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
+      <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
         
-        <!-- Modal Header (Hidden when printing) -->
-        <div class="flex items-center justify-between p-4 border-b border-slate-200 bg-white print:hidden">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between p-4 border-b border-slate-200 bg-white">
           <div>
-            <h2 class="text-lg font-bold text-slate-800">Print OPD Card</h2>
+            <h2 class="text-lg font-bold text-slate-800">OPD Card Preview</h2>
             <p class="text-sm text-slate-500">Preview and print the OPD Card for this appointment.</p>
           </div>
           <div class="flex items-center gap-3">
@@ -442,22 +490,38 @@ const exportToExcel = (reportData) => {
             >
               Close
             </button>
-            <button 
-              @click="handlePrintCard"
-              :disabled="printingPDF"
-              class="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+            <a 
+              v-if="pdfPreviewUrl"
+              :href="pdfPreviewUrl"
+              :download="currentFilename"
+              class="flex items-center gap-2 px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors cursor-pointer"
             >
-              <span v-if="printingPDF" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
-              <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-              Print Card
-            </button>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              Download PDF
+            </a>
           </div>
         </div>
 
-        <!-- Scrollable Print Area -->
-        <div class="flex-grow overflow-y-auto p-4 sm:p-8 bg-slate-200 print:p-0 print:bg-white print:overflow-visible print:block">
-          <!-- Render the Card Component -->
-          <OpdCard :appointment="selectedAppointmentForPrint" />
+        <!-- Scrollable Print Area / PDF Preview -->
+        <div class="flex-grow flex flex-col relative bg-slate-600">
+          
+          <!-- Loading State -->
+          <div v-if="printingPDF" class="absolute inset-0 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm z-20">
+            <div class="flex flex-col items-center">
+              <span class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-500 border-t-transparent mb-3"></span>
+              <span class="text-white font-medium shadow-sm">Generating PDF Preview...</span>
+            </div>
+          </div>
+
+          <!-- Hidden DOM for html2canvas -->
+          <div v-show="!pdfPreviewUrl" class="absolute inset-0 overflow-y-auto bg-slate-200 p-8 flex justify-center z-0" style="opacity: 0; pointer-events: none;">
+             <div class="print-card-wrapper bg-white">
+               <OpdCard :appointment="selectedAppointmentForPrint" />
+             </div>
+          </div>
+          
+          <!-- PDF Preview Iframe -->
+          <iframe v-if="pdfPreviewUrl" :src="pdfPreviewUrl" class="w-full h-full border-0 z-10 relative" title="PDF Preview"></iframe>
         </div>
         
       </div>

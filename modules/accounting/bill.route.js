@@ -11,8 +11,10 @@ module.exports = async function (fastify, opts) {
     fastify.post('/generate-from-dental-appointment', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.generateBillFromDentalAppointment)
     fastify.post('/generate-from-dental-consultation', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.generateBillFromDentalConsultation)
     fastify.post('/generate-from-ipd-charges', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, billController.generateBillFromIpdCharges)
+    fastify.put('/ipd-bills/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.updateIpdBill)
     fastify.post('/bills/:id/pay', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.processPayment)
     fastify.post('/bills/:id/cancel', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.cancelBill)
+    fastify.delete('/bills/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.cancelBill)
     fastify.get('/bills/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.getBillById)
     fastify.post('/payments/:id/cancel', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Cashier'])] }, billController.cancelPayment)
 }

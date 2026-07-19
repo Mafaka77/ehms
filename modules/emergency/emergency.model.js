@@ -56,7 +56,7 @@ const emergencyVisitSchema = new mongoose.Schema({
 
   paymentStatus: {
     type: String,
-    enum: ['Paid', 'Unpaid'],
+    enum: ['Paid', 'Partially Paid', 'Unpaid'],
     default: 'Unpaid'
   },
 

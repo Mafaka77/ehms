@@ -261,3 +261,81 @@ exports.returnIpdMedicineItem = async (req, res) => {
         return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
     }
 }
+
+// ── Pharmacy Indents ──────────────────────────────────────
+
+exports.createIndent = async (req, res) => {
+    try {
+        const indent = await pharmacyService.createIndent(req.user._id, req.body)
+        return res.code(STATUS_CODES.CREATED).send({
+            success: true,
+            message: 'Pharmacy Indent created successfully',
+            data: indent
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.getIndents = async (req, res) => {
+    try {
+        const result = await pharmacyService.getIndents(req.query)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            data: result.indents,
+            pagination: result.pagination
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.getIndentById = async (req, res) => {
+    try {
+        const indent = await pharmacyService.getIndentById(req.params.id)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            data: indent
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.updateIndentStatus = async (req, res) => {
+    try {
+        const indent = await pharmacyService.updateIndentStatus(req.params.id, req.user._id, req.body)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            message: 'Indent status updated successfully',
+            data: indent
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.updateIndent = async (req, res) => {
+    try {
+        const indent = await pharmacyService.updateIndent(req.params.id, req.body)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            message: 'Pharmacy Indent updated successfully',
+            data: indent
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.deleteIndent = async (req, res) => {
+    try {
+        await pharmacyService.deleteIndent(req.params.id)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            message: 'Pharmacy Indent deleted successfully'
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}

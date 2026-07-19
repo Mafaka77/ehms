@@ -7,6 +7,8 @@ const PharmacySaleItem = require('./pharmacy_sale_item.model')
 const STATUS_CODES = require('../../utils/statuscode')
 const MedicineIpdOrder = require('./medicine_ipd_order.model')
 const MedicineIpdOrderItem = require('./medicine_idp_order_item.model')
+const PharmacyIndent = require('./pharmacy_indent_model')
+const PharmacyIndentItem = require('./pharmacy_indent_item.model')
 const Admission = require('../clinical/ipd/admission.model')
 const nursingServices = require('../nursing/nursing.services')
 
@@ -815,6 +817,257 @@ exports.returnIpdMedicineItem = async (itemId, returnQty, remarks) => {
         }
 
         return item
+    } catch (error) {
+        throw error
+    }
+}
+
+// ── Pharmacy Indents ──────────────────────────────────────
+
+exports.createIndent = async (userId, data) => {
+    try {
+        const items = data.items || []
+        if (items.length === 0) {
+            const error = new Error('Indent must contain at least one medicine')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        // Validate stock logic is optional for indents, but let's just make sure medicine exists
+        for (const item of items) {
+            const medicine = await Medicine.findById(item.medicineId)
+            if (!medicine) {
+                const error = new Error(`Medicine not found for ID: ${item.medicineId}`)
+                error.status = STATUS_CODES.NOT_FOUND
+                throw error
+            }
+        }
+
+        const indentData = {
+            ...data,
+            requestedBy: userId
+        }
+        delete indentData.items
+
+        const indent = await PharmacyIndent.create(indentData)
+        
+        const indentItems = items.map(item => ({
+            indentId: indent._id,
+            medicineId: item.medicineId,
+            batchId: item.batchId || null,
+            quantity: item.quantity,
+            remarks: item.remarks
+        }))
+
+        await PharmacyIndentItem.insertMany(indentItems)
+
+        return indent
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getIndents = async (query = {}) => {
+    try {
+        const page = parseInt(query.page) || 1
+        const limit = parseInt(query.limit) || 10
+        const skip = (page - 1) * limit
+        
+        let filter = {}
+        if (query.status) {
+            filter.status = query.status
+        }
+        if (query.search) {
+            filter.indentNo = { $regex: query.search, $options: 'i' }
+        }
+
+        const total = await PharmacyIndent.countDocuments(filter)
+        const indents = await PharmacyIndent.find(filter)
+            .populate('requestedBy', 'fullName')
+            .populate('approvedBy', 'fullName')
+            .populate('patientId', 'fullName patientCode')
+            .populate('wardId', 'name')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit)
+
+        return { indents, pagination: { total, page, limit, pages: Math.ceil(total / limit) } }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getIndentById = async (id) => {
+    try {
+        const indent = await PharmacyIndent.findById(id)
+            .populate('requestedBy', 'fullName')
+            .populate('approvedBy', 'fullName')
+            .populate('patientId', 'fullName patientCode')
+            .populate('wardId', 'name')
+            
+        if (!indent) {
+            const error = new Error('Indent not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const items = await PharmacyIndentItem.find({ indentId: id })
+            .populate('medicineId', 'medicineName')
+            .populate('batchId', 'batchNo')
+            
+        // Calculate currentStock for each medicine
+        const medicineIds = items.map(item => item.medicineId?._id).filter(Boolean)
+        const activeBatches = await MedicineBatch.find({ medicineId: { $in: medicineIds }, isActive: true })
+        
+        const itemsWithStock = items.map(item => {
+            const itemObj = item.toObject()
+            if (itemObj.medicineId) {
+                const medBatches = activeBatches.filter(b => b.medicineId.toString() === itemObj.medicineId._id.toString())
+                itemObj.medicineId.currentStock = medBatches.reduce((sum, b) => sum + (b.currentStock || 0), 0)
+            }
+            return itemObj
+        })
+            
+        return { ...indent.toObject(), items: itemsWithStock }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.updateIndentStatus = async (id, userId, statusData) => {
+    try {
+        const { status, remarks } = statusData
+
+        const existingIndent = await PharmacyIndent.findById(id)
+        if (!existingIndent) {
+            const error = new Error('Indent not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        // Deduct stock from pharmacy when approving indent
+        if (existingIndent.status !== 'APPROVED' && status === 'APPROVED') {
+            const indentItems = await PharmacyIndentItem.find({ indentId: id })
+            if (indentItems.length === 0) {
+                const error = new Error('Indent must contain at least one item to approve')
+                error.status = STATUS_CODES.BAD_REQUEST
+                throw error
+            }
+
+            // 1. Validate stock availability for all items first
+            for (const item of indentItems) {
+                if (item.batchId) {
+                    const batch = await MedicineBatch.findById(item.batchId)
+                    if (!batch) {
+                        const error = new Error('Batch not found for indent item')
+                        error.status = STATUS_CODES.BAD_REQUEST
+                        throw error
+                    }
+                    if (batch.currentStock < item.quantity) {
+                        const error = new Error(`Insufficient stock for batch ${batch.batchNo}. Required: ${item.quantity}, Available: ${batch.currentStock}`)
+                        error.status = STATUS_CODES.BAD_REQUEST
+                        throw error
+                    }
+                } else {
+                    const batches = await MedicineBatch.find({ medicineId: item.medicineId, currentStock: { $gt: 0 } })
+                    const totalStock = batches.reduce((sum, b) => sum + (b.currentStock || 0), 0)
+                    if (totalStock < item.quantity) {
+                        const error = new Error(`Insufficient stock for requested medicine. Required: ${item.quantity}, Available: ${totalStock}`)
+                        error.status = STATUS_CODES.BAD_REQUEST
+                        throw error
+                    }
+                }
+            }
+
+            // 2. Perform stock deduction and update issuedQuantity
+            for (const item of indentItems) {
+                let remainingToDeduct = item.quantity
+                if (item.batchId) {
+                    const batch = await MedicineBatch.findById(item.batchId)
+                    batch.currentStock -= remainingToDeduct
+                    await batch.save()
+                } else {
+                    const batches = await MedicineBatch.find({ medicineId: item.medicineId, currentStock: { $gt: 0 } }).sort({ expiryDate: 1 })
+                    for (const batch of batches) {
+                        if (remainingToDeduct <= 0) break
+                        const deduct = Math.min(batch.currentStock, remainingToDeduct)
+                        batch.currentStock -= deduct
+                        remainingToDeduct -= deduct
+                        await batch.save()
+                    }
+                }
+                item.issuedQuantity = item.quantity
+                await item.save()
+            }
+        }
+
+        const updateData = { status }
+        
+        if (remarks) {
+            updateData.remarks = remarks
+        }
+        if (['APPROVED', 'PARTIALLY_ISSUED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(status)) {
+            updateData.approvedBy = userId
+        }
+
+        const indent = await PharmacyIndent.findByIdAndUpdate(
+            id,
+            updateData,
+            { new: true }
+        ).populate('requestedBy', 'fullName').populate('approvedBy', 'fullName')
+        
+        return indent
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.updateIndent = async (id, data) => {
+    try {
+        const indent = await PharmacyIndent.findById(id)
+        if (!indent) {
+            const error = new Error('Indent not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const items = data.items
+        const updateData = { ...data }
+        delete updateData.items
+
+        Object.assign(indent, updateData)
+        await indent.save()
+
+        if (Array.isArray(items) && items.length > 0) {
+            await PharmacyIndentItem.deleteMany({ indentId: id })
+            const indentItems = items.map(item => ({
+                indentId: indent._id,
+                medicineId: item.medicineId,
+                batchId: item.batchId || null,
+                quantity: item.quantity,
+                remarks: item.remarks
+            }))
+            await PharmacyIndentItem.insertMany(indentItems)
+        }
+
+        return indent
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.deleteIndent = async (id) => {
+    try {
+        const indent = await PharmacyIndent.findById(id)
+        if (!indent) {
+            const error = new Error('Indent not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        await PharmacyIndentItem.deleteMany({ indentId: id })
+        await PharmacyIndent.findByIdAndDelete(id)
+        return true
     } catch (error) {
         throw error
     }

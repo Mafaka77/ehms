@@ -460,6 +460,64 @@ export const usePharmacyStore = defineStore('pharmacy', {
         console.error('Failed to fetch pending IPD orders count', err)
         return 0
       }
+    },
+
+    async fetchIndents(page = 1, limit = 10, search = '', status = '') {
+      try {
+        const queryParams = new URLSearchParams({ page, limit })
+        if (search) queryParams.append('search', search)
+        if (status) queryParams.append('status', status)
+        
+        const res = await api.get(`/pharmacy/indents?${queryParams.toString()}`)
+        return { success: true, data: res.data.data, pagination: res.data.pagination }
+      } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Error fetching indents' }
+      }
+    },
+
+    async createIndent(indentData) {
+      try {
+        const res = await api.post('/pharmacy/indents', indentData)
+        return { success: true, data: res.data.data, message: res.data.message }
+      } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Error creating indent' }
+      }
+    },
+
+    async getIndentById(id) {
+      try {
+        const res = await api.get(`/pharmacy/indents/${id}`)
+        return { success: true, data: res.data.data }
+      } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Error fetching indent details' }
+      }
+    },
+
+    async updateIndentStatus(id, statusData) {
+      try {
+        const res = await api.put(`/pharmacy/indents/${id}/status`, statusData)
+        return { success: true, data: res.data.data, message: res.data.message }
+      } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Error updating indent status' }
+      }
+    },
+
+    async updateIndent(id, indentData) {
+      try {
+        const res = await api.put(`/pharmacy/indents/${id}`, indentData)
+        return { success: true, data: res.data.data, message: res.data.message }
+      } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Error updating indent' }
+      }
+    },
+
+    async deleteIndent(id) {
+      try {
+        const res = await api.delete(`/pharmacy/indents/${id}`)
+        return { success: true, message: res.data.message }
+      } catch (error) {
+        return { success: false, message: error.response?.data?.message || 'Error deleting indent' }
+      }
     }
 
   }

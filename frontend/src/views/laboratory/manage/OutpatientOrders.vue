@@ -19,6 +19,24 @@ const showReportModal = ref(false)
 const selectedOrder = ref(null)
 const selectedOrderDetails = ref(null)
 
+const calculateAge = (patient) => {
+  if (!patient) return '-'
+  if (patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth)
+    const today = new Date()
+    let years = today.getFullYear() - dob.getFullYear()
+    let months = today.getMonth() - dob.getMonth()
+    let days = today.getDate() - dob.getDate()
+    if (months < 0 || (months === 0 && days < 0)) years--
+    
+    const lastBirthday = new Date(dob.getFullYear() + years, dob.getMonth(), dob.getDate())
+    const diffTime = Math.abs(today.getTime() - lastBirthday.getTime())
+    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24))
+    return years > 0 ? `${years}Y ${diffDays}D` : `${diffDays}D`
+  }
+  return patient.age ? `${patient.age}Y` : '-'
+}
+
 const openResultsModal = (order) => {
   selectedOrder.value = order
   showResultsModal.value = true
@@ -231,7 +249,7 @@ onMounted(async () => {
             <div class="flex items-center justify-between">
               <span class="text-slate-400 text-xs">Code / Info</span>
               <span class="font-mono text-xs text-slate-600 text-right">
-                {{ order.patientId?.patientCode || 'N/A' }} ({{ order.patientId?.age }}Y / {{ order.patientId?.gender }})
+                {{ order.patientId?.patientCode || 'N/A' }} ({{ calculateAge(order.patientId) }} / {{ order.patientId?.gender }})
               </span>
             </div>
             <div class="flex items-center justify-between">
@@ -391,7 +409,7 @@ onMounted(async () => {
             </div>
             <div>
               <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Age / Gender</div>
-              <div class="font-semibold text-slate-800 mt-1">{{ selectedOrder.patientId?.age }} Yrs / {{ selectedOrder.patientId?.gender }}</div>
+              <div class="font-semibold text-slate-800 mt-1">{{ calculateAge(selectedOrder.patientId) }} / {{ selectedOrder.patientId?.gender }}</div>
               <div class="text-xs text-slate-500 mt-0.5">Mob: {{ selectedOrder.patientId?.mobileNo }}</div>
             </div>
             <div>

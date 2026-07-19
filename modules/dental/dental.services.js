@@ -81,7 +81,7 @@ exports.getAppointments = async (query) => {
         }
 
         const appointments = await DentalAppointment.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo gender')
+            .populate('patientId', 'fullName patientCode mobileNo gender dateOfBirth age')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',
@@ -146,7 +146,7 @@ exports.createAppointment = async (data) => {
         const appointment = await DentalAppointment.create(appointmentData);
         
         const populatedAppointment = await DentalAppointment.findById(appointment._id)
-            .populate('patientId', 'fullName patientCode mobileNo age gender')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',
@@ -228,7 +228,7 @@ exports.deleteAppointment = async (id) => {
 exports.getAppointmentById = async (id) => {
     try {
         const appointment = await DentalAppointment.findById(id)
-            .populate('patientId', 'fullName patientCode mobileNo gender age')
+            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',
@@ -279,7 +279,7 @@ exports.getAppointmentsReport = async (query) => {
         }
 
         const appointments = await DentalAppointment.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo age gender')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
             .populate({
                 path: 'doctorId',
                 select: 'fullName',

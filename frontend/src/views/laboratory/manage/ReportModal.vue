@@ -85,7 +85,7 @@ const generateEditorContent = () => {
   let html = '<table><tbody><tr><th>Test Name</th><th>Result</th><th>Unit</th><th>Reference Ranges</th></tr>'
 
   tests.value.forEach(test => {
-    html += `<tr><td colspan="4"><strong>${test.testName.toUpperCase()}</strong></td></tr>`
+    html += `<tr><td colspan="4" class="test-title-header"><u><strong style="font-weight: 900; font-size: 13px;">${test.testName.toUpperCase()}</strong></u></td></tr>`
 
     const groups = {}
     test.parameters.forEach(param => {
@@ -115,7 +115,7 @@ const generateEditorContent = () => {
          const outOfRangeStar = param.isOutOfRange ? ' <span style="color:red">*</span>' : ''
          
          html += `<tr>`
-         html += `<td>${param.name}</td>`
+         html += `<td><strong>${param.name}</strong></td>`
          html += `<td><strong>${valueStr}</strong>${outOfRangeStar}</td>`
          html += `<td>${param.unit || '-'}</td>`
          html += `<td>${rangeStr}</td>`
@@ -229,8 +229,9 @@ const generateReportPDF = async (preview = false) => {
     const element = document.querySelector('.print-report-container')
     if (!element) throw new Error('Report container not found')
     
+    const scaleFactor = 3
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: scaleFactor,
       useCORS: true,
       logging: false,
       windowWidth: element.scrollWidth,
@@ -263,8 +264,8 @@ const generateReportPDF = async (preview = false) => {
     const cropCanvas = (y, h) => {
       const c = document.createElement('canvas')
       c.width = canvas.width
-      const sy = Math.max(0, y * 2)
-      const sh = Math.max(0, Math.min(h * 2, canvas.height - sy))
+      const sy = Math.max(0, y * scaleFactor)
+      const sh = Math.max(0, Math.min(h * scaleFactor, canvas.height - sy))
       c.height = sh || 1 // prevent 0 height canvas
       const ctx = c.getContext('2d')
       if (sh > 0) {
@@ -278,9 +279,9 @@ const generateReportPDF = async (preview = false) => {
     const footerData = cropCanvas(footerY, footerH)
     
     const ratio = pdfWidth / canvas.width
-    const headerPdfH = (headerH * 2) * ratio
-    const bodyPdfH = (bodyH * 2) * ratio
-    const footerPdfH = (footerH * 2) * ratio
+    const headerPdfH = (headerH * scaleFactor) * ratio
+    const bodyPdfH = (bodyH * scaleFactor) * ratio
+    const footerPdfH = (footerH * scaleFactor) * ratio
     
     const bodyAvailableSpace = pageHeight - headerPdfH - footerPdfH
     let bodyHeightLeft = bodyPdfH
@@ -305,7 +306,7 @@ const generateReportPDF = async (preview = false) => {
       
       // Draw page number at the bottom left (within the bottom margin)
       pdf.setFontSize(8)
-      pdf.setTextColor(148, 163, 184) // slate-400
+      pdf.setTextColor(51, 65, 85) // slate-700 for high contrast
       const pageText = `Page ${pageNum} of ${total}`
       pdf.text(pageText, 15, pageHeight - 8)
     }
@@ -609,7 +610,9 @@ const formatDate = (dateString) => {
   padding: 10mm 15mm 15mm 15mm;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: Arial, Helvetica, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -623,21 +626,22 @@ const formatDate = (dateString) => {
 
 .report-header {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .report-header h1 {
-  font-size: 16px;
-  font-weight: 900;
+  font-size: 17px;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: -0.025em;
   color: #1e3a8a;
-  margin: 0 0 6px 0;
+  margin: 0 0 4px 0;
 }
 
 .report-header p {
-  font-size: 9px;
-  color: #64748b;
+  font-size: 10.5px;
+  color: #1e293b;
+  font-weight: 600;
   margin: 0;
   line-height: 1.4;
 }
@@ -649,8 +653,8 @@ const formatDate = (dateString) => {
 }
 
 .report-header h2 {
-  font-size: 12px;
-  font-weight: bold;
+  font-size: 13px;
+  font-weight: 800;
   letter-spacing: 0.05em;
   color: #0f172a;
   margin: 6px 0 0 0;
@@ -661,22 +665,24 @@ const formatDate = (dateString) => {
   grid-template-columns: 1.2fr 0.8fr;
   column-gap: 24px;
   row-gap: 6px;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 500;
   margin-bottom: 20px;
-  padding: 12px;
-  border: 1px solid #e2e8f0;
+  padding: 12px 14px;
+  border: 1px solid #94a3b8;
   border-radius: 8px;
   background-color: #f8fafc;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
 .demographics p {
   margin: 0;
-  color: #334155;
+  color: #0f172a;
 }
 
 .demographics strong {
-  color: #0f172a;
+  color: #000000;
+  font-weight: 700;
 }
 
 .results-table-container {
@@ -693,7 +699,9 @@ const formatDate = (dateString) => {
 .tiptap-editor :deep(.tiptap) {
   outline: none;
   flex-grow: 1;
-  font-size: 10px;
+  font-size: 11px;
+  color: #0f172a;
+  line-height: 1.5;
 }
 
 .tiptap-editor :deep(.tiptap table) {
@@ -703,11 +711,12 @@ const formatDate = (dateString) => {
 }
 
 .tiptap-editor :deep(.tiptap th) {
-  border-top: 2px solid #475569;
-  border-bottom: 2px solid #475569;
-  font-weight: bold;
+  border-top: 2px solid #0f172a;
+  border-bottom: 2px solid #0f172a;
+  font-weight: 700;
   padding: 8px 6px;
-  color: #1e293b;
+  color: #000000;
+  font-size: 11px;
   text-align: left;
 }
 
@@ -718,9 +727,11 @@ const formatDate = (dateString) => {
 }
 
 .tiptap-editor :deep(.tiptap td) {
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid #cbd5e1;
   padding: 8px 6px;
-  color: #334155;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 500;
   vertical-align: top;
 }
 
@@ -735,11 +746,42 @@ const formatDate = (dateString) => {
 }
 
 .tiptap-editor :deep(.tiptap strong) {
-  color: #0f172a;
+  color: #000000;
+  font-weight: 700;
+}
+
+.tiptap-editor :deep(.tiptap td:first-child) {
+  font-weight: 700;
+  color: #000000;
+}
+
+.tiptap-editor :deep(.tiptap td.test-title-header) {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  padding: 10px 14px !important;
+  text-align: center !important;
+  letter-spacing: 0.06em !important;
+  border: 1px solid #000000 !important;
+  text-decoration: underline !important;
+}
+
+.tiptap-editor :deep(.tiptap td.test-title-header strong),
+.tiptap-editor :deep(.tiptap td.test-title-header b),
+.tiptap-editor :deep(.tiptap td.test-title-header u),
+.tiptap-editor :deep(.tiptap td.test-title-header p) {
+  color: #ffffff !important;
+  font-weight: 900 !important;
+  font-size: 13px !important;
+  text-align: center !important;
+  text-decoration: underline !important;
 }
 
 .tiptap-editor :deep(.tiptap td.section-header) {
-  background-color: #f8fafc;
+  background-color: #f1f5f9;
+  font-weight: 700;
+  color: #000000;
 }
 
 .signatures {
@@ -747,18 +789,19 @@ const formatDate = (dateString) => {
   padding-top: 40px;
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
-  color: #475569;
+  font-size: 10px;
+  font-weight: 600;
+  color: #0f172a;
 }
 
 .signatures .operator-name {
-  font-weight: bold;
-  color: #0f172a;
+  font-weight: 700;
+  color: #000000;
   margin: 4px 0 0 0;
 }
 
 .signatures .sig-line {
-  border-top: 1px solid #94a3b8;
+  border-top: 1.5px solid #334155;
   padding-top: 6px;
   display: inline-block;
   width: 200px;
@@ -767,8 +810,9 @@ const formatDate = (dateString) => {
 .notice {
   text-align: center;
   margin-top: 20px;
-  font-size: 8px;
-  color: #94a3b8;
+  font-size: 9px;
+  color: #334155;
+  font-weight: 600;
   line-height: 1.4;
 }
 
@@ -778,6 +822,7 @@ const formatDate = (dateString) => {
 
 .notice .wish {
   font-style: italic;
+  font-weight: 700;
   margin-top: 4px;
 }
 

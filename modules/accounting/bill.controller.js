@@ -308,3 +308,21 @@ exports.generateBillFromIpdCharges = async (req, res) => {
         })
     }
 }
+
+exports.updateIpdBill = async (req, res) => {
+    try {
+        const { id } = req.params
+        const { chargeIds, discountAmount } = req.body
+        const bill = await billService.updateIpdBill(id, { chargeIds, discountAmount }, req.user._id)
+        return res.code(STATUS_CODES.OK).send({
+            message: 'IPD Bill updated successfully',
+            data: bill,
+            status: STATUS_CODES.OK
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}

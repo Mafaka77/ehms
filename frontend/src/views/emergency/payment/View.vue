@@ -34,7 +34,40 @@
       </div>
     </div>
 
-    <div class="flex-1 overflow-y-auto p-6 space-y-6">
+    <!-- Main Content Area -->
+    <div v-if="isInitializing" class="flex-1 overflow-y-auto p-6 space-y-6">
+      <!-- Skeleton Loading / Shimmer -->
+      <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm animate-pulse">
+        <div class="bg-slate-100 border-b border-slate-200 px-5 py-4 flex justify-between items-center">
+          <div class="h-4 bg-slate-300 rounded w-1/3"></div>
+          <div class="h-6 w-16 bg-slate-300 rounded-md"></div>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="h-4 bg-slate-200 rounded w-3/4 mb-4"></div>
+          <div class="h-16 bg-slate-100 rounded-lg w-full border border-slate-200"></div>
+          <div class="flex justify-end gap-3 pt-2">
+             <div class="h-8 w-24 bg-slate-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm animate-pulse">
+        <div class="bg-slate-100 border-b border-slate-200 px-5 py-4 flex justify-between items-center">
+          <div class="h-4 bg-slate-300 rounded w-1/3"></div>
+          <div class="h-6 w-16 bg-slate-300 rounded-md"></div>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="h-4 bg-slate-200 rounded w-full mb-4"></div>
+          <div class="h-4 bg-slate-200 rounded w-5/6 mb-4"></div>
+          <div class="h-16 bg-slate-100 rounded-lg w-full border border-slate-200"></div>
+          <div class="flex justify-end gap-3 pt-2">
+             <div class="h-8 w-24 bg-slate-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="flex-1 overflow-y-auto p-6 space-y-6">
 
       <!-- SECTION 1: REGISTRATION / CONSULTATION -->
       <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
@@ -98,6 +131,7 @@
                 Process Payment
               </button>
               <button 
+                v-if="consultationBill.status === 'PAID'"
                 @click="printBill(consultationBill)"
                 class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2 px-4 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5"
               >
@@ -210,6 +244,7 @@
                 Process Payment
               </button>
               <button 
+                v-if="dischargeBill.status === 'PAID'"
                 @click="printBill(dischargeBill)"
                 class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2 px-4 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5"
               >
@@ -267,7 +302,7 @@ const consultationBill = ref(null)
 const dischargeBill = ref(null)
 
 const patientCharges = ref([])
-const loadingCharges = ref(false)
+const isInitializing = ref(false)
 
 const fetchBillDetails = async (billId, isConsultation = true) => {
   try {
@@ -285,8 +320,10 @@ const fetchBillDetails = async (billId, isConsultation = true) => {
 // Watch for visit changes to load bills and charges
 watch(() => props.visit, async (newVisit) => {
   if (newVisit) {
+    isInitializing.value = true
     consultationBill.value = null
     dischargeBill.value = null
+    patientCharges.value = []
 
     if (newVisit.consultationBillId) {
       await fetchBillDetails(newVisit.consultationBillId, true)
@@ -297,14 +334,13 @@ watch(() => props.visit, async (newVisit) => {
     }
     
     // Fetch patient charges
-    loadingCharges.value = true
     try {
       const res = await emergencyStore.getVisitCharges(newVisit._id)
       patientCharges.value = res.data || []
     } catch (e) {
       patientCharges.value = []
     } finally {
-      loadingCharges.value = false
+      isInitializing.value = false
     }
   } else {
     consultationBill.value = null
@@ -451,6 +487,7 @@ const getPaymentStatusColor = (status) => {
   const map = {
     'Paid': 'bg-emerald-100 text-emerald-700 border-emerald-200',
     'Unpaid': 'bg-rose-100 text-rose-700 border-rose-200',
+    'Partially Paid': 'bg-amber-100 text-amber-700 border-amber-200',
     'Partial': 'bg-amber-100 text-amber-700 border-amber-200',
     'Billed': 'bg-blue-100 text-blue-700 border-blue-200',
     'Unbilled': 'bg-slate-100 text-slate-500 border-slate-200',

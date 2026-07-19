@@ -402,6 +402,12 @@ const routes = [
             name: 'doctors-view',
             component: () => import('../views/doctor/View.vue'),
             meta: { permission: 'doctor.view' }
+          },
+          {
+            path: 'edit/:id',
+            name: 'doctors-edit',
+            component: () => import('../views/doctor/Edit.vue'),
+            meta: { permission: 'doctor.update' }
           }
         ]
       },
