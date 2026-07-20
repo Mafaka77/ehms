@@ -353,7 +353,10 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
 
         // 2. Calculate amounts
         const grossAmount = visit.consultationFee || 0
-        const netAmount = grossAmount - discountAmount
+        const netAmount = Math.max(0, grossAmount - discountAmount)
+        const isFreeOrPaid = netAmount === 0
+        const initialStatus = isFreeOrPaid ? 'PAID' : 'DRAFT'
+        const initialBalance = isFreeOrPaid ? 0 : netAmount
 
         // 3. Create Bill
         const [bill] = await Bill.create([{
@@ -364,8 +367,8 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
             discountAmount,
             netAmount,
             paidAmount: 0,
-            balanceAmount: netAmount,
-            status: 'DRAFT',
+            balanceAmount: initialBalance,
+            status: initialStatus,
             generatedBy: userId,
             generatedAt: new Date()
         }], { session })
@@ -386,7 +389,16 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
         }], { session })
 
         // 5. Update Emergency Visit reference
-        visit.paymentStatus = 'Unpaid'
+        if (isFreeOrPaid) {
+            const existingDischargeBill = await Bill.findOne({ emergencyVisitId: visit._id, billType: 'EMERGENCY' }).session(session)
+            if (existingDischargeBill && existingDischargeBill.status === 'PAID') {
+                visit.paymentStatus = 'Paid'
+            } else {
+                visit.paymentStatus = 'Partially Paid'
+            }
+        } else {
+            visit.paymentStatus = 'Unpaid'
+        }
         await visit.save({ session })
 
         // 6. Create Discount record if discount is applied
@@ -462,7 +474,10 @@ exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, disc
 
         // 3. Calculate amounts
         const grossAmount = totalChargesAmount
-        const netAmount = grossAmount - discountAmount
+        const netAmount = Math.max(0, grossAmount - discountAmount)
+        const isFreeOrPaid = netAmount === 0
+        const initialStatus = isFreeOrPaid ? 'PAID' : 'DRAFT'
+        const initialBalance = isFreeOrPaid ? 0 : netAmount
 
         // 4. Create Bill
         const [bill] = await Bill.create([{
@@ -473,8 +488,8 @@ exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, disc
             discountAmount,
             netAmount,
             paidAmount: 0,
-            balanceAmount: netAmount,
-            status: 'DRAFT',
+            balanceAmount: initialBalance,
+            status: initialStatus,
             generatedBy: userId,
             generatedAt: new Date()
         }], { session })
@@ -739,7 +754,12 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
         error.status = STATUS_CODES.BAD_REQUEST
         throw error
     }
-    if (amount <= 0) {
+    if (amount < 0) {
+        const error = new Error('Payment amount cannot be negative')
+        error.status = STATUS_CODES.BAD_REQUEST
+        throw error
+    }
+    if (amount === 0 && bill.balanceAmount > 0) {
         const error = new Error('Payment amount must be greater than zero')
         error.status = STATUS_CODES.BAD_REQUEST
         throw error

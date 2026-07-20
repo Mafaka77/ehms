@@ -142,7 +142,7 @@ const openRegisterModal = () => {
     chiefComplaint: '',
     priority: 'MEDIUM',
     notes: '',
-    consultationFee: 250
+    consultationFee: 300
   }
   showRegisterModal.value = true
 }

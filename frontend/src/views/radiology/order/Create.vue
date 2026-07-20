@@ -142,6 +142,17 @@ const clearOpdAppointment = () => {
 const showPatientModal = ref(false)
 const newPatient = reactive({ fullName: '', mobileNo: '' })
 const isCreatingPatient = ref(false)
+
+const openPatientModal = () => {
+  const query = (patientSearchQuery.value || '').trim()
+  if (/^\d+$/.test(query)) {
+    newPatient.mobileNo = query
+    newPatient.fullName = ''
+  } else {
+    newPatient.fullName = query
+  }
+  showPatientModal.value = true
+}
 const createQuickPatient = async () => {
   if (!newPatient.fullName || !newPatient.mobileNo) return
   isCreatingPatient.value = true
@@ -327,7 +338,7 @@ onMounted(() => fetchAllTests())
                   <button
                     v-if="patientSearchQuery.length >= 2 && patientSearchResults.length === 0 && !isSearchingPatients"
                     type="button"
-                    @click="showPatientModal = true"
+                    @click="openPatientModal"
                     class="mt-2 w-full text-center px-4 py-2 border border-dashed border-indigo-300 rounded-lg text-indigo-600 text-sm font-medium hover:bg-indigo-50 transition-colors"
                   >+ Add New Patient "{{ patientSearchQuery }}"</button>
                 </div>

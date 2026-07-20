@@ -357,8 +357,9 @@ const totalChargesAmount = computed(() => {
 })
 
 const consultationStatus = computed(() => {
+  if (props.visit.consultationFee === 0 && !consultationBill.value) return 'Paid'
   if (!consultationBill.value) return 'Unbilled'
-  if (consultationBill.value.status === 'PAID') return 'Paid'
+  if (consultationBill.value.status === 'PAID' || props.visit.consultationFee === 0) return 'Paid'
   if (consultationBill.value.status === 'PARTIALLY_PAID') return 'Partial'
   return 'Billed'
 })
@@ -366,15 +367,15 @@ const consultationStatus = computed(() => {
 const dischargeStatus = computed(() => {
   if (patientCharges.value.length === 0) return 'No Charges'
   if (!dischargeBill.value) return 'Unbilled'
-  if (dischargeBill.value.status === 'PAID') return 'Paid'
+  if (dischargeBill.value.status === 'PAID' || dischargeBill.value.netAmount === 0) return 'Paid'
   if (dischargeBill.value.status === 'PARTIALLY_PAID') return 'Partial'
   return 'Billed'
 })
 
 const canDischarge = computed(() => {
-  // Can discharge if consultation is paid (or 0) AND discharge bill is either fully paid or not needed (no charges)
+  // Can discharge if consultation is paid (or 0) AND discharge bill is either fully paid or not needed (no charges / 0 amount)
   const isConsultationPaid = consultationBill.value?.status === 'PAID' || props.visit.consultationFee === 0
-  const isDischargePaid = patientCharges.value.length === 0 || dischargeBill.value?.status === 'PAID'
+  const isDischargePaid = patientCharges.value.length === 0 || dischargeBill.value?.status === 'PAID' || dischargeBill.value?.netAmount === 0
   return isConsultationPaid && isDischargePaid
 })
 

@@ -94,7 +94,11 @@ const handlePayClicked = (bill) => {
 }
 
 const submitPayment = async () => {
-  if (paymentForm.value.amount <= 0) {
+  if (paymentForm.value.amount < 0) {
+    snackbarStore.show({ message: 'Please enter a valid payment amount', type: 'error' })
+    return
+  }
+  if (paymentForm.value.amount === 0 && activeBill.value.balanceAmount > 0) {
     snackbarStore.show({ message: 'Please enter a valid payment amount', type: 'error' })
     return
   }
@@ -408,8 +412,8 @@ const formatCurrency = (val) => {
                 v-model.number="paymentForm.amount"
                 type="number"
                 step="0.01"
-                min="0.01"
-                :max="activeBill.balanceAmount"
+                :min="activeBill?.balanceAmount === 0 ? 0 : 0.01"
+                :max="activeBill?.balanceAmount"
                 class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-500 text-slate-700 transition-all shadow-sm"
               />
             </div>

@@ -38,6 +38,17 @@ const newPatient = reactive({
 })
 const isCreatingPatient = ref(false)
 
+const openPatientModal = () => {
+  const query = (patientSearchQuery.value || '').trim()
+  if (/^\d+$/.test(query)) {
+    newPatient.mobileNo = query
+    newPatient.fullName = ''
+  } else {
+    newPatient.fullName = query
+  }
+  showPatientModal.value = true
+}
+
 const searchPatients = async () => {
   if (patientSearchQuery.value.length < 2) {
     patientSearchResults.value = []
@@ -430,7 +441,7 @@ onMounted(() => {
                   <button 
                     v-if="patientSearchQuery.length >= 2 && patientSearchResults.length === 0 && !isSearchingPatients"
                     type="button"
-                    @click="showPatientModal = true"
+                    @click="openPatientModal"
                     class="mt-2 w-full text-center px-4 py-2 border border-dashed border-indigo-300 rounded-lg text-indigo-600 text-sm font-medium hover:bg-indigo-50 hover:border-indigo-400 transition-colors"
                   >
                     + Add New Patient "{{ patientSearchQuery }}"
