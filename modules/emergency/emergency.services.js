@@ -98,7 +98,7 @@ exports.createEmergencyVisit = async (data) => {
             chiefComplaint: data.chiefComplaint || '',
             priority: data.priority || 'MEDIUM',
             notes: data.notes || '',
-            consultationFee: data.consultationFee !== undefined ? data.consultationFee : 250,
+            consultationFee: data.consultationFee !== undefined ? data.consultationFee : 300,
             paymentStatus: data.paymentStatus || 'Unpaid'
         };
 

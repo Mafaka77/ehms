@@ -7,12 +7,19 @@ function authorize(roles = []) {
 
     const roleNames = []
 
+    if (!request.user) {
+      return reply.code(STATUS_CODES.UNAUTHORIZED).send({
+        success: false,
+        message: 'Unauthorized'
+      })
+    }
+
     // New slim JWT: roleName (string) + roleIds (array of id strings)
     if (request.user.roleName) {
       roleNames.push(request.user.roleName)
     }
 
-    if (request.user.roleIds && Array.isArray(request.user.roleIds)) {
+    if (Array.isArray(request.user.roleIds)) {
       for (const id of request.user.roleIds) {
         try {
           const dbRole = await Role.findById(id).select('name')
@@ -27,7 +34,7 @@ function authorize(roles = []) {
     if (roleNames.length === 0) {
       const legacyRoles = []
       if (request.user.role) legacyRoles.push(request.user.role)
-      if (request.user.roles && Array.isArray(request.user.roles)) {
+      if (Array.isArray(request.user.roles)) {
         request.user.roles.forEach(r => { if (r) legacyRoles.push(r) })
       }
       for (const r of legacyRoles) {

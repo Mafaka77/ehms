@@ -1289,9 +1289,11 @@ exports.generateBillFromIpdCharges = async (admissionId, chargeIds, userId) => {
         }], { session })
 
         // Assign billId to the bill items
-        billItemsData.forEach(item => {
-            item.billId = bill._id
-        })
+        if (Array.isArray(billItemsData)) {
+            billItemsData.forEach(item => {
+                if (item) item.billId = bill._id
+            })
+        }
 
         await BillItem.insertMany(billItemsData, { session })
 

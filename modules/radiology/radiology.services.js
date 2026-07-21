@@ -208,27 +208,40 @@ exports.createRadiologyOrder = async (data, userId) => {
     const session = await RadiologyOrder.startSession()
     session.startTransaction()
     try {
-        const { tests = [], ...orderData } = data
+        const { tests = [], ...orderData } = data || {}
+
+        // Sanitize optional ObjectId fields
+        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId']
+        for (const field of fields) {
+            if (orderData[field] === '' || orderData[field] === undefined) {
+                orderData[field] = null
+            }
+        }
+        if (orderData.referral === 'Self') {
+            orderData.doctorId = null
+        }
 
         const order = new RadiologyOrder({
             ...orderData,
             paymentStatus: orderData.admissionId ? 'IPD' : 'UNPAID',
             status: orderData.admissionId ? 'IPD' : 'ORDERED',
-            createdBy: userId
+            createdBy: userId || null
         })
         await order.save({ session })
 
         let totalAmount = 0
         const items = []
-        for (const t of tests) {
+        const testList = Array.isArray(tests) ? tests : []
+        for (const t of testList) {
+            if (!t || !t.testId) continue
             const test = await RadiologyTest.findById(t.testId).session(session)
             if (!test) continue
-            const amount = test.rate
+            const amount = test.rate || 0
             totalAmount += amount
             items.push({
                 orderId: order._id,
                 radiologyTestId: test._id,
-                rate: test.rate,
+                rate: test.rate || 0,
                 amount
             })
         }
@@ -244,7 +257,6 @@ exports.createRadiologyOrder = async (data, userId) => {
         if (orderData.admissionId && insertedItems.length > 0) {
             const ChargeCategory = require('../clinical/ipd/ipd_charge_category.model')
             const PatientCharge = require('../common/patient_charge.model')
-            const PatientChargeAddon = require('../common/patient_charge_addon.model')
 
             const radCategory = await ChargeCategory.findOne({ code: 'RADIOLOGY' }).session(session)
 
@@ -252,18 +264,18 @@ exports.createRadiologyOrder = async (data, userId) => {
                 const test = await RadiologyTest.findById(dbItem.radiologyTestId).session(session)
                 const testName = test ? test.name : 'Radiology Test'
 
-                const [charge] = await PatientCharge.create([{
+                await PatientCharge.create([{
                     admissionId: orderData.admissionId || null,
                     emergencyVisitId: orderData.emergencyVisitId || null,
                     dentalAppointmentId: orderData.dentalAppointmentId || null,
                     sourceType: 'RADIOLOGY',
                     patientId: orderData.patientId,
-                    chargeCategoryId: radCategory?._id,
+                    chargeCategoryId: radCategory?._id || null,
                     description: testName,
                     sourceId: dbItem._id,
                     quantity: 1,
-                    rate: dbItem.rate,
-                    amount: dbItem.amount,
+                    rate: dbItem.rate || 0,
+                    amount: dbItem.amount || 0,
                     isBilled: false,
                     createdBy: userId || null,
                     updatedBy: userId || null
@@ -373,7 +385,27 @@ exports.getRadiologyOrderById = async (id) => {
 
 exports.updateRadiologyOrder = async (id, data) => {
     try {
-        const order = await RadiologyOrder.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+        const updateData = { ...data }
+        delete updateData.tests
+
+        // Only sanitize empty string fields if explicitly passed in updateData
+        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId']
+        for (const field of fields) {
+            if (updateData[field] === '') {
+                updateData[field] = null
+            } else if (updateData[field] === undefined) {
+                delete updateData[field]
+            }
+        }
+
+        if (updateData.referral === 'Self') {
+            updateData.doctorId = null
+        }
+
+        const order = await RadiologyOrder.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
+            .populate('patientId', 'fullName patientCode mobileNo')
+            .populate('doctorId', 'fullName doctorCode')
+
         if (!order) {
             const error = new Error('Radiology order not found')
             error.status = STATUS_CODES.NOT_FOUND

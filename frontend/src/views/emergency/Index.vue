@@ -2,6 +2,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useEmergencyStore } from '../../stores/emergencyStore'
 import { usePatientStore } from '../../stores/patientStore'
+import { useDoctorStore } from '../../stores/doctorStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
 import BaseInput from '../../components/BaseInput.vue'
 import BaseSelect from '../../components/BaseSelect.vue'
@@ -13,6 +14,7 @@ import jsPDF from 'jspdf'
 
 const emergencyStore = useEmergencyStore()
 const patientStore = usePatientStore()
+const doctorStore = useDoctorStore()
 const snackbarStore = useSnackbarStore()
 
 const loading = ref(false)
@@ -50,7 +52,8 @@ const visitForm = ref({
   arrivalDateTime: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDThh:mm
   chiefComplaint: '',
   priority: 'MEDIUM',
-  notes: ''
+  notes: '',
+  consultationFee: 300
 })
 const isRegistering = ref(false)
 
@@ -198,6 +201,22 @@ const doctorOptions = computed(() => {
     value: doctor._id,
     label: `Dr. ${doctor.fullName} - ${doctor.specializationId?.name || 'Emergency Medicine'}`
   }))
+})
+
+// Auto-fill consultationFee when a doctor with EMERGENCY serviceType rule is selected
+watch(() => visitForm.value.doctorId, async (newDoctorId) => {
+  if (!newDoctorId) return
+  try {
+    const res = await doctorStore.fetchRemunerationRules(newDoctorId)
+    if (res.success && Array.isArray(res.data)) {
+      const emergencyRule = res.data.find(r => r.serviceType === 'EMERGENCY' && r.isActive !== false)
+      if (emergencyRule && typeof emergencyRule.amount === 'number') {
+        visitForm.value.consultationFee = emergencyRule.amount
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching doctor remuneration rules for EMERGENCY:', err)
+  }
 })
 
 const submitVisit = async () => {
@@ -704,7 +723,7 @@ const exportToExcel = (reportData) => {
                 <SearchableSelect
                   v-model="visitForm.doctorId"
                   id="doctor-select"
-                  label="Triage Doctor on Duty (Optional)"
+                  label="Triage / Consultation Doctor on Duty (Optional)"
                   placeholder="Select a doctor..."
                   :options="doctorOptions"
                 />

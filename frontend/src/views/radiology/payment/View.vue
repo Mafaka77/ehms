@@ -115,25 +115,13 @@ const clearEmployee = () => {
   employeeSearchQuery.value = ''
 }
 
-// Reset/Auto-detect discount when order changes
-watch(() => props.order, (newOrder) => {
-  if (newOrder && !newOrder.billId && newOrder.patientId?.isEmployee) {
-    showDiscount.value = true
-    discountMode.value = 'employee'
-    discountInputVal.value = 20
-    selectedEmployee.value = {
-      _id: newOrder.patientId.employeeId,
-      fullName: newOrder.patientId.fullName,
-      employeeCode: newOrder.patientId.employeeCode
-    }
-    employeeSearchQuery.value = newOrder.patientId.fullName
-  } else {
-    showDiscount.value = false
-    discountMode.value = 'employee'
-    discountInputVal.value = 20
-    selectedEmployee.value = null
-    employeeSearchQuery.value = ''
-  }
+// Reset discount when order changes
+watch(() => props.order, () => {
+  showDiscount.value = false
+  discountMode.value = 'employee'
+  discountInputVal.value = 0
+  selectedEmployee.value = null
+  employeeSearchQuery.value = ''
   discountRemarks.value = ''
 })
 
@@ -332,7 +320,8 @@ const getPaymentStatusColor = (status) => {
         </div>
       </div>
 
-      <!-- Discount Configuration (Only if bill not generated yet) -->
+      <!-- Discount Configuration (Commented Out) -->
+      <!--
       <div v-if="!order.billId && order.paymentStatus === 'UNPAID'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 uppercase select-none">
@@ -369,7 +358,6 @@ const getPaymentStatusColor = (status) => {
             />
           </div>
 
-          <!-- Employee Search Select -->
           <div v-else class="col-span-2 sm:col-span-1 relative">
             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Search Employee <span class="text-rose-500">*</span></label>
             
@@ -390,7 +378,6 @@ const getPaymentStatusColor = (status) => {
                 placeholder="Name or employee code..." 
                 class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-1 focus:ring-violet-500"
               />
-              <!-- Dropdown Results -->
               <div v-if="employeeSearchResults.length > 0" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 <ul class="py-0.5 divide-y divide-slate-50">
                   <li 
@@ -407,7 +394,6 @@ const getPaymentStatusColor = (status) => {
             </div>
           </div>
 
-          <!-- Reason/Remarks Input -->
           <div class="col-span-2">
             <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Discount Reason / Remarks</label>
             <input 
@@ -419,7 +405,6 @@ const getPaymentStatusColor = (status) => {
           </div>
         </div>
 
-        <!-- Live Totals Summary (If discount is applied) -->
         <div v-if="showDiscount" class="pt-2.5 border-t border-dashed border-slate-200 space-y-1.5 text-xs">
           <div class="flex justify-between items-center text-slate-500">
             <span>Gross Total:</span>
@@ -435,6 +420,7 @@ const getPaymentStatusColor = (status) => {
           </div>
         </div>
       </div>
+      -->
 
       <!-- Bill summary if generated -->
       <div v-if="billDetails" class="space-y-3 bg-violet-50/40 p-4 rounded-xl border border-violet-100/50">

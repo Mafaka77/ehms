@@ -19,10 +19,10 @@ module.exports = async (fastify, options) => {
     fastify.delete('/test/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, radiologyController.deleteRadiologyTest)
 
     // Radiology order routes
-    fastify.get('/order', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'Cashier'])] }, radiologyController.getAllRadiologyOrders)
-    fastify.post('/order', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist'])] }, radiologyController.createRadiologyOrder)
-    fastify.get('/order/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'Cashier'])] }, radiologyController.getRadiologyOrderById)
-    fastify.put('/order/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist'])] }, radiologyController.updateRadiologyOrder)
+    fastify.get('/order', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'Cashier', 'Doctor', 'Nurse', 'EmergencyNurse'])] }, radiologyController.getAllRadiologyOrders)
+    fastify.post('/order', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'Doctor', 'Nurse', 'EmergencyNurse'])] }, radiologyController.createRadiologyOrder)
+    fastify.get('/order/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'Cashier', 'Doctor', 'Nurse', 'EmergencyNurse'])] }, radiologyController.getRadiologyOrderById)
+    fastify.put('/order/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin', 'Receptionist', 'Doctor', 'Nurse', 'EmergencyNurse'])] }, radiologyController.updateRadiologyOrder)
     fastify.delete('/order/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, radiologyController.deleteRadiologyOrder)
 
 }

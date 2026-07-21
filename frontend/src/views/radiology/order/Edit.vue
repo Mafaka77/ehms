@@ -145,30 +145,34 @@ const selectedCategoryFilter = ref('')
 
 const allCategories = computed(() => {
   const map = {}
-  allTests.value.forEach(t => {
-    if (t.radiologyId) map[t.radiologyId._id || t.radiologyId] = t.radiologyId?.name || 'Unknown'
-  })
+  if (Array.isArray(allTests.value)) {
+    allTests.value.forEach(t => {
+      if (t && t.radiologyId) map[t.radiologyId._id || t.radiologyId] = t.radiologyId?.name || 'Unknown'
+    })
+  }
   return Object.entries(map).map(([id, name]) => ({ id, name }))
 })
 
 const filteredAvailableTests = computed(() => {
-  let list = allTests.value
-  if (selectedCategoryFilter.value) list = list.filter(t => (t.radiologyId?._id || t.radiologyId) === selectedCategoryFilter.value)
+  let list = Array.isArray(allTests.value) ? allTests.value : []
+  if (selectedCategoryFilter.value) list = list.filter(t => t && (t.radiologyId?._id || t.radiologyId) === selectedCategoryFilter.value)
   if (testSearchQuery.value) {
     const q = testSearchQuery.value.toLowerCase()
-    list = list.filter(t => t.name.toLowerCase().includes(q) || (t.code && t.code.toLowerCase().includes(q)))
+    list = list.filter(t => t && (t.name?.toLowerCase().includes(q) || (t.code && t.code.toLowerCase().includes(q))))
   }
   return list
 })
 
-const totalAmount = computed(() => selectedTests.value.reduce((sum, t) => sum + (t.rate || 0), 0))
+const totalAmount = computed(() => (selectedTests.value || []).reduce((sum, t) => sum + (t?.rate || 0), 0))
 
 const fetchAllTests = async () => {
   try {
     const res = await api.get('/radiology/test', { params: { limit: 1000 } })
-    allTests.value = (res.data.data || []).filter(t => t.isActive)
+    const list = res.data?.data
+    allTests.value = Array.isArray(list) ? list.filter(t => t && t.isActive) : []
   } catch (err) {
     console.error('Error loading radiology tests:', err)
+    allTests.value = []
   }
 }
 
@@ -244,7 +248,12 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
-    const orderData = { ...form, tests: selectedTests.value }
+    const orderData = { 
+      ...form, 
+      opdAppointmentId: form.opdAppointmentId || null,
+      doctorId: form.referral === 'Self' ? null : (form.doctorId || null),
+      tests: selectedTests.value 
+    }
     const response = await radiologyStore.updateOrder(orderId, orderData)
     if (response.success) {
       snackbarStore.show({ message: 'Radiology order updated successfully!', type: 'success' })

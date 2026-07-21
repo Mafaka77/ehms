@@ -1,5 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, computed } from 'vue'
+import html2canvas from 'html2canvas-pro'
+import jsPDF from 'jspdf'
 
 const props = defineProps({
   show: {
@@ -19,11 +21,86 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const printingPDF = ref(false)
+const pdfPreviewUrl = ref(null)
+const currentFilename = ref('')
+const receiptRef = ref(null)
 
-const printInvoicePDF = () => {
-  window.print()
+const generateInvoicePDF = async () => {
+  if (printingPDF.value) return
+  printingPDF.value = true
+  
+  try {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    const element = receiptRef.value
+    if (!element) throw new Error('Receipt container not found')
+    
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    })
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.98)
+    
+    const pdf = new jsPDF('l', 'mm', 'a5')
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const ratio = pdfWidth / canvas.width
+    const imgHeight = canvas.height * ratio
+    
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight)
+    
+    const patientName = props.order?.patientId?.fullName?.replace(/\s+/g, '_') || 'Patient'
+    const filename = `Radiology_Invoice_${patientName}.pdf`
+    currentFilename.value = filename
+    
+    const blob = pdf.output('blob')
+    if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value)
+    pdfPreviewUrl.value = URL.createObjectURL(blob)
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error)
+  } finally {
+    printingPDF.value = false
+  }
 }
 
+watch(() => props.show, (newVal) => {
+  if (newVal && props.billDetails) {
+    generateInvoicePDF()
+  } else {
+    if (pdfPreviewUrl.value) {
+      URL.revokeObjectURL(pdfPreviewUrl.value)
+      pdfPreviewUrl.value = null
+    }
+  }
+}, { immediate: true })
+
+const patientAge = computed(() => {
+  const patient = props.order?.patientId
+  if (!patient) return '-'
+  if (patient.dateOfBirth) {
+    const dob = new Date(patient.dateOfBirth)
+    const today = new Date()
+    
+    let years = today.getFullYear() - dob.getFullYear()
+    let months = today.getMonth() - dob.getMonth()
+    let days = today.getDate() - dob.getDate()
+    
+    if (months < 0 || (months === 0 && days < 0)) {
+      years--
+    }
+    
+    const lastBirthday = new Date(dob.getFullYear() + years, dob.getMonth(), dob.getDate())
+    const diffTime = Math.abs(today.getTime() - lastBirthday.getTime())
+    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24))
+    
+    return years > 0 ? `${years}Y ${diffDays}D` : `${diffDays}D`
+  }
+  return patient.age ? `${patient.age}Y` : '-'
+})
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
@@ -46,16 +123,30 @@ const formatCurrency = (val) => {
     <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
 
       <!-- Preview Area -->
-      <div class="p-6 overflow-y-auto flex justify-center bg-slate-100 flex-grow print:p-0 print:bg-white print:overflow-visible print:block">
-        <!-- Receipt Mockup Sheet (Sized to 210mm x 148mm ratio on screen) -->
-        <div class="print-receipt-container select-none">
-          <!-- Receipt Content -->
-          <div class="receipt-content">
+      <div class="flex-grow flex flex-col relative bg-slate-600 min-h-[500px]">
+        
+        <!-- Loading State -->
+        <div v-if="printingPDF" class="absolute inset-0 flex items-center justify-center bg-slate-800 z-50">
+          <div class="flex flex-col items-center">
+            <span class="animate-spin rounded-full h-10 w-10 border-4 border-indigo-400 border-t-transparent mb-3"></span>
+            <span class="text-white font-medium shadow-sm">Generating PDF Preview...</span>
+          </div>
+        </div>
+
+        <!-- Hidden DOM for html2canvas -->
+        <div v-show="!pdfPreviewUrl" class="absolute inset-0 overflow-y-auto bg-slate-200 p-8 flex justify-center z-0">
+          <div ref="receiptRef" class="opd-print-receipt-container select-none bg-white">
+            <div class="receipt-content">
+
             <!-- Header Brand -->
             <div class="receipt-header">
-              <h1>EHMS Hospital & Research Centre</h1>
-              <p>123 Health Care Avenue, Medical City</p>
-              <p>Mob: +91 98765 43210 | Email: billing@ehms.com</p>
+              <div class="flex items-center justify-between mb-2">
+                <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
+                <div class="text-right">
+                   <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                   <p>Phone: 0389-2913340 / 8974326872</p>
+                </div>
+              </div>
               <hr class="receipt-divider" />
               <h2>RADIOLOGY BILL / INVOICE</h2>
             </div>
@@ -67,11 +158,12 @@ const formatCurrency = (val) => {
                 <p><strong>Date:</strong> {{ formatDate(billDetails.generatedAt || billDetails.createdAt) }}</p>
                 <p><strong>Status:</strong> <span class="uppercase font-bold">{{ billDetails.status }}</span></p>
                 <p><strong>Order No:</strong> <span class="font-mono">{{ order.orderNo }}</span></p>
+                <p><strong>Payment Mode:</strong> <span class="font-mono uppercase">{{ billDetails.payments?.[0]?.paymentMode || 'N/A' }}</span></p>
               </div>
               <div class="text-right">
                 <p class="patient-name truncate"><strong>Patient:</strong> {{ order.patientId?.fullName }}</p>
                 <p><strong>Code:</strong> <span class="font-mono">{{ order.patientId?.patientCode }}</span></p>
-                <p><strong>Age/Gender:</strong> {{ order.patientId?.age }} Yrs / {{ order.patientId?.gender }}</p>
+                <p><strong>Age/Gender:</strong> {{ patientAge }} / {{ order.patientId?.gender }}</p>
                 <p><strong>Contact:</strong> {{ order.patientId?.mobileNo }}</p>
               </div>
             </div>
@@ -84,20 +176,18 @@ const formatCurrency = (val) => {
             <table class="items-table">
               <thead>
                 <tr>
-                  <th>Test Name</th>
+                  <th>Description / Test Name</th>
                   <th class="text-right">Rate</th>
                   <th class="text-center">Qty</th>
-                  <th class="text-right">Discount</th>
                   <th class="text-right">Net Amount</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in billDetails.items" :key="item._id">
+                <tr v-for="item in billDetails.items" :key="item._id || item.description">
                   <td class="font-medium truncate max-w-[200px]">{{ item.description }}</td>
                   <td class="text-right font-mono">{{ formatCurrency(item.rate) }}</td>
-                  <td class="text-center font-mono">{{ item.quantity }}</td>
-                  <td class="text-right font-mono discount-col">-{{ formatCurrency(item.discountAmount) }}</td>
-                  <td class="text-right font-mono font-semibold">{{ formatCurrency(item.netAmount) }}</td>
+                  <td class="text-center font-mono">{{ item.quantity || 1 }}</td>
+                  <td class="text-right font-mono font-semibold">{{ formatCurrency(item.netAmount || item.amount) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -142,8 +232,12 @@ const formatCurrency = (val) => {
               <p>This is a computer-generated invoice and does not require a physical signature.</p>
               <p class="wish">*** Get Well Soon ***</p>
             </div>
+            </div>
           </div>
         </div>
+
+        <!-- PDF Preview Iframe -->
+        <iframe v-if="pdfPreviewUrl" :src="pdfPreviewUrl" class="absolute inset-0 w-full h-full border-0 z-10" title="PDF Preview"></iframe>
       </div>
 
       <!-- Action Footer -->
@@ -154,24 +248,23 @@ const formatCurrency = (val) => {
         >
           Close
         </button>
-        <button 
-          @click="printInvoicePDF"
-          :disabled="printingPDF"
-          class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center gap-1.5 disabled:opacity-50"
+        <a
+          v-if="pdfPreviewUrl"
+          :href="pdfPreviewUrl"
+          :download="currentFilename"
+          class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg shadow-indigo-100 transition-all flex items-center gap-1.5 cursor-pointer"
         >
-          <span v-if="printingPDF" class="animate-spin rounded-full h-3 w-3 border-2 border-white border-t-transparent"></span>
-          <svg v-else class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-          </svg>
-          Print Invoice
-        </button>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+          Download PDF
+        </a>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.print-receipt-container {
+/* Using explicit hex colors to avoid oklch() issues in html2canvas */
+.opd-print-receipt-container {
   width: 210mm;
   height: 148mm;
   overflow: hidden;
@@ -188,7 +281,7 @@ const formatCurrency = (val) => {
 
 .receipt-header {
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .receipt-header h1 {
@@ -224,9 +317,9 @@ const formatCurrency = (val) => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   column-gap: 16px;
-  row-gap: 4px;
+  row-gap: 2px;
   font-size: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   line-height: 1.25;
 }
 
@@ -242,34 +335,34 @@ const formatCurrency = (val) => {
 
 .doctor-section {
   border-top: 1px dashed #e2e8f0;
-  padding-top: 6px;
+  padding-top: 5px;
   font-size: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   color: #334155;
 }
 
 .doctor-section p {
-  margin: 0;
+  margin: 0 0 2px 0;
 }
 
 .items-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .items-table th {
   border-top: 1px dashed #cbd5e1;
   border-bottom: 1px dashed #cbd5e1;
   font-weight: bold;
-  padding: 6px 0;
+  padding: 5px 0;
   color: #475569;
 }
 
 .items-table td {
   border-bottom: 1px dashed #f1f5f9;
-  padding: 6px 0;
+  padding: 5px 0;
   color: #334155;
 }
 
@@ -287,7 +380,7 @@ const formatCurrency = (val) => {
 }
 
 .financials-summary > div {
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 
 .financials-summary .net-payable {
@@ -306,7 +399,7 @@ const formatCurrency = (val) => {
 }
 
 .signatures {
-  margin-top: 24px;
+  margin-top: 16px;
   display: flex;
   justify-content: space-between;
   font-size: 8px;
@@ -328,7 +421,7 @@ const formatCurrency = (val) => {
 
 .notice {
   text-align: center;
-  margin-top: 16px;
+  margin-top: 12px;
   font-size: 8px;
   color: #94a3b8;
   font-style: italic;
@@ -350,15 +443,14 @@ const formatCurrency = (val) => {
     size: A5 landscape;
     margin: 0;
   }
-  
 
   body * {
     visibility: hidden;
   }
-  .print-receipt-container, .print-receipt-container * {
+  .opd-print-receipt-container, .opd-print-receipt-container * {
     visibility: visible;
   }
-  .print-receipt-container {
+  .opd-print-receipt-container {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;

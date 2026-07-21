@@ -412,9 +412,11 @@ const formatCurrency = (val) => {
                 v-model.number="paymentForm.amount"
                 type="number"
                 step="0.01"
+                disabled
+                readonly
                 :min="activeBill?.balanceAmount === 0 ? 0 : 0.01"
                 :max="activeBill?.balanceAmount"
-                class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-500 text-slate-700 transition-all shadow-sm"
+                class="w-full px-3.5 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none text-slate-500 cursor-not-allowed transition-all shadow-sm select-none"
               />
             </div>
 

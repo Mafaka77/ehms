@@ -451,7 +451,9 @@ exports.addInstallment = async (appointmentId, chargeId, data, userId) => {
         const addons = await PatientChargeAddon.find({ patientChargeId: chargeId });
         const addonsTotal = addons.reduce((sum, a) => sum + (a.amount || 0), 0);
         let paidAmount = 0;
-        installments.forEach(i => paidAmount += i.amount);
+        if (Array.isArray(installments)) {
+            installments.forEach(i => { if (i && i.amount) paidAmount += i.amount });
+        }
         let balance = (charge.amount + addonsTotal) - paidAmount;
 
         if (data.amount > balance) {

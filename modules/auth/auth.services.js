@@ -34,16 +34,16 @@ exports.login = async (data, fastify) => {
         throw error
     }
     const permissions = []
-    if (user.role && user.role.permissions) {
+    if (user.role && Array.isArray(user.role.permissions)) {
         user.role.permissions.forEach((permission) => {
             if (permission && permission.code && !permissions.includes(permission.code)) {
                 permissions.push(permission.code)
             }
         })
     }
-    if (user.roles && user.roles.length > 0) {
+    if (Array.isArray(user.roles)) {
         user.roles.forEach((r) => {
-            if (r && r.permissions) {
+            if (r && Array.isArray(r.permissions)) {
                 r.permissions.forEach((permission) => {
                     if (permission && permission.code && !permissions.includes(permission.code)) {
                         permissions.push(permission.code)
