@@ -24,7 +24,17 @@ exports.createDoctor = async (data) => {
             employeeId = newEmployee._id;
         }
 
+        if (data.doctorCode && data.doctorCode.trim()) {
+            const existing = await Doctor.findOne({ doctorCode: data.doctorCode.trim() });
+            if (existing) {
+                const error = new Error(`Doctor Code '${data.doctorCode.trim()}' is already assigned to another doctor.`);
+                error.status = STATUS_CODES.BAD_REQUEST;
+                throw error;
+            }
+        }
+
         const doctorData = {
+            doctorCode: data.doctorCode && data.doctorCode.trim() ? data.doctorCode.trim() : undefined,
             fullName: data.fullName,
             gender: data.gender,
             mobileNo: data.mobileNo,
@@ -146,8 +156,17 @@ exports.getDoctorById = async (id) => {
 exports.updateDoctor = async (id, data) => {
     try {
         const updateData = { ...data };
-        delete updateData.doctorCode; // prevent overwriting the code
         delete updateData.employeeId; // prevent changing the employee link
+
+        if (updateData.doctorCode) {
+            updateData.doctorCode = updateData.doctorCode.trim();
+            const existing = await Doctor.findOne({ doctorCode: updateData.doctorCode, _id: { $ne: id } });
+            if (existing) {
+                const error = new Error(`Doctor Code '${updateData.doctorCode}' is already assigned to another doctor.`);
+                error.status = STATUS_CODES.BAD_REQUEST;
+                throw error;
+            }
+        }
 
         const doctor = await Doctor.findByIdAndUpdate(
             id,

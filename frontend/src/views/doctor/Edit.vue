@@ -80,6 +80,7 @@ const clearDesignation = () => {
 }
 
 const form = ref({
+  doctorCode: '',
   fullName: '',
   gender: '',
   mobileNo: '',
@@ -115,6 +116,7 @@ const loadData = async () => {
       if (res.success && res.data) {
         const d = res.data
         form.value = {
+          doctorCode: d.doctorCode || '',
           fullName: d.fullName || '',
           gender: d.gender || '',
           mobileNo: d.mobileNo || '',
@@ -203,6 +205,7 @@ onMounted(() => {
         <div>
           <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">Personal Details</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <BaseInput v-model="form.doctorCode" id="doctorCode" label="Doctor Code" placeholder="e.g. EH-DOC-0001" required />
             <BaseInput v-model="form.fullName" id="fullName" label="Full Name" placeholder="Dr. John Doe" required />
             <BaseInput v-model="form.email" id="email" type="email" label="Email Address" placeholder="doctor@hospital.com" required />
             <BaseInput v-model="form.mobileNo" id="mobileNo" label="Mobile Number" placeholder="e.g. 9876543210" required />

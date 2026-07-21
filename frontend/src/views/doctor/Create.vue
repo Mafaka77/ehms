@@ -79,6 +79,7 @@ const clearDesignation = () => {
 }
 
 const form = ref({
+  doctorCode: '',
   fullName: '',
   gender: '',
   mobileNo: '',
@@ -88,7 +89,6 @@ const form = ref({
   specializationId: '',
   doctorType: 'CONSULTANT',
   consultationFee: 0,
-  // Extra fields if PERMANENT
   departmentId: '',
   designationId: '',
   basicSalary: 0,
@@ -174,6 +174,7 @@ onMounted(() => {
         <div>
           <h2 class="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">Personal Details</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <BaseInput v-model="form.doctorCode" id="doctorCode" label="Doctor Code (Optional)" placeholder="Leave blank to auto-generate (e.g. EH-DOC-0001)" />
             <BaseInput v-model="form.fullName" id="fullName" label="Full Name" placeholder="Dr. John Doe" required />
             <BaseInput v-model="form.email" id="email" type="email" label="Email Address" placeholder="doctor@hospital.com" required />
             <BaseInput v-model="form.mobileNo" id="mobileNo" label="Mobile Number" placeholder="e.g. 9876543210" required />
