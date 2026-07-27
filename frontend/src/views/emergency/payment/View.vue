@@ -138,6 +138,14 @@
                 Print Bill
               </button>
               <button 
+                v-if="consultationBill.status === 'PAID'"
+                @click="cancelPaidBill(consultationBill)"
+                :disabled="loadingCancel === consultationBill._id"
+                class="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 py-2 px-3 rounded-lg font-semibold text-xs transition-all disabled:opacity-50"
+              >
+                Refund & Cancel
+              </button>
+              <button 
                 v-if="consultationBill.status !== 'PAID'"
                 @click="cancelBill(consultationBill)"
                 :disabled="loadingCancel === consultationBill._id"
@@ -249,6 +257,14 @@
                 class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2 px-4 rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5"
               >
                 Print Bill
+              </button>
+              <button 
+                v-if="dischargeBill.status === 'PAID'"
+                @click="cancelPaidBill(dischargeBill)"
+                :disabled="loadingCancel === dischargeBill._id"
+                class="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 py-2 px-3 rounded-lg font-semibold text-xs transition-all disabled:opacity-50"
+              >
+                Refund & Cancel
               </button>
               <button 
                 v-if="dischargeBill.status !== 'PAID'"
@@ -447,6 +463,38 @@ const cancelBill = async (bill) => {
     emit('bill-generated', null)
   } catch (error) {
     snackbarStore.show({ message: error.response?.data?.message || 'Failed to cancel bill', type: 'error' })
+  } finally {
+    loadingCancel.value = null
+  }
+}
+
+const cancelPaidBill = async (bill) => {
+  if (!confirm('This will refund all payments and cancel the bill. Are you sure you want to proceed?')) return
+  
+  loadingCancel.value = bill._id
+  try {
+    // 1. Cancel/Refund all successful payments
+    if (bill.payments && bill.payments.length > 0) {
+      for (const payment of bill.payments) {
+        if (payment.status === 'SUCCESS') {
+          await emergencyStore.cancelPayment(payment._id)
+        }
+      }
+    }
+    
+    // 2. Cancel the bill
+    await emergencyStore.cancelBill(bill._id)
+    snackbarStore.show({ message: 'Bill and payments refunded & cancelled successfully', type: 'success' })
+    
+    if (bill.billType === 'EMERGENCY_CONSULTATION') {
+      consultationBill.value = null
+    } else {
+      dischargeBill.value = null
+    }
+    
+    emit('bill-generated', null)
+  } catch (error) {
+    snackbarStore.show({ message: error.response?.data?.message || 'Failed to cancel paid bill', type: 'error' })
   } finally {
     loadingCancel.value = null
   }

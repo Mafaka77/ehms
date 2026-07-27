@@ -867,7 +867,7 @@ exports.createIndent = async (userId, data) => {
     }
 }
 
-exports.getIndents = async (query = {}) => {
+exports.getIndents = async (query = {}, user = {}) => {
     try {
         const page = parseInt(query.page) || 1
         const limit = parseInt(query.limit) || 10
@@ -879,6 +879,13 @@ exports.getIndents = async (query = {}) => {
         }
         if (query.search) {
             filter.indentNo = { $regex: query.search, $options: 'i' }
+        }
+
+        // Only Admin and Pharmacist roles can see all indents.
+        // All other users can only see indents they created.
+        const privilegedRoles = ['Admin', 'Pharmacist', 'SuperAdmin', 'HospitalAdmin']
+        if (!privilegedRoles.includes(user.roleName)) {
+            filter.requestedBy = user._id
         }
 
         const total = await PharmacyIndent.countDocuments(filter)

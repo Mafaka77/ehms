@@ -5,9 +5,11 @@ import Stocks from './Stocks.vue'
 import IPDOrder from './IPDOrder.vue'
 import Indent from './Indent.vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
+import { useAuthStore } from '../../../stores/authStore'
 
 const pharmacyStore = usePharmacyStore()
-const activeTab = ref('sales')
+const authStore = useAuthStore()
+const activeTab = ref(authStore.hasPermission('pharmacy.sale') ? 'sales' : 'stock')
 let pollingInterval = null
 
 const refreshPendingCount = async () => {
@@ -42,6 +44,7 @@ watch(activeTab, refreshPendingCount)
     <!-- Tab Bar -->
     <div class="border-b border-slate-100 flex items-center gap-1 select-none">
       <button 
+        v-if="authStore.hasPermission('pharmacy.sale')"
         @click="activeTab = 'sales'"
         :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none', activeTab === 'sales' ? 'border-teal-600 text-teal-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
       >
@@ -54,6 +57,7 @@ watch(activeTab, refreshPendingCount)
         Stock
       </button>
       <button 
+        v-if="authStore.hasPermission('pharmacy.sale')"
         @click="activeTab = 'orders'"
         :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none flex items-center gap-2', activeTab === 'orders' ? 'border-teal-600 text-teal-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
       >
@@ -76,9 +80,9 @@ watch(activeTab, refreshPendingCount)
 
     <!-- Tab Contents -->
     <div class="transition-all duration-300">
-      <Sales v-if="activeTab === 'sales'" />
+      <Sales v-if="activeTab === 'sales' && authStore.hasPermission('pharmacy.sale')" />
       <Stocks v-else-if="activeTab === 'stock'" />
-      <IPDOrder v-else-if="activeTab === 'orders'" />
+      <IPDOrder v-else-if="activeTab === 'orders' && authStore.hasPermission('pharmacy.sale')" />
       <Indent v-else-if="activeTab === 'indent'" />
     </div>
   </div>

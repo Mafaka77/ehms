@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useDoctorStore } from '../../../stores/doctorStore'
@@ -372,6 +372,24 @@ const submitNewIndent = async () => {
   }
   creatingIndent.value = false
 }
+
+// Returns true if the current user is allowed to edit a given indent.
+// Pharmacist role can edit any indent; others can only edit their own (if they have the permission).
+const canEditIndent = computed(() => (indent) => {
+  if (authStore.user?.roleName === 'Pharmacist') return true
+  if (!authStore.hasPermission('pharmacy.indent.update')) return false
+  const requestedById = indent.requestedBy?._id || indent.requestedBy
+  return requestedById?.toString() === authStore.user?._id?.toString()
+})
+
+// Returns true if the current user is allowed to delete a given indent.
+// Pharmacist role can delete any indent; others can only delete their own (if they have the permission).
+const canDeleteIndent = computed(() => (indent) => {
+  if (authStore.user?.roleName === 'Pharmacist') return true
+  if (!authStore.hasPermission('pharmacy.indent.delete')) return false
+  const requestedById = indent.requestedBy?._id || indent.requestedBy
+  return requestedById?.toString() === authStore.user?._id?.toString()
+})
 </script>
 
 <template>
@@ -484,6 +502,7 @@ const submitNewIndent = async () => {
                 </button>
 
                 <button 
+                  v-if="canEditIndent(indent)"
                   @click.stop="openEditModal(indent)"
                   :disabled="['COMPLETED', 'ISSUED'].includes(indent.status)"
                   class="p-2 rounded-xl text-slate-400 hover:bg-indigo-50 hover:text-indigo-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
@@ -495,6 +514,7 @@ const submitNewIndent = async () => {
                 </button>
 
                 <button 
+                  v-if="canDeleteIndent(indent)"
                   @click.stop="handleDeleteIndent(indent)"
                   :disabled="['COMPLETED', 'ISSUED'].includes(indent.status)"
                   class="p-2 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"

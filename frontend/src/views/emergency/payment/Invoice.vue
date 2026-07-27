@@ -33,43 +33,94 @@ const printingPDF = ref(false)
 
 const pdfPreviewUrl = ref(null)
 const currentFilename = ref('')
-const receiptRef = ref(null)
+const itemsRef = ref(null)   // header + items table section
+const footerRef = ref(null)  // totals + signatures + notice section
+
+// Capture a DOM element as a canvas, with the element temporarily
+// moved off-screen to avoid any parent clipping.
+const captureElement = (el) => {
+  return html2canvas(el, {
+    scale: 2,
+    useCORS: true,
+    logging: false,
+    scrollX: 0,
+    scrollY: 0,
+    windowWidth: el.scrollWidth,
+    windowHeight: el.scrollHeight,
+  })
+}
 
 const generateInvoicePDF = async () => {
   if (printingPDF.value) return
   printingPDF.value = true
-  
+
   try {
     await new Promise(resolve => setTimeout(resolve, 300))
-    
-    const element = receiptRef.value
-    if (!element) throw new Error('Receipt container not found')
-    
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      windowWidth: element.scrollWidth,
-      windowHeight: element.scrollHeight
-    })
-    
-    const imgData = canvas.toDataURL('image/jpeg', 0.98)
-    
+
+    const itemsEl = itemsRef.value
+    const footerEl = footerRef.value
+    if (!itemsEl || !footerEl) throw new Error('Receipt containers not found')
+
+    // Capture both sections independently
+    const [itemsCanvas, footerCanvas] = await Promise.all([
+      captureElement(itemsEl),
+      captureElement(footerEl),
+    ])
+
+    // A5 landscape: 210mm × 148mm
     const pdf = new jsPDF('l', 'mm', 'a5')
-    const pdfWidth = pdf.internal.pageSize.getWidth()
-    const ratio = pdfWidth / canvas.width
-    const imgHeight = canvas.height * ratio
-    
-    pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, imgHeight)
-    
+    const pdfW = pdf.internal.pageSize.getWidth()   // 210
+    const pdfH = pdf.internal.pageSize.getHeight()  // 148
+
+    // All canvases share the same horizontal scale (both are 210mm wide)
+    const ratio = pdfW / itemsCanvas.width           // mm per canvas-px
+    const pageHeightPx = pdfH / ratio                // canvas-px that fit in one page
+
+    const footerHeightPx = footerCanvas.height
+    const footerHeightMm = footerHeightPx * ratio
+
+    // ── Slice the items section across as many pages as needed ──────────────
+    const totalItemPages = Math.ceil(itemsCanvas.height / pageHeightPx)
+
+    for (let page = 0; page < totalItemPages; page++) {
+      if (page > 0) pdf.addPage('a5', 'landscape')
+
+      const srcY = Math.round(page * pageHeightPx)
+      const srcH = Math.round(Math.min(pageHeightPx, itemsCanvas.height - srcY))
+
+      const sliceCanvas = document.createElement('canvas')
+      sliceCanvas.width = itemsCanvas.width
+      sliceCanvas.height = srcH
+      sliceCanvas.getContext('2d')
+        .drawImage(itemsCanvas, 0, srcY, itemsCanvas.width, srcH, 0, 0, itemsCanvas.width, srcH)
+
+      const sliceHeightMm = srcH * ratio
+      pdf.addImage(sliceCanvas.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, pdfW, sliceHeightMm)
+    }
+
+    // ── Place the footer (totals + signatures + notice) ──────────────────────
+    // Check how much vertical space is left on the last items page.
+    const lastSliceH = Math.round(itemsCanvas.height - (totalItemPages - 1) * pageHeightPx)
+    const usedMm = lastSliceH * ratio
+    const remainingMm = pdfH - usedMm
+
+    if (footerHeightMm <= remainingMm - 2) {
+      // Footer fits on the SAME last page — place it right below the items
+      pdf.addImage(footerCanvas.toDataURL('image/jpeg', 0.98), 'JPEG', 0, usedMm, pdfW, footerHeightMm)
+    } else {
+      // Footer needs its own page
+      pdf.addPage('a5', 'landscape')
+      pdf.addImage(footerCanvas.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, pdfW, footerHeightMm)
+    }
+
     const patientName = props.visit?.patientId?.fullName?.replace(/\s+/g, '_') || 'Patient'
     const filename = `Emergency_Invoice_${patientName}.pdf`
     currentFilename.value = filename
-    
+
     const blob = pdf.output('blob')
     if (pdfPreviewUrl.value) URL.revokeObjectURL(pdfPreviewUrl.value)
     pdfPreviewUrl.value = URL.createObjectURL(blob)
-    
+
   } catch (error) {
     console.error('Error generating PDF:', error)
   } finally {
@@ -88,7 +139,6 @@ watch(() => props.show, (newVal) => {
   }
 }, { immediate: true })
 
-
 const formatDate = (dateString) => {
   if (!dateString) return '-'
   return new Date(dateString).toLocaleDateString('en-IN', {
@@ -98,6 +148,22 @@ const formatDate = (dateString) => {
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val || 0)
+}
+
+const calculateAge = (patient) => {
+  if (!patient) return 'N/A'
+  if (patient.age) return patient.age
+  if (patient.dateOfBirth) {
+    const today = new Date()
+    const birthDate = new Date(patient.dateOfBirth)
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+      age--
+    }
+    return age
+  }
+  return 'N/A'
 }
 </script>
 
@@ -125,6 +191,9 @@ const formatCurrency = (val) => {
           <div ref="receiptRef" class="emergency-print-receipt-container select-none bg-white">
             <div class="receipt-content">
 
+            <!-- Itemized Table (items section — captured separately) -->
+            <div ref="itemsRef" class="emergency-receipt-items-section">
+
             <!-- Header Brand -->
             <div class="receipt-header">
               <div class="flex items-center justify-between mb-2">
@@ -150,26 +219,18 @@ const formatCurrency = (val) => {
               <div class="text-right">
                 <p class="patient-name truncate"><strong>Patient:</strong> {{ visit.patientId?.fullName }}</p>
                 <p><strong>Code:</strong> <span class="font-mono">{{ visit.patientId?.patientCode }}</span></p>
-                <p><strong>Age/Gender:</strong> {{ visit.patientId?.age }} Yrs / {{ visit.patientId?.gender }}</p>
+                <p><strong>Age/Gender:</strong> {{ calculateAge(visit.patientId) }} Yrs / {{ visit.patientId?.gender }}</p>
                 <p><strong>Contact:</strong> {{ visit.patientId?.mobileNo }}</p>
               </div>
             </div>
 
-            <div class="doctor-section">
-              <p><strong>Consulting Doctor:</strong> Dr. {{ visit.doctorId?.fullName || 'On Duty' }}
-                <span v-if="visit.doctorId?.specializationId?.name"> &mdash; {{ visit.doctorId.specializationId.name }}</span>
-              </p>
-              <p><strong>Arrival Date/Time:</strong> {{ formatDate(visit.arrivalDateTime) }}</p>
-            </div>
-
-            <!-- Itemized Table -->
+            <!-- Items Table -->
             <table class="items-table">
               <thead>
                 <tr>
                   <th>Description</th>
                   <th class="text-right">Rate</th>
                   <th class="text-center">Qty</th>
-              
                   <th class="text-right">Net Amount</th>
                 </tr>
               </thead>
@@ -195,11 +256,15 @@ const formatCurrency = (val) => {
                   </td>
                   <td class="text-right font-mono">{{ formatCurrency(item.rate) }}</td>
                   <td class="text-center font-mono">{{ item.quantity }}</td>
-  
                   <td class="text-right font-mono font-semibold">{{ formatCurrency(item.netAmount) }}</td>
                 </tr>
               </tbody>
             </table>
+
+            </div><!-- end itemsRef -->
+
+            <!-- Footer section: totals + signatures + notice (captured separately) -->
+            <div ref="footerRef" class="emergency-receipt-footer-section">
 
             <!-- Financials Summary -->
             <div class="financials-summary">
@@ -245,6 +310,8 @@ const formatCurrency = (val) => {
               <p>This is a computer-generated invoice and does not require a physical signature.</p>
               <p class="wish">*** Thank You for Visiting ***</p>
             </div>
+
+            </div><!-- end footerRef -->
           </div>
         </div>
         </div>
@@ -278,17 +345,39 @@ const formatCurrency = (val) => {
 <style scoped>
 .emergency-print-receipt-container {
   width: 210mm;
-  height: 148mm;
-  overflow: hidden;
+  min-height: 148mm;
+  overflow: visible;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
   border: 1px dashed #cbd5e1;
   color: #0f172a;
-  padding: 24px;
+  padding: 0;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   font-family: ui-mono, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Items section — captures header + demographics + doctor + items table.
+   Width matches A5 landscape so html2canvas renders it at the right scale. */
+.emergency-receipt-items-section {
+  width: 210mm;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  color: #0f172a;
+  padding: 24px 24px 12px 24px;
+  font-family: inherit;
+}
+
+/* Footer section — captures totals, signatures, and notice.
+   Rendered as a separate canvas so it is always placed whole on the last PDF page. */
+.emergency-receipt-footer-section {
+  width: 210mm;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  color: #0f172a;
+  padding: 12px 24px 24px 24px;
+  font-family: inherit;
 }
 
 .receipt-header {
@@ -469,9 +558,8 @@ const formatCurrency = (val) => {
     left: 0 !important;
     top: 0 !important;
     width: 210mm !important;
-    height: 148mm !important;
-    overflow: hidden !important;
-    height: auto !important;
+    min-height: 148mm !important;
+    overflow: visible !important;
     margin: 0 !important;
     padding: 10mm !important;
     box-shadow: none !important;

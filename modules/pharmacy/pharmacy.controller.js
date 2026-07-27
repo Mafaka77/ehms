@@ -279,7 +279,7 @@ exports.createIndent = async (req, res) => {
 
 exports.getIndents = async (req, res) => {
     try {
-        const result = await pharmacyService.getIndents(req.query)
+        const result = await pharmacyService.getIndents(req.query, req.user)
         return res.code(STATUS_CODES.OK).send({
             success: true,
             data: result.indents,
