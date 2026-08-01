@@ -215,8 +215,8 @@ const formatDate = (dateString) => {
 
 const getPriorityColor = (priority) => {
   switch (priority) {
-    case 'STAT': return 'bg-rose-100 text-rose-800 border-rose-200'
-    case 'URGENT': return 'bg-amber-100 text-amber-800 border-amber-200'
+    case 'URGENT': return 'bg-rose-100 text-rose-800 border-rose-200'
+    case 'NORMAL': return 'bg-blue-100 text-blue-800 border-blue-200'
     default: return 'bg-slate-100 text-slate-700 border-slate-200'
   }
 }
@@ -743,7 +743,6 @@ const canDeleteIndent = computed(() => (indent) => {
               <select v-model="newIndentForm.priority" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 outline-none transition-all">
                 <option value="NORMAL">Normal</option>
                 <option value="URGENT">Urgent</option>
-                <option value="STAT">STAT (Immediate)</option>
               </select>
             </div>
           </div>

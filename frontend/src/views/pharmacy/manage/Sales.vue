@@ -32,7 +32,9 @@ const patientSearchQuery = ref('')
 const selectedPatient = ref(null)
 const customerName = ref('Customer')
 const customerPhone = ref('')
+const customerAddress = ref('')
 const remarks = ref('')
+const paymentMethod = ref('CASH')
 
 const isSaving = ref(false)
 
@@ -230,8 +232,10 @@ const handleGenerateBill = async () => {
       patientId: isWalkIn.value ? null : selectedPatient.value._id,
       customerName: isWalkIn.value ? customerName.value.trim() : null,
       customerPhone: isWalkIn.value ? customerPhone.value.trim() : null,
+      customerAddress: isWalkIn.value ? customerAddress.value.trim() : null,
       totalAmount: draftTotal.value,
       remarks: remarks.value.trim() || null,
+      paymentMethod: paymentMethod.value,
       items: draftItems.value.map(item => ({
         medicineId: item.medicineId,
         batchId: item.batchId,
@@ -274,7 +278,9 @@ const resetBillForm = () => {
   patientSearchQuery.value = ''
   customerName.value = ''
   customerPhone.value = ''
+  customerAddress.value = ''
   remarks.value = ''
+  paymentMethod.value = 'CASH'
   draftItems.value = []
   medSearchQuery.value = ''
   matchingMedicines.value = []
@@ -575,6 +581,9 @@ const formatDate = (dateStr) => {
           <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <BaseInput v-model="customerName" id="customerName" label="Customer Name *" placeholder="e.g. John Doe" required />
             <BaseInput v-model="customerPhone" id="customerPhone" label="Contact Number" placeholder="e.g. 9876543210" />
+            <div class="sm:col-span-2">
+              <BaseInput v-model="customerAddress" id="customerAddress" label="Address" placeholder="e.g. 123 Main St" />
+            </div>
           </div>
         </div>
 
@@ -739,6 +748,19 @@ const formatDate = (dateStr) => {
                 <span class="text-slate-900 font-extrabold uppercase tracking-wide">Grand Total</span>
                 <span class="font-black text-teal-700">₹{{ draftTotal.toFixed(2) }}</span>
               </div>
+            </div>
+
+            <!-- Payment Method -->
+            <div class="space-y-1.5 mb-3">
+              <label for="paymentMethod" class="block text-xs font-bold text-slate-700">Payment Method</label>
+              <select 
+                v-model="paymentMethod"
+                id="paymentMethod"
+                class="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500 transition-all shadow-sm"
+              >
+                <option value="CASH">Cash</option>
+                <option value="UPI">UPI</option>
+              </select>
             </div>
 
             <!-- Remarks Input -->

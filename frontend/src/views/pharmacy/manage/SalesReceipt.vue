@@ -20,7 +20,9 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const netPayable = computed(() => props.sale?.totalAmount || 0)
+const netPayable = computed(() => Math.round(props.sale?.totalAmount || 0))
+const totalCgst = computed(() => (props.sale?.totalAmount || 0) * 0.025)
+const totalSgst = computed(() => (props.sale?.totalAmount || 0) * 0.025)
 
 const printingPDF = ref(false)
 const pdfPreviewUrl = ref(null)
@@ -172,8 +174,6 @@ const numberToWords = (num) => {
                 <div>
                   <p><strong>Bill No:</strong> <span class="font-mono">{{ sale.saleNo }}</span></p>
                   <p><strong>Date:</strong> {{ formatDate(sale.createdAt) }}</p>
-                  <p><strong>Status:</strong> <span class="uppercase font-bold text-emerald-600">PAID</span></p>
-                  <p><strong>Payment Mode:</strong> <span class="font-mono uppercase">{{ sale.paymentMode || sale.paymentMethod || 'CASH' }}</span></p>
                 </div>
                 <div class="text-right font-sans">
                   <div v-if="sale.patientId">
@@ -184,8 +184,8 @@ const numberToWords = (num) => {
                   </div>
                   <div v-else>
                     <p class="patient-name truncate font-bold text-slate-900"><strong>Customer:</strong> {{ sale.customerName || 'Walk-in' }}</p>
+                    <p v-if="sale.customerAddress"><strong>Address:</strong> {{ sale.customerAddress }}</p>
                     <p v-if="sale.customerPhone"><strong>Contact:</strong> {{ sale.customerPhone }}</p>
-                    <p v-else>—</p>
                   </div>
                 </div>
               </div>
@@ -195,10 +195,13 @@ const numberToWords = (num) => {
                 <thead>
                   <tr>
                     <th class="text-left">Medicine Name</th>
+                    <th class="text-center">HSN</th>
                     <th class="text-center">Batch No</th>
                     <th class="text-center">Exp. Dt</th>
                     <th class="text-center">Qty</th>
                     <th class="text-right">Rate</th>
+                    <th class="text-right">CGST 2.5%</th>
+                    <th class="text-right">SGST 2.5%</th>
                     <th class="text-right">Amount</th>
                   </tr>
                 </thead>
@@ -208,10 +211,13 @@ const numberToWords = (num) => {
                       {{ item.medicineId?.medicineName }}
                       <span v-if="item.medicineId?.brandName" class="text-[8px] text-slate-500 font-normal ml-1">({{ item.medicineId.brandName }})</span>
                     </td>
+                    <td class="text-center font-mono text-[9px]">{{ item.medicineId?.hsn || '—' }}</td>
                     <td class="text-center font-mono font-bold text-[9px]">{{ item.batchId?.batchNo || '—' }}</td>
                     <td class="text-center font-mono text-[9px]">{{ formatDateShort(item.batchId?.expiryDate) }}</td>
                     <td class="text-center font-mono text-[9px]">{{ item.quantity }}</td>
                     <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.rate) }}</td>
+                    <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.amount * 0.025) }}</td>
+                    <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.amount * 0.025) }}</td>
                     <td class="text-right font-mono font-semibold text-[9px]">{{ formatCurrency(item.amount) }}</td>
                   </tr>
                 </tbody>
@@ -219,14 +225,28 @@ const numberToWords = (num) => {
 
               <!-- Financials Summary -->
               <div class="financials-summary-container flex justify-between mt-3">
-                <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%]">
-                  <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
-                  {{ numberToWords(netPayable) }}
+                <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%] flex flex-col">
+                  <div>
+                    <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
+                    {{ numberToWords(netPayable) }}
+                  </div>
+                  <div class="mt-3 not-italic text-slate-800 space-y-0.5">
+                    <p><strong>Status:</strong> <span class="uppercase font-bold text-emerald-600">PAID</span></p>
+                    <p><strong>Payment Mode:</strong> <span class="font-mono uppercase">{{ sale.paymentMode || sale.paymentMethod || 'CASH' }}</span></p>
+                  </div>
                 </div>
                 <div class="financials-summary w-48">
                   <div class="flex justify-between">
                     <span>Gross Total:</span>
-                    <span class="font-mono">{{ formatCurrency(sale.totalAmount) }}</span>
+                    <span class="font-mono">{{ formatCurrency(netPayable) }}</span>
+                  </div>
+                  <div class="flex justify-between text-slate-500">
+                    <span>CGST (2.5%):</span>
+                    <span class="font-mono">{{ formatCurrency(totalCgst) }}</span>
+                  </div>
+                  <div class="flex justify-between text-slate-500">
+                    <span>SGST (2.5%):</span>
+                    <span class="font-mono">{{ formatCurrency(totalSgst) }}</span>
                   </div>
                   <div class="flex justify-between net-payable">
                     <span>Net Payable:</span>

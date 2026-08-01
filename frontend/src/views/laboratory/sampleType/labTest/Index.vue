@@ -36,6 +36,28 @@ const fetchTests = async () => {
   }
 }
 
+const exportLabTests = async () => {
+  const allTests = await labStore.fetchAllTestsForExport(sampleTypeId)
+  if (!allTests || allTests.length === 0) {
+    snackbarStore.show({ message: 'No tests found to export', type: 'warning' })
+    return
+  }
+
+  let csvContent = "data:text/csv;charset=utf-8,"
+  csvContent += "Test Code,Test Name\n"
+  allTests.forEach(test => {
+    csvContent += `"${test.code || ''}","${test.name || ''}"\n`
+  })
+
+  const encodedUri = encodeURI(csvContent)
+  const link = document.createElement("a")
+  link.setAttribute("href", encodedUri)
+  link.setAttribute("download", `Lab_Tests_${currentSampleType.value?.name || 'Export'}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 const generateCode = (name, code) => {
   if (code) return code + '-' + Math.floor(100 + Math.random() * 900)
   
@@ -159,6 +181,15 @@ onMounted(() => {
             class="px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all focus:outline-none focus:ring-2 focus:ring-slate-100"
           >
             Back
+          </button>
+          <button 
+            @click="exportLabTests"
+            class="px-5 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 font-medium text-sm hover:bg-indigo-100 transition-all focus:outline-none flex items-center justify-center gap-2"
+          >
+            <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export
           </button>
           <button 
             @click="openAddModal"

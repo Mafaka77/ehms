@@ -86,6 +86,11 @@ new mongoose.Schema({
     default: null
   },
 
+  hsn: {
+    type: String,
+    default: null
+  },
+
   remarks: {
     type: String,
     default: null

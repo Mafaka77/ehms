@@ -431,7 +431,7 @@ exports.deleteBatch = async (id) => {
 
 exports.createSale = async (createdBy, data) => {
     try {
-        const { patientId, opdVisitId, admissionId, totalAmount, remarks, customerName, customerPhone, items } = data
+        const { patientId, opdVisitId, admissionId, totalAmount, remarks, customerName, customerPhone, customerAddress, paymentMethod, items } = data
         
         if (!items || items.length === 0) {
             const error = new Error('Sale must contain at least one item')
@@ -463,6 +463,8 @@ exports.createSale = async (createdBy, data) => {
             remarks,
             customerName: customerName || null,
             customerPhone: customerPhone || null,
+            customerAddress: customerAddress || null,
+            paymentMethod: paymentMethod || 'CASH',
             createdBy
         })
 
@@ -849,6 +851,10 @@ exports.createIndent = async (userId, data) => {
         }
         delete indentData.items
 
+        if (indentData.priority === 'URGENT') {
+            indentData.status = 'APPROVED'
+        }
+
         const indent = await PharmacyIndent.create(indentData)
         
         const indentItems = items.map(item => ({
@@ -1041,6 +1047,10 @@ exports.updateIndent = async (id, data) => {
         const items = data.items
         const updateData = { ...data }
         delete updateData.items
+
+        if (updateData.priority === 'URGENT') {
+            updateData.status = 'APPROVED'
+        }
 
         Object.assign(indent, updateData)
         await indent.save()

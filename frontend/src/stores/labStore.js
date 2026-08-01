@@ -196,6 +196,18 @@ export const useLabStore = defineStore('lab', {
         },
 
         // --- Lab Tests ---
+        async fetchAllTestsForExport(sampleTypeId) {
+            try {
+                const response = await api.get('/lab/test', {
+                    params: { page: 1, limit: 1000, sampleTypeId }
+                });
+                return response.data.data;
+            } catch (error) {
+                console.error('Error fetching tests for export:', error);
+                return [];
+            }
+        },
+
         async fetchTests(page = 1, limit = 10, search = '', sampleTypeId = '') {
             this.loading = true;
             this.error = null;   

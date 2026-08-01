@@ -26,6 +26,11 @@ new mongoose.Schema({
     default: null
   },
 
+  customerAddress: {
+    type: String,
+    default: null
+  },
+
   opdVisitId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'OpdVisit',
@@ -46,6 +51,12 @@ new mongoose.Schema({
   remarks: {
     type: String,
     default: null
+  },
+
+  paymentMethod: {
+    type: String,
+    enum: ['CASH', 'UPI'],
+    default: 'CASH'
   },
 
   createdBy: {

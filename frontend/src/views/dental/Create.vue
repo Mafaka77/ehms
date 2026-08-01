@@ -36,7 +36,8 @@ const newPatient = ref({
   fullName: '',
   mobileNo: '',
   gender: 'Male',
-  dateOfBirth: ''
+  dateOfBirth: '',
+  address: ''
 })
 const isCreatingPatient = ref(false)
 
@@ -67,9 +68,9 @@ const toggleNewPatient = () => {
   if (showNewPatientForm.value) {
     // Attempt to auto-fill if the search query looks like a phone number or name
     if (/^\d{10}$/.test(searchQuery.value)) {
-      newPatient.value.mobileNo = searchQuery.value
+      newPatient.value = { fullName: '', mobileNo: searchQuery.value, gender: 'Male', dateOfBirth: '', address: '' }
     } else {
-      newPatient.value.fullName = searchQuery.value
+      newPatient.value = { fullName: searchQuery.value, mobileNo: '', gender: 'Male', dateOfBirth: '', address: '' }
     }
   }
 }
@@ -304,6 +305,7 @@ const closeModal = () => {
               />
               <BaseInput v-model="newPatient.dateOfBirth" type="date" id="dob" label="Date of Birth" />
             </div>
+            <BaseInput v-model="newPatient.address" id="address" label="Address" placeholder="e.g. 123 Main St" />
             
             <div class="pt-4 flex justify-end">
               <button 

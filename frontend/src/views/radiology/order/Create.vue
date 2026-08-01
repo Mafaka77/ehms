@@ -140,7 +140,7 @@ const clearOpdAppointment = () => {
 
 // ── Quick Add Patient Modal ───────────────────────────────────────────────────
 const showPatientModal = ref(false)
-const newPatient = reactive({ fullName: '', mobileNo: '' })
+const newPatient = reactive({ fullName: '', mobileNo: '', dob: '', gender: 'Male', address: '' })
 const isCreatingPatient = ref(false)
 
 const openPatientModal = () => {
@@ -164,6 +164,9 @@ const createQuickPatient = async () => {
       snackbarStore.show({ message: 'Patient created successfully', type: 'success' })
       newPatient.fullName = ''
       newPatient.mobileNo = ''
+      newPatient.dob = ''
+      newPatient.gender = 'Male'
+      newPatient.address = ''
     }
   } catch (err) {
     snackbarStore.show({ message: err.response?.data?.message || 'Failed to create patient', type: 'error' })
@@ -535,6 +538,18 @@ onMounted(() => fetchAllTests())
           <form @submit.prevent="createQuickPatient" class="p-6 space-y-4">
             <BaseInput v-model="newPatient.fullName" id="newPatientName" label="Full Name" required :disabled="isCreatingPatient" />
             <BaseInput v-model="newPatient.mobileNo" id="newPatientMobile" label="Mobile Number" required :disabled="isCreatingPatient" />
+            <div class="grid grid-cols-2 gap-4">
+              <BaseInput v-model="newPatient.dob" id="newPatientDob" type="date" label="Date of Birth" :disabled="isCreatingPatient" />
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Gender</label>
+                <select v-model="newPatient.gender" id="newPatientGender" class="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:border-indigo-500 shadow-inner" :disabled="isCreatingPatient">
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+            <BaseInput v-model="newPatient.address" id="newPatientAddress" label="Address" :disabled="isCreatingPatient" />
             <div class="pt-4 flex justify-end gap-3">
               <button type="button" @click="showPatientModal = false" class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
               <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-75" :disabled="isCreatingPatient">

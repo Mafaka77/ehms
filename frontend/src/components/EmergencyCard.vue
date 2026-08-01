@@ -34,13 +34,17 @@ const patientAge = computed(() => {
       years--
     }
     
-    const lastBirthday = new Date(dob.getFullYear() + years, dob.getMonth(), dob.getDate())
-    const diffTime = Math.abs(today.getTime() - lastBirthday.getTime())
-    const diffDays = Math.floor(diffTime / (1000 * 3600 * 24))
-    
-    return years > 0 ? `${years}Y ${diffDays}D` : `${diffDays}D`
+    if (years > 0) {
+      return `${years} Yrs`
+    } else {
+      let totalMonths = (today.getFullYear() - dob.getFullYear()) * 12 + today.getMonth() - dob.getMonth()
+      if (today.getDate() < dob.getDate()) {
+        totalMonths--
+      }
+      return `${Math.max(0, totalMonths)} Months`
+    }
   }
-  return patient.value.age ? `${patient.value.age}Y` : '-'
+  return patient.value.age ? `${patient.value.age} Yrs` : '-'
 })
 </script>
 
@@ -56,56 +60,53 @@ const patientAge = computed(() => {
       </div>
 
       <!-- Details Grid -->
-      <div class="grid grid-cols-2 gap-6 mb-6 border-b-1 border-slate-800 pb-2">
+      <div class="grid grid-cols-2 gap-4 mb-4">
         
         <!-- Patient Details -->
-        <div>
-          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[11px] mb-2">Patient Details</h2>
-          <table class="w-full text-xs">
-            <tbody>
-              <tr>
-                <td class="py-1 font-semibold w-1/3">Patient Name:</td>
-                <td class="py-1 font-bold">{{ patient.fullName || '-' }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold">Patient ID:</td>
-                <td class="py-1 font-bold">{{ patient.patientCode || '-' }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold">Age / Gender:</td>
-                <td class="py-1 font-bold">{{ patientAge }} / {{ patient.gender || '-' }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold">Contact:</td>
-                <td class="py-1 font-bold">{{ patient.mobileNo || '-' }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="border border-slate-300 rounded-lg p-3 bg-slate-50/50 print:border-slate-300">
+          <h2 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2 pb-1 border-b border-slate-200 print:text-slate-800 print:border-slate-300">Patient Details</h2>
+          <div class="grid grid-cols-2 gap-y-2 gap-x-3">
+            <div>
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Patient Name</p>
+              <p class="font-bold text-xs text-slate-900">{{ patient.fullName || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Patient ID</p>
+              <p class="font-bold text-xs text-slate-900">{{ patient.patientCode || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Age / Gender</p>
+              <p class="font-bold text-xs text-slate-900">{{ patientAge }} / {{ patient.gender || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Contact</p>
+              <p class="font-bold text-xs text-slate-900">{{ patient.mobileNo || '-' }}</p>
+            </div>
+            <div class="col-span-2">
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Address</p>
+              <p class="font-bold text-xs text-slate-900">{{ patient.address || '-' }}</p>
+            </div>
+          </div>
         </div>
 
         <!-- Visit Details -->
-        <div>
-          <h2 class="font-bold text-slate-500 uppercase tracking-wider text-[11px] mb-2">Visit Details</h2>
-          <table class="w-full text-xs">
-            <tbody>
-              <tr>
-                <td class="py-1 font-semibold w-1/3">Visit No:</td>
-                <td class="py-1 font-bold">{{ visit.visitNo || '-' }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold">Date:</td>
-                <td class="py-1 font-bold">{{ formatDate(visit.arrivalDateTime) }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold">Doctor:</td>
-                <td class="py-1 font-bold">{{ doctor.fullName || '-' }}</td>
-              </tr>
-              <tr>
-                <td class="py-1 font-semibold"></td>
-                <td class="py-1 font-bold">{{ doctor.qualification || '-' }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="border border-slate-300 rounded-lg p-3 bg-slate-50/50 print:border-slate-300">
+          <h2 class="font-bold text-slate-800 uppercase tracking-wider text-[11px] mb-2 pb-1 border-b border-slate-200 print:text-slate-800 print:border-slate-300">Visit Details</h2>
+          <div class="grid grid-cols-2 gap-y-2 gap-x-3">
+            <div>
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Visit No</p>
+              <p class="font-bold text-xs text-slate-900">{{ visit.visitNo || '-' }}</p>
+            </div>
+            <div>
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Date</p>
+              <p class="font-bold text-xs text-slate-900">{{ formatDate(visit.arrivalDateTime) }}</p>
+            </div>
+            <div class="col-span-2">
+              <p class="text-[9px] text-slate-500 uppercase font-semibold">Doctor</p>
+              <p class="font-bold text-xs text-slate-900">{{ doctor.fullName || '-' }}</p>
+              <p class="text-[10px] text-slate-600 mt-0.5 font-medium">{{ doctor.qualification || '-' }}</p>
+            </div>
+          </div>
         </div>
       </div>
 

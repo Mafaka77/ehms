@@ -66,7 +66,7 @@ exports.getAppointments = async (query) => {
         }
 
         const appointments = await OpdAppointment.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth address')
             .populate({
                 path: 'doctorId',
                 select: 'fullName qualification',
@@ -132,7 +132,7 @@ exports.createAppointment = async (data) => {
         
         // Populate patient and doctor details so the frontend has them immediately for the OPD Card
         const populatedAppointment = await OpdAppointment.findById(appointment._id)
-            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth address')
             .populate({
                 path: 'doctorId',
                 select: 'fullName qualification',
@@ -165,7 +165,7 @@ exports.deleteAppointment = async (id) => {
 exports.getAppointmentById = async (id) => {
     try {
         const appointment = await OpdAppointment.findById(id)
-            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth address')
             .populate({
                 path: 'doctorId',
                 select: 'fullName qualification',
@@ -218,7 +218,7 @@ exports.getAppointmentsReport = async (query) => {
 
         // Fetch appointments
         const appointments = await OpdAppointment.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth address')
             .populate({
                 path: 'doctorId',
                 select: 'fullName qualification',

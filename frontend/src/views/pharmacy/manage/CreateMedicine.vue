@@ -33,6 +33,7 @@ const form = reactive({
   unit: 'TAB',
   reorderLevel: 10,
   manufacturer: '',
+  hsn: '',
   remarks: '',
   isActive: true
 })
@@ -70,6 +71,7 @@ watch(() => props.show, (newVal) => {
       form.unit = props.medicine.unit || 'TAB'
       form.reorderLevel = props.medicine.reorderLevel || 10
       form.manufacturer = props.medicine.manufacturer || ''
+      form.hsn = props.medicine.hsn || ''
       form.remarks = props.medicine.remarks || ''
       form.isActive = props.medicine.isActive !== undefined ? props.medicine.isActive : true
     } else {
@@ -84,6 +86,7 @@ watch(() => props.show, (newVal) => {
       form.unit = 'TAB'
       form.reorderLevel = 10
       form.manufacturer = ''
+      form.hsn = ''
       form.remarks = ''
       form.isActive = true
     }
@@ -326,8 +329,8 @@ const handleSubmit = async () => {
               />
             </div>
 
-            <!-- Row 5: Manufacturer and Remarks -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <!-- Row 5: Manufacturer, HSN, and Remarks -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <BaseInput 
                 v-model="form.manufacturer"
                 id="manufacturer"
@@ -336,10 +339,17 @@ const handleSubmit = async () => {
                 :disabled="loading"
               />
               <BaseInput 
+                v-model="form.hsn"
+                id="hsn"
+                label="HSN Code"
+                placeholder="e.g. 3004"
+                :disabled="loading"
+              />
+              <BaseInput 
                 v-model="form.remarks"
                 id="remarks"
                 label="Remarks"
-                placeholder="Any special storage instructions, etc."
+                placeholder="Special storage instructions..."
                 :disabled="loading"
               />
             </div>

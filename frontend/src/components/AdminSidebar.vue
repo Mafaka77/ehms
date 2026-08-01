@@ -240,10 +240,8 @@ const handleLogout = () => {
   >
     <!-- Logo -->
     <div class="h-20 flex items-center border-b border-white/10 bg-slate-950/50 shrink-0" :class="collapsed ? 'justify-center px-0' : 'px-8'">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
-        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
-        </svg>
+      <div class="w-8 h-8 flex items-center justify-center shrink-0">
+        <img src="../assets/logo_final.png" alt="EHMS Logo" class="w-full h-full object-contain" />
       </div>
       <transition name="label-fade">
         <span v-if="!collapsed" class="ml-3 text-lg font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-200 to-white whitespace-nowrap">EHMS</span>
