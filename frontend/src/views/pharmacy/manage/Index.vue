@@ -9,7 +9,7 @@ import { useAuthStore } from '../../../stores/authStore'
 
 const pharmacyStore = usePharmacyStore()
 const authStore = useAuthStore()
-const activeTab = ref(authStore.hasPermission('pharmacy.sale') ? 'sales' : (['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist'].includes(authStore.user?.roleName || authStore.user?.role?.name) ? 'stock' : 'indent'))
+const activeTab = ref(authStore.hasPermission('pharmacy.sale') ? 'sales' : (['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist','PharmacyManager'].includes(authStore.user?.roleName || authStore.user?.role?.name) ? 'stock' : 'indent'))
 let pollingInterval = null
 
 const refreshPendingCount = async () => {
@@ -51,7 +51,7 @@ watch(activeTab, refreshPendingCount)
         Sales
       </button>
       <button 
-        v-if="['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist'].includes(authStore.user?.roleName || authStore.user?.role?.name)"
+        v-if="['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist','PharmacyManager'].includes(authStore.user?.roleName || authStore.user?.role?.name)"
         @click="activeTab = 'stock'"
         :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none', activeTab === 'stock' ? 'border-teal-600 text-teal-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
       >
@@ -82,7 +82,7 @@ watch(activeTab, refreshPendingCount)
     <!-- Tab Contents -->
     <div class="transition-all duration-300">
       <Sales v-if="activeTab === 'sales' && authStore.hasPermission('pharmacy.sale')" />
-      <Stocks v-else-if="activeTab === 'stock' && ['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist'].includes(authStore.user?.roleName || authStore.user?.role?.name)" />
+      <Stocks v-else-if="activeTab === 'stock' && ['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist','PharmacyManager'].includes(authStore.user?.roleName || authStore.user?.role?.name)" />
       <IPDOrder v-else-if="activeTab === 'orders' && authStore.hasPermission('pharmacy.sale')" />
       <Indent v-else-if="activeTab === 'indent'" />
     </div>
