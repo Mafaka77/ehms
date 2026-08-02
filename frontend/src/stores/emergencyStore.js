@@ -77,6 +77,23 @@ export const useEmergencyStore = defineStore('emergency', {
                 this.loading = false;
             }
         },
+        async updateVisit(id, data) {
+            this.loading = true;
+            try {
+                const response = await api.put(`/emergency/visits/${id}`, data);
+                const index = this.visits.findIndex(v => v._id === id);
+                if (index !== -1) {
+                    this.visits[index] = response.data.data;
+                }
+                return { success: true, data: response.data.data, message: 'Emergency visit updated successfully' };
+            } catch (error) {
+                console.error('Error updating emergency visit:', error);
+                this.error = error.response?.data?.message || 'Failed to update emergency visit';
+                return { success: false, message: this.error };
+            } finally {
+                this.loading = false;
+            }
+        },
         async getVisitById(id) {
             this.loading = true;
             try {

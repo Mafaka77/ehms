@@ -8,5 +8,6 @@ module.exports = async function (fastify, opts) {
     fastify.get('/opd/appointments/report', { onRequest: [auth] }, opdController.getAppointmentsReport);
     fastify.get('/opd/appointments/:id', { onRequest: [auth] }, opdController.getAppointmentById);
     fastify.post('/opd/appointments', { onRequest: [auth] }, opdController.createAppointment);
+    fastify.put('/opd/appointments/:id', { onRequest: [auth] }, opdController.updateAppointment);
     fastify.delete('/opd/appointments/:id', { onRequest: [auth] }, opdController.deleteAppointment);
 }

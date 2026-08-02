@@ -161,8 +161,10 @@ const numberToWords = (num) => {
                 <div class="flex items-center justify-between mb-2">
                   <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
                   <div class="text-right">
-                     <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
-                      <p>Phone: 0389-2913340 / 8974326872</p>
+                    <p class="text-2xl font-bold">EMMANUEL HOSPITAL PHARMACY (General Retail)</p>
+                    <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                    <p>Phone: 0389-2913340 / 8974326872, GSTIN: 15CDTPN0612H1ZK</p>
+                    <p>Licence No: 01/01/26/2003 (20) & 01/01/26/2004 (21)</p>
                   </div>
                 </div>
                 <hr class="receipt-divider" />

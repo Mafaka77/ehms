@@ -51,22 +51,13 @@ watch(() => props.appointment, (newAppt) => {
 }, { immediate: true })
 
 const showDiscount = ref(false)
-const discountMode = ref('employee') // 'employee', 'percentage', 'amount'
-const discountInputVal = ref(20) // percentage or flat amount value
+const discountMode = ref('free') // 'free', 'doctor'
 const discountRemarks = ref('')
 
 // Compute final discount amount
 const discountAmount = computed(() => {
   if (!showDiscount.value) return 0
-  const gross = props.appointment.consultationFee || 0
-  if (discountMode.value === 'employee') {
-    return Number((gross * 0.20).toFixed(2)) // 20% default employee discount
-  } else if (discountMode.value === 'percentage') {
-    const pct = Number(discountInputVal.value) || 0
-    return Number((gross * (pct / 100)).toFixed(2))
-  } else {
-    return Number(discountInputVal.value) || 0
-  }
+  return props.appointment.consultationFee || 0
 })
 
 // Compute net total amount
@@ -74,67 +65,54 @@ const netAmount = computed(() => {
   return Math.max(0, (props.appointment.consultationFee || 0) - discountAmount.value)
 })
 
-const employeeSearchQuery = ref('')
-const isSearchingEmployees = ref(false)
-const employeeSearchResults = ref([])
-const selectedEmployee = ref(null)
+const doctorSearchQuery = ref('')
+const isSearchingDoctors = ref(false)
+const doctorSearchResults = ref([])
+const selectedDoctor = ref(null)
 
-const searchEmployees = async () => {
-  if (employeeSearchQuery.value.length < 2) {
-    employeeSearchResults.value = []
+const searchDoctors = async () => {
+  if (doctorSearchQuery.value.length < 2) {
+    doctorSearchResults.value = []
     return
   }
-  isSearchingEmployees.value = true
+  isSearchingDoctors.value = true
   try {
-    const res = await api.get('/employees', { params: { search: employeeSearchQuery.value, limit: 10 } })
-    employeeSearchResults.value = res.data.data
+    const res = await api.get('/doctors', { params: { search: doctorSearchQuery.value, limit: 10 } })
+    doctorSearchResults.value = res.data.data
   } catch (err) {
-    console.error('Error searching employees:', err)
+    console.error('Error searching doctors:', err)
   } finally {
-    isSearchingEmployees.value = false
+    isSearchingDoctors.value = false
   }
 }
 
-let employeeSearchTimeout = null
-watch(employeeSearchQuery, () => {
-  if (employeeSearchTimeout) clearTimeout(employeeSearchTimeout)
-  if (selectedEmployee.value && employeeSearchQuery.value === selectedEmployee.value.fullName) return
+let doctorSearchTimeout = null
+watch(doctorSearchQuery, () => {
+  if (doctorSearchTimeout) clearTimeout(doctorSearchTimeout)
+  if (selectedDoctor.value && doctorSearchQuery.value === selectedDoctor.value.fullName) return
   
-  employeeSearchTimeout = setTimeout(() => {
-    searchEmployees()
+  doctorSearchTimeout = setTimeout(() => {
+    searchDoctors()
   }, 400)
 })
 
-const selectEmployee = (emp) => {
-  selectedEmployee.value = emp
-  employeeSearchQuery.value = emp.fullName
-  employeeSearchResults.value = []
+const selectDoctor = (doc) => {
+  selectedDoctor.value = doc
+  doctorSearchQuery.value = doc.fullName
+  doctorSearchResults.value = []
 }
 
-const clearEmployee = () => {
-  selectedEmployee.value = null
-  employeeSearchQuery.value = ''
+const clearDoctor = () => {
+  selectedDoctor.value = null
+  doctorSearchQuery.value = ''
 }
 
 // Reset/Auto-detect discount when appointment changes
-watch(() => props.appointment, (newAppt) => {
-  if (newAppt && !newAppt.billId && newAppt.patientId?.isEmployee) {
-    showDiscount.value = true
-    discountMode.value = 'employee'
-    discountInputVal.value = 20
-    selectedEmployee.value = {
-      _id: newAppt.patientId.employeeId,
-      fullName: newAppt.patientId.fullName,
-      employeeCode: newAppt.patientId.employeeCode
-    }
-    employeeSearchQuery.value = newAppt.patientId.fullName
-  } else {
-    showDiscount.value = false
-    discountMode.value = 'employee'
-    discountInputVal.value = 20
-    selectedEmployee.value = null
-    employeeSearchQuery.value = ''
-  }
+watch(() => props.appointment, () => {
+  showDiscount.value = false
+  discountMode.value = 'free'
+  selectedDoctor.value = null
+  doctorSearchQuery.value = ''
   discountRemarks.value = ''
 })
 
@@ -144,12 +122,13 @@ const generateBill = async () => {
     const payload = {
       opdAppointmentId: props.appointment._id,
       discountAmount: discountAmount.value,
-      discountType: showDiscount.value ? (discountMode.value === 'employee' ? 'EMPLOYEE' : (discountMode.value === 'percentage' ? 'PERCENTAGE' : 'AMOUNT')) : 'CUSTOM',
-      discountRemarks: showDiscount.value ? discountRemarks.value : ''
+      discountType: showDiscount.value ? (discountMode.value === 'free' ? 'Free Clinic' : 'Doctor Discount') : 'Free Clinic',
+      discountRemarks: showDiscount.value ? (discountRemarks.value || (discountMode.value === 'free' ? 'Free Clinic 100%' : `Doctor Discount` + (selectedDoctor.value ? ` - Dr. ${selectedDoctor.value.fullName}` : ''))) : ''
     }
-    if (showDiscount.value && discountMode.value === 'employee' && selectedEmployee.value) {
-      payload.employeeId = selectedEmployee.value._id
+    if (showDiscount.value && discountMode.value === 'doctor' && selectedDoctor.value) {
+      payload.doctorId = selectedDoctor.value._id
     }
+
     const data = await opdStore.generateBill(payload)
     snackbarStore.show({
       message: 'Bill generated successfully',
@@ -322,7 +301,7 @@ const getPaymentStatusColor = (status) => {
       </div>
 
       <!-- Discount Configuration (Only if bill not generated yet) -->
-      <div v-if="false && !appointment.billId && appointment.paymentStatus === 'Unpaid'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
+      <div v-if="!appointment.billId && appointment.paymentStatus === 'Unpaid'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 uppercase select-none">
             <input type="checkbox" v-model="showDiscount" class="text-indigo-600 focus:ring-indigo-500 rounded border-slate-300">
@@ -340,56 +319,43 @@ const getPaymentStatusColor = (status) => {
               v-model="discountMode"
               class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
             >
-              <option value="employee">Employee Discount (20%)</option>
-              <option value="percentage">Custom Percentage (%)</option>
-              <option value="amount">Custom Flat Amount (₹)</option>
+              <option value="free">Free Clinic (100%)</option>
+              <option value="doctor">Doctor Discount</option>
             </select>
           </div>
 
-          <div v-if="discountMode !== 'employee'" class="col-span-2 sm:col-span-1">
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-              {{ discountMode === 'percentage' ? 'Percentage (%)' : 'Amount (INR)' }}
-            </label>
-            <input 
-              v-model.number="discountInputVal"
-              type="number"
-              min="0"
-              class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 font-mono"
-            />
-          </div>
-
-          <!-- Employee Search Select -->
-          <div v-else class="col-span-2 sm:col-span-1 relative">
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Search Employee <span class="text-rose-500">*</span></label>
+          <!-- Doctor Search Select -->
+          <div v-if="discountMode === 'doctor'" class="col-span-2 sm:col-span-1 relative">
+            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Search Doctor <span class="text-rose-500">*</span></label>
             
-            <div v-if="selectedEmployee" class="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div v-if="selectedDoctor" class="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
               <div class="flex flex-col overflow-hidden w-full">
-                <span class="text-xs font-bold text-indigo-900 truncate">{{ selectedEmployee.fullName }}</span>
-                <span class="text-[9px] text-indigo-700 font-mono truncate">{{ selectedEmployee.employeeCode }}</span>
+                <span class="text-xs font-bold text-indigo-900 truncate">{{ selectedDoctor.fullName }}</span>
+                <span class="text-[9px] text-indigo-700 font-mono truncate">{{ selectedDoctor.doctorCode }}</span>
               </div>
-              <button type="button" @click="clearEmployee" class="text-indigo-400 hover:text-indigo-600 focus:outline-none ml-2">
+              <button type="button" @click="clearDoctor" class="text-indigo-400 hover:text-indigo-600 focus:outline-none ml-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
             
             <div v-else>
               <input 
-                v-model="employeeSearchQuery"
+                v-model="doctorSearchQuery"
                 type="text" 
-                placeholder="Name or employee code..." 
+                placeholder="Name or doctor code..." 
                 class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
               <!-- Dropdown Results -->
-              <div v-if="employeeSearchResults.length > 0" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              <div v-if="doctorSearchResults.length > 0" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 <ul class="py-0.5 divide-y divide-slate-50">
                   <li 
-                    v-for="emp in employeeSearchResults" 
-                    :key="emp._id"
-                    @click="selectEmployee(emp)"
+                    v-for="doc in doctorSearchResults" 
+                    :key="doc._id"
+                    @click="selectDoctor(doc)"
                     class="px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer flex flex-col"
                   >
-                    <span class="text-xs font-semibold text-slate-800">{{ emp.fullName }}</span>
-                    <span class="text-[10px] text-slate-500 font-mono">{{ emp.employeeCode }}</span>
+                    <span class="text-xs font-semibold text-slate-800">{{ doc.fullName }}</span>
+                    <span class="text-[10px] text-slate-500 font-mono">{{ doc.doctorCode }}</span>
                   </li>
                 </ul>
               </div>
@@ -402,7 +368,7 @@ const getPaymentStatusColor = (status) => {
             <input 
               v-model="discountRemarks"
               type="text"
-              placeholder="e.g. Hospital staff benefit, Special management approval..."
+              placeholder="e.g. Free clinic scheme, Doctor recommendation..."
               class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 placeholder-slate-400"
             />
           </div>
@@ -546,7 +512,7 @@ const getPaymentStatusColor = (status) => {
       <button
         v-if="!appointment.billId && appointment.paymentStatus === 'Unpaid'"
         @click="generateBill"
-        :disabled="loadingBill || (showDiscount && discountMode === 'employee' && !selectedEmployee)"
+        :disabled="loadingBill || (showDiscount && discountMode === 'doctor' && !selectedDoctor)"
         class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-5 rounded-xl font-semibold text-sm shadow-lg shadow-indigo-100 hover:shadow-indigo-200 transition-all transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <span v-if="loadingBill" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>

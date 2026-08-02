@@ -157,6 +157,23 @@ export const useDentalStore = defineStore('dental', {
                 this.loading = false;
             }
         },
+        async updateAppointment(id, data) {
+            this.loading = true;
+            try {
+                const response = await api.put(`/dental/appointments/${id}`, data);
+                const index = this.appointments.findIndex(app => app._id === id);
+                if (index !== -1) {
+                    this.appointments[index] = response.data.data;
+                }
+                return { success: true, data: response.data.data, message: 'Appointment updated successfully' };
+            } catch (error) {
+                console.error('Error updating appointment:', error);
+                this.error = error.response?.data?.message || 'Failed to update appointment';
+                return { success: false, message: this.error };
+            } finally {
+                this.loading = false;
+            }
+        },
         async updateAppointmentStatus(id, status) {
             this.loading = true;
             try {

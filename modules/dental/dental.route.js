@@ -8,6 +8,7 @@ module.exports = async function (fastify, opts) {
     fastify.get('/dental/appointments/report', { onRequest: [auth] }, dentalController.getAppointmentsReport);
     fastify.get('/dental/appointments/:id', { onRequest: [auth] }, dentalController.getAppointmentById);
     fastify.post('/dental/appointments', { onRequest: [auth] }, dentalController.createAppointment);
+    fastify.put('/dental/appointments/:id', { onRequest: [auth] }, dentalController.updateAppointment);
     fastify.delete('/dental/appointments/:id', { onRequest: [auth] }, dentalController.deleteAppointment);
     fastify.post('/dental/appointments/:id/charges', { onRequest: [auth] }, dentalController.addPatientCharge);
     fastify.get('/dental/appointments/:id/charges', { onRequest: [auth] }, dentalController.getPatientCharges);

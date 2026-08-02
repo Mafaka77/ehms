@@ -14,29 +14,36 @@ const Employee = require('../hr/employee.model')
 const STATUS_CODES = require('../../utils/statuscode')
 
 // ---------------------------------------------------------------------------
-// Helper: resolve employee for discount
+// Helper: resolve doctor for discount
 // ---------------------------------------------------------------------------
-async function resolveDiscountEmployee(patientId, employeeId, session) {
-    if (employeeId) return employeeId
+async function resolveDiscountDoctor(patientId, doctorIdOrEmployeeId, session) {
+    if (doctorIdOrEmployeeId) {
+        const doc = await mongoose.model('Doctor').findById(doctorIdOrEmployeeId).session(session)
+        if (doc) return doc._id
+
+        const linkedDoc = await mongoose.model('Doctor').findOne({ employeeId: doctorIdOrEmployeeId }).session(session)
+        if (linkedDoc) return linkedDoc._id
+
+        return null
+    }
 
     const patient = await mongoose.model('Patient').findById(patientId).session(session)
     if (!patient) return null
 
     const mobileStr = patient.mobileNo ? String(patient.mobileNo).replace(/\D/g, '') : ''
-    const phoneNum = Number(mobileStr)
     const query = []
-    if (mobileStr && !isNaN(phoneNum)) query.push({ mobile: phoneNum })
+    if (mobileStr) query.push({ mobileNo: mobileStr })
     if (patient.email) query.push({ email: patient.email })
     if (query.length === 0) return null
 
-    const emp = await Employee.findOne({ $or: query, isActive: true }).session(session)
-    return emp ? emp._id : null
+    const doc = await mongoose.model('Doctor').findOne({ $or: query, isActive: true }).session(session)
+    return doc ? doc._id : null
 }
 
 // ---------------------------------------------------------------------------
 // generateBillFromLabOrder
 // ---------------------------------------------------------------------------
-exports.generateBillFromLabOrder = async (labOrderId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+exports.generateBillFromLabOrder = async (labOrderId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
@@ -110,17 +117,17 @@ exports.generateBillFromLabOrder = async (labOrderId, userId, discountAmount = 0
 
         // 7. Create Discount record if discount is applied
         if (discountAmount > 0) {
-            const resolvedEmployeeId = await resolveDiscountEmployee(order.patientId, employeeId, session)
+            const resolvedDoctorId = await resolveDiscountDoctor(order.patientId, doctorId, session)
             await Discount.create([{
                 billId: bill._id,
                 patientId: order.patientId,
-                employeeId: resolvedEmployeeId,
-                discountType: discountType || 'CUSTOM',
+                doctorId: resolvedDoctorId,
+                discountType,
                 originalAmount: grossAmount,
                 discountAmount,
                 netAmount,
                 appliedBy: userId,
-                remarks: discountRemarks || 'Discount applied during bill generation'
+                remarks: discountRemarks
             }], { session })
         }
 
@@ -137,7 +144,7 @@ exports.generateBillFromLabOrder = async (labOrderId, userId, discountAmount = 0
 // ---------------------------------------------------------------------------
 // generateBillFromRadiologyOrder
 // ---------------------------------------------------------------------------
-exports.generateBillFromRadiologyOrder = async (radiologyOrderId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+exports.generateBillFromRadiologyOrder = async (radiologyOrderId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
@@ -213,17 +220,17 @@ exports.generateBillFromRadiologyOrder = async (radiologyOrderId, userId, discou
 
         // 7. Create Discount record if discount is applied
         if (discountAmount > 0) {
-            const resolvedEmployeeId = await resolveDiscountEmployee(order.patientId, employeeId, session)
+            const resolvedDoctorId = await resolveDiscountDoctor(order.patientId, doctorId, session)
             await Discount.create([{
                 billId: bill._id,
                 patientId: order.patientId,
-                employeeId: resolvedEmployeeId,
-                discountType: discountType || 'CUSTOM',
+                doctorId: resolvedDoctorId,
+                discountType,
                 originalAmount: grossAmount,
                 discountAmount,
                 netAmount,
                 appliedBy: userId,
-                remarks: discountRemarks || 'Discount applied during bill generation'
+                remarks: discountRemarks
             }], { session })
         }
 
@@ -240,7 +247,7 @@ exports.generateBillFromRadiologyOrder = async (radiologyOrderId, userId, discou
 // ---------------------------------------------------------------------------
 // generateBillFromOpdAppointment
 // ---------------------------------------------------------------------------
-exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
@@ -302,17 +309,17 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
 
         // 6. Create Discount record if discount is applied
         if (discountAmount > 0) {
-            const resolvedEmployeeId = await resolveDiscountEmployee(appointment.patientId, employeeId, session)
+            const resolvedDoctorId = await resolveDiscountDoctor(appointment.patientId, doctorId, session)
             await Discount.create([{
                 billId: bill._id,
                 patientId: appointment.patientId,
-                employeeId: resolvedEmployeeId,
-                discountType: discountType || 'CUSTOM',
+                doctorId: resolvedDoctorId,
+                discountType,
                 originalAmount: grossAmount,
                 discountAmount,
                 netAmount,
                 appliedBy: userId,
-                remarks: discountRemarks || 'Discount applied during bill generation'
+                remarks: discountRemarks
             }], { session })
         }
 
@@ -329,7 +336,7 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
 // ---------------------------------------------------------------------------
 // generateBillFromEmergencyVisit
 // ---------------------------------------------------------------------------
-exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
@@ -403,17 +410,17 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
 
         // 6. Create Discount record if discount is applied
         if (discountAmount > 0) {
-            const resolvedEmployeeId = await resolveDiscountEmployee(visit.patientId, employeeId, session)
+            const resolvedDoctorId = await resolveDiscountDoctor(visit.patientId, doctorId, session)
             await Discount.create([{
                 billId: bill._id,
                 patientId: visit.patientId,
-                employeeId: resolvedEmployeeId,
-                discountType: discountType || 'CUSTOM',
+                doctorId: resolvedDoctorId,
+                discountType,
                 originalAmount: grossAmount,
                 discountAmount,
                 netAmount,
                 appliedBy: userId,
-                remarks: discountRemarks || 'Discount applied during bill generation'
+                remarks: discountRemarks
             }], { session })
         }
 
@@ -430,7 +437,7 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
 // ---------------------------------------------------------------------------
 // generateBillFromEmergencyCharges
 // ---------------------------------------------------------------------------
-exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
@@ -518,17 +525,17 @@ exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, disc
 
         // 6. Create Discount record if discount is applied
         if (discountAmount > 0) {
-            const resolvedEmployeeId = await resolveDiscountEmployee(visit.patientId, employeeId, session)
+            const resolvedDoctorId = await resolveDiscountDoctor(visit.patientId, doctorId, session)
             await Discount.create([{
                 billId: bill._id,
                 patientId: visit.patientId,
-                employeeId: resolvedEmployeeId,
-                discountType: discountType || 'CUSTOM',
+                doctorId: resolvedDoctorId,
+                discountType,
                 originalAmount: grossAmount,
                 discountAmount,
                 netAmount,
                 appliedBy: userId,
-                remarks: discountRemarks || 'Discount applied during bill generation'
+                remarks: discountRemarks
             }], { session })
         }
 
@@ -545,7 +552,7 @@ exports.generateBillFromEmergencyCharges = async (emergencyVisitId, userId, disc
 // ---------------------------------------------------------------------------
 // generateBillFromDentalConsultation
 // ---------------------------------------------------------------------------
-exports.generateBillFromDentalConsultation = async (dentalAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null) => {
+exports.generateBillFromDentalConsultation = async (dentalAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
@@ -595,15 +602,17 @@ exports.generateBillFromDentalConsultation = async (dentalAppointmentId, userId,
         }], { session })
 
         if (discountAmount > 0) {
+            const resolvedDoctorId = await resolveDiscountDoctor(appointment.patientId, doctorId, session)
             await Discount.create([{
                 billId: bill._id,
+                patientId: appointment.patientId,
                 discountType,
-                employeeId,
+                doctorId: resolvedDoctorId,
                 originalAmount: grossAmount,
                 discountAmount,
                 netAmount,
                 appliedBy: userId,
-                remarks: discountRemarks || 'Discount applied during bill generation'
+                remarks: discountRemarks
             }], { session })
         }
 
@@ -620,7 +629,7 @@ exports.generateBillFromDentalConsultation = async (dentalAppointmentId, userId,
 // ---------------------------------------------------------------------------
 // generateBillFromDentalAppointment
 
-exports.generateBillFromDentalAppointment = async (dentalAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, employeeId = null, specificChargeId = null) => {
+exports.generateBillFromDentalAppointment = async (dentalAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null, specificChargeId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
     try {
@@ -712,16 +721,17 @@ exports.generateBillFromDentalAppointment = async (dentalAppointmentId, userId, 
 
         // 8. Handle Discount Model
         if (discountAmount > 0) {
-            const resolvedEmployeeId = await resolveDiscountEmployee(appointment.patientId, employeeId, session)
+            const resolvedDoctorId = await resolveDiscountDoctor(appointment.patientId, doctorId, session)
             await Discount.create([{
                 billId: bill._id,
                 patientId: appointment.patientId,
                 discountType,
+                doctorId: resolvedDoctorId,
                 originalAmount: grossAmount,
                 discountAmount,
                 netAmount,
                 appliedBy: userId,
-                remarks: discountRemarks || 'Discount applied during bill generation'
+                remarks: discountRemarks
             }], { session })
         }
 

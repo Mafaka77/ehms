@@ -65,6 +65,22 @@ exports.deleteEmergencyVisit = async (req, res) => {
     }
 }
 
+exports.updateEmergencyVisit = async (req, res) => {
+    try {
+        const visit = await emergencyService.updateEmergencyVisit(req.params.id, req.body);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Emergency visit updated successfully',
+            data: visit,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
 exports.dischargeEmergencyVisit = async (req, res) => {
     try {
         const visit = await emergencyService.dischargeEmergencyVisit(req.params.id);

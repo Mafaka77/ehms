@@ -135,6 +135,46 @@ exports.deleteEmergencyVisit = async (id) => {
     }
 }
 
+exports.updateEmergencyVisit = async (id, data) => {
+    try {
+        const visit = await EmergencyVisit.findById(id);
+        if (!visit) {
+            const error = new Error('Emergency visit not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        if (data.doctorId) visit.doctorId = data.doctorId;
+        if (data.arrivalDateTime) visit.arrivalDateTime = data.arrivalDateTime;
+        if (data.chiefComplaint !== undefined) visit.chiefComplaint = data.chiefComplaint;
+        if (data.priority) visit.priority = data.priority;
+        if (data.visitStatus) visit.visitStatus = data.visitStatus;
+
+        await visit.save();
+
+        if (data.patientName && visit.patientId) {
+            await mongoose.model('Patient').findByIdAndUpdate(visit.patientId, {
+                fullName: data.patientName
+            });
+        }
+
+        const populatedVisit = await EmergencyVisit.findById(visit._id)
+            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth address')
+            .populate({
+                path: 'doctorId',
+                select: 'fullName',
+                populate: {
+                    path: 'specializationId',
+                    select: 'name'
+                }
+            });
+
+        return populatedVisit;
+    } catch (error) {
+        throw error;
+    }
+}
+
 exports.dischargeEmergencyVisit = async (id) => {
     try {
         const visit = await EmergencyVisit.findById(id);

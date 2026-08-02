@@ -15,7 +15,7 @@ const discountSchema = new mongoose.Schema({
   },
   discountType: {
     type: String,
-    enum: ['EMPLOYEE', 'PERCENTAGE', 'AMOUNT', 'CUSTOM'],
+    enum: ['Free Clinic','Doctor Discount'],
     required: true
   },
   originalAmount: {
@@ -35,9 +35,9 @@ const discountSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  employeeId: {
+  doctorId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
+    ref: 'Doctor',
     default: null,
     index: true
   },

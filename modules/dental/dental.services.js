@@ -225,6 +225,47 @@ exports.deleteAppointment = async (id) => {
     }
 }
 
+exports.updateAppointment = async (id, data) => {
+    try {
+        const appointment = await DentalAppointment.findById(id);
+        if (!appointment) {
+            const error = new Error('Appointment not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        if (data.doctorId) appointment.doctorId = data.doctorId;
+        if (data.appointmentDate) appointment.appointmentDate = data.appointmentDate;
+        if (data.consultationFee !== undefined) appointment.consultationFee = data.consultationFee;
+        if (data.notes !== undefined) appointment.notes = data.notes;
+        if (data.status) appointment.status = data.status;
+
+        await appointment.save();
+
+        if (data.patientName && appointment.patientId) {
+            const mongoose = require('mongoose');
+            await mongoose.model('Patient').findByIdAndUpdate(appointment.patientId, {
+                fullName: data.patientName
+            });
+        }
+
+        const populatedAppointment = await DentalAppointment.findById(appointment._id)
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
+            .populate({
+                path: 'doctorId',
+                select: 'fullName',
+                populate: {
+                    path: 'specializationId',
+                    select: 'name'
+                }
+            });
+
+        return populatedAppointment;
+    } catch (error) {
+        throw error;
+    }
+}
+
 exports.getAppointmentById = async (id) => {
     try {
         const appointment = await DentalAppointment.findById(id)

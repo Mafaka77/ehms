@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDentalStore } from '../../stores/dentalStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
 import OpdCard from '../../components/OpdCard.vue'
 import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
+import SearchableSelect from '../../components/SearchableSelect.vue'
 
 const router = useRouter()
 const dentalStore = useDentalStore()
@@ -279,6 +280,71 @@ const exportToExcel = (reportData) => {
   link.click()
   document.body.removeChild(link)
 }
+
+// Edit Modal States & Logic
+const showEditModal = ref(false)
+const isUpdating = ref(false)
+const editForm = ref({
+  _id: '',
+  doctorId: '',
+  appointmentDate: '',
+  notes: '',
+  consultationFee: 0,
+  hasBill: false,
+  patientName: ''
+})
+
+const doctorOptions = computed(() => {
+  return dentalStore.dentalDoctors.map(doctor => ({
+    value: doctor._id,
+    label: `Dr. ${doctor.fullName} - ${doctor.specializationId?.name || 'General'}`
+  }))
+})
+
+const openEditModal = (app) => {
+  editForm.value = {
+    _id: app._id,
+    doctorId: app.doctorId?._id || app.doctorId || '',
+    appointmentDate: app.appointmentDate ? app.appointmentDate.split('T')[0] : '',
+    notes: app.notes || '',
+    consultationFee: app.consultationFee || 0,
+    hasBill: !!app.billId,
+    patientName: app.patientId?.fullName || ''
+  }
+  showEditModal.value = true
+}
+
+const handleUpdate = async () => {
+  if (!editForm.value.doctorId || !editForm.value.appointmentDate || !editForm.value.patientName) {
+    snackbarStore.show({ message: 'Patient Name, Doctor, and Date are required', type: 'error' })
+    return
+  }
+  isUpdating.value = true
+  const res = await dentalStore.updateAppointment(editForm.value._id, {
+    doctorId: editForm.value.doctorId,
+    appointmentDate: editForm.value.appointmentDate,
+    consultationFee: editForm.value.consultationFee,
+    notes: editForm.value.notes,
+    patientName: editForm.value.patientName
+  })
+  isUpdating.value = false
+  if (res.success) {
+    snackbarStore.show({ message: 'Appointment updated successfully!', type: 'success' })
+    showEditModal.value = false
+    fetchAppointments()
+  } else {
+    snackbarStore.show({ message: res.message || 'Failed to update appointment', type: 'error' })
+  }
+}
+
+// Watch doctor to auto-fill fee
+watch(() => editForm.value.doctorId, (newDocId) => {
+  if (editForm.value.hasBill) return // Do not change fee if bill already generated
+  const doctor = dentalStore.dentalDoctors.find(d => d._id === newDocId)
+  if (doctor) {
+    editForm.value.consultationFee = doctor.consultationFee || 0
+  }
+})
 </script>
 
 <template>
@@ -461,7 +527,8 @@ const exportToExcel = (reportData) => {
                   
                   <!-- Edit Button -->
                   <button 
-                    class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                    @click.stop="openEditModal(app)"
+                    class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                     title="Edit Appointment"
                   >
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -632,6 +699,112 @@ const exportToExcel = (reportData) => {
             <span v-if="generatingReport" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
             <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             Export to Excel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Modal Overlay -->
+    <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showEditModal = false"></div>
+      
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-fade-in">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-6 border-b border-slate-100">
+          <div>
+            <h2 class="text-lg font-bold text-slate-800">Edit Dental Appointment</h2>
+            <p class="text-xs text-slate-500 mt-0.5">Update details of the dental appointment.</p>
+          </div>
+          <button 
+            @click="showEditModal = false"
+            class="text-slate-400 hover:text-slate-600 rounded-lg p-1 transition-colors"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Form Body -->
+        <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          <!-- Info Alert if Billed -->
+          <div v-if="editForm.hasBill" class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex gap-2.5 text-xs text-amber-800">
+            <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div>
+              <p class="font-bold">Bill Generated</p>
+              <p class="mt-0.5">A bill is already generated for this appointment. Modifying the doctor or consultation fee is disabled.</p>
+            </div>
+          </div>
+
+          <!-- Patient Name Input -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-slate-600">Patient Name</label>
+            <input 
+              type="text" 
+              v-model="editForm.patientName"
+              placeholder="Enter correct patient name"
+              class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium"
+            />
+          </div>
+
+          <!-- Doctor Selection -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-slate-600">Doctor <span class="text-rose-500">*</span></label>
+            <SearchableSelect 
+              v-model="editForm.doctorId"
+              :options="doctorOptions"
+              placeholder="Search or select doctor..."
+              :disabled="editForm.hasBill"
+              required
+            />
+          </div>
+
+          <!-- Date Selector -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-slate-600">Appointment Date</label>
+            <input 
+              type="date" 
+              v-model="editForm.appointmentDate"
+              class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-medium"
+            />
+          </div>
+
+          <!-- Consultation Fee -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-slate-600">Consultation Fee (₹)</label>
+            <input 
+              type="number" 
+              v-model.number="editForm.consultationFee"
+              :disabled="editForm.hasBill"
+              class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 font-mono disabled:bg-slate-100 disabled:text-slate-500"
+            />
+          </div>
+
+          <!-- Notes -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-xs font-semibold text-slate-600">Notes / Remarks</label>
+            <textarea 
+              v-model="editForm.notes"
+              rows="3"
+              placeholder="e.g. Follow-up patient, check reports..."
+              class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700"
+            ></textarea>
+          </div>
+        </div>
+
+        <!-- Action Footer -->
+        <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+          <button 
+            @click="showEditModal = false"
+            class="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="handleUpdate"
+            :disabled="isUpdating"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+          >
+            <span v-if="isUpdating" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+            Save Changes
           </button>
         </div>
       </div>

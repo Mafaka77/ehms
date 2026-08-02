@@ -81,6 +81,22 @@ exports.deleteAppointment = async (req, res) => {
     }
 }
 
+exports.updateAppointment = async (req, res) => {
+    try {
+        const appointment = await dentalService.updateAppointment(req.params.id, req.body);
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Appointment updated successfully',
+            data: appointment,
+            status: STATUS_CODES.OK
+        });
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        });
+    }
+}
+
 exports.getAppointmentById = async (req, res) => {
     try {
         const appointment = await dentalService.getAppointmentById(req.params.id);

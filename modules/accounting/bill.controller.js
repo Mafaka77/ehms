@@ -3,7 +3,7 @@ const STATUS_CODES = require('../../utils/statuscode')
 
 exports.generateBillFromLabOrder = async (req, res) => {
     try {
-        const { labOrderId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        const { labOrderId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
         if (!labOrderId) {
             return res.code(STATUS_CODES.BAD_REQUEST).send({
                 message: 'labOrderId is required',
@@ -16,7 +16,7 @@ exports.generateBillFromLabOrder = async (req, res) => {
             discountAmount || 0,
             discountType,
             discountRemarks,
-            employeeId
+            doctorId || employeeId
         )
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Bill generated successfully',
@@ -33,7 +33,7 @@ exports.generateBillFromLabOrder = async (req, res) => {
 
 exports.generateBillFromRadiologyOrder = async (req, res) => {
     try {
-        const { radiologyOrderId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        const { radiologyOrderId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
         if (!radiologyOrderId) {
             return res.code(STATUS_CODES.BAD_REQUEST).send({
                 message: 'radiologyOrderId is required',
@@ -46,7 +46,7 @@ exports.generateBillFromRadiologyOrder = async (req, res) => {
             discountAmount || 0,
             discountType,
             discountRemarks,
-            employeeId
+            doctorId || employeeId
         )
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Bill generated successfully',
@@ -63,7 +63,7 @@ exports.generateBillFromRadiologyOrder = async (req, res) => {
 
 exports.generateBillFromOpdAppointment = async (req, res) => {
     try {
-        const { opdAppointmentId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        const { opdAppointmentId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
         if (!opdAppointmentId) {
             return res.code(STATUS_CODES.BAD_REQUEST).send({
                 message: 'opdAppointmentId is required',
@@ -76,7 +76,7 @@ exports.generateBillFromOpdAppointment = async (req, res) => {
             discountAmount || 0,
             discountType,
             discountRemarks,
-            employeeId
+            doctorId || employeeId
         )
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Bill generated successfully',
@@ -93,7 +93,7 @@ exports.generateBillFromOpdAppointment = async (req, res) => {
 
 exports.generateBillFromEmergencyVisit = async (req, res) => {
     try {
-        const { emergencyVisitId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        const { emergencyVisitId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
         if (!emergencyVisitId) {
             return res.code(STATUS_CODES.BAD_REQUEST).send({
                 message: 'emergencyVisitId is required',
@@ -106,7 +106,7 @@ exports.generateBillFromEmergencyVisit = async (req, res) => {
             discountAmount || 0,
             discountType,
             discountRemarks,
-            employeeId
+            doctorId || employeeId
         )
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Bill generated successfully',
@@ -123,7 +123,7 @@ exports.generateBillFromEmergencyVisit = async (req, res) => {
 
 exports.generateBillFromEmergencyCharges = async (req, res) => {
     try {
-        const { emergencyVisitId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        const { emergencyVisitId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
         if (!emergencyVisitId) {
             return res.code(STATUS_CODES.BAD_REQUEST).send({
                 message: 'emergencyVisitId is required',
@@ -136,7 +136,7 @@ exports.generateBillFromEmergencyCharges = async (req, res) => {
             discountAmount || 0,
             discountType,
             discountRemarks,
-            employeeId
+            doctorId || employeeId
         )
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Discharge bill generated successfully',
@@ -153,7 +153,7 @@ exports.generateBillFromEmergencyCharges = async (req, res) => {
 
 exports.generateBillFromDentalAppointment = async (req, res) => {
     try {
-        const { dentalAppointmentId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        const { dentalAppointmentId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
         if (!dentalAppointmentId) {
             return res.code(STATUS_CODES.BAD_REQUEST).send({
                 message: 'dentalAppointmentId is required',
@@ -166,7 +166,7 @@ exports.generateBillFromDentalAppointment = async (req, res) => {
             discountAmount || 0,
             discountType,
             discountRemarks,
-            employeeId
+            doctorId || employeeId
         )
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Bill generated successfully',
@@ -183,7 +183,7 @@ exports.generateBillFromDentalAppointment = async (req, res) => {
 
 exports.generateBillFromDentalConsultation = async (req, res) => {
     try {
-        const { dentalAppointmentId, discountAmount, discountType, discountRemarks, employeeId } = req.body
+        const { dentalAppointmentId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
         if (!dentalAppointmentId) {
             return res.code(STATUS_CODES.BAD_REQUEST).send({
                 message: 'dentalAppointmentId is required',
@@ -196,7 +196,7 @@ exports.generateBillFromDentalConsultation = async (req, res) => {
             discountAmount || 0,
             discountType,
             discountRemarks,
-            employeeId
+            doctorId || employeeId
         )
         return res.code(STATUS_CODES.CREATED).send({
             message: 'Consultation Bill generated successfully',

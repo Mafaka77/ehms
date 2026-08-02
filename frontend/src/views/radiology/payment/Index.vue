@@ -95,8 +95,12 @@ const handlePayClicked = (bill) => {
 }
 
 const submitPayment = async () => {
-  if (paymentForm.value.amount <= 0) {
-    snackbarStore.show({ message: 'Please enter a valid payment amount', type: 'error' })
+  if (paymentForm.value.amount < 0) {
+    snackbarStore.show({ message: 'Payment amount cannot be negative', type: 'error' })
+    return
+  }
+  if (paymentForm.value.amount === 0 && activeBill.value.balanceAmount > 0) {
+    snackbarStore.show({ message: 'Payment amount must be greater than zero', type: 'error' })
     return
   }
   if (paymentForm.value.amount > activeBill.value.balanceAmount) {
