@@ -81,10 +81,10 @@ exports.getAppointments = async (query) => {
         }
 
         const appointments = await DentalAppointment.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo gender dateOfBirth age')
+            .populate('patientId', 'fullName patientCode mobileNo gender dateOfBirth age address')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
@@ -146,10 +146,10 @@ exports.createAppointment = async (data) => {
         const appointment = await DentalAppointment.create(appointmentData);
         
         const populatedAppointment = await DentalAppointment.findById(appointment._id)
-            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth address')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
@@ -250,10 +250,10 @@ exports.updateAppointment = async (id, data) => {
         }
 
         const populatedAppointment = await DentalAppointment.findById(appointment._id)
-            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth address')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
@@ -269,10 +269,10 @@ exports.updateAppointment = async (id, data) => {
 exports.getAppointmentById = async (id) => {
     try {
         const appointment = await DentalAppointment.findById(id)
-            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth address')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
@@ -320,10 +320,10 @@ exports.getAppointmentsReport = async (query) => {
         }
 
         const appointments = await DentalAppointment.find(filter)
-            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth')
+            .populate('patientId', 'fullName patientCode mobileNo age gender dateOfBirth address')
             .populate({
                 path: 'doctorId',
-                select: 'fullName',
+                select: 'fullName qualification',
                 populate: {
                     path: 'specializationId',
                     select: 'name'
