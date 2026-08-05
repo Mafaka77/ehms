@@ -1,11 +1,18 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useEmergencyStore } from '../../../stores/emergencyStore'
+import { useAuthStore } from '../../../stores/authStore'
 import EmergencyPaymentView from './View.vue'
 
 const snackbarStore = useSnackbarStore()
 const emergencyStore = useEmergencyStore()
+const authStore = useAuthStore()
+
+const isSuperAdmin = computed(() => {
+  const r = authStore.user?.roleName || authStore.user?.role?.name
+  return r === 'SuperAdmin'
+})
 
 // State
 const selectedVisit = ref(null)
@@ -14,6 +21,9 @@ const selectedDetailedVisit = ref(null)
 // Filtering & Pagination
 const searchQuery = ref('')
 const paymentStatusFilter = ref('Unpaid') // 'Unpaid', 'Paid', or '' (All)
+const filterStartDate = ref('')
+const filterEndDate = ref('')
+const isExportingPdf = ref(false)
 const currentPage = ref(1)
 const limit = ref(10)
 const totalPages = ref(1)
@@ -32,12 +42,16 @@ const paymentForm = ref({
 
 const fetchVisits = async () => {
   try {
-    await emergencyStore.fetchVisits({
+    const filters = {
       page: currentPage.value,
       limit: limit.value,
       search: searchQuery.value,
       paymentStatus: paymentStatusFilter.value
-    })
+    }
+    if (filterStartDate.value) filters.startDate = filterStartDate.value
+    if (filterEndDate.value) filters.endDate = filterEndDate.value
+
+    await emergencyStore.fetchVisits(filters)
     
     const pag = emergencyStore.pagination
     if (pag) {
@@ -153,6 +167,13 @@ watch(paymentStatusFilter, () => {
   fetchVisits()
 })
 
+watch([filterStartDate, filterEndDate], () => {
+  currentPage.value = 1
+  selectedVisit.value = null
+  selectedDetailedVisit.value = null
+  fetchVisits()
+})
+
 watch(currentPage, () => {
   fetchVisits()
 })
@@ -160,6 +181,225 @@ watch(currentPage, () => {
 onMounted(() => {
   fetchVisits()
 })
+
+const clearFilters = () => {
+  filterStartDate.value = ''
+  filterEndDate.value = ''
+  paymentStatusFilter.value = 'Unpaid'
+  searchQuery.value = ''
+  currentPage.value = 1
+  selectedVisit.value = null
+  selectedDetailedVisit.value = null
+  fetchVisits()
+}
+
+const handleExportPdf = async () => {
+  isExportingPdf.value = true
+  try {
+    const filters = {
+      page: 1,
+      limit: 0,
+      search: searchQuery.value,
+      paymentStatus: paymentStatusFilter.value
+    }
+    if (filterStartDate.value) filters.startDate = filterStartDate.value
+    if (filterEndDate.value) filters.endDate = filterEndDate.value
+
+    const res = await emergencyStore.fetchVisits(filters)
+    const exportVisits = res.visits || []
+
+    if (!exportVisits || exportVisits.length === 0) {
+      snackbarStore.show({ message: 'No emergency visits found for the selected criteria to export.', type: 'warning' })
+      isExportingPdf.value = false
+      return
+    }
+
+    let totalRevenue = 0
+    let totalPaid = 0
+    let totalBalance = 0
+    const statusBreakdown = { Paid: 0, Unpaid: 0, 'Partially Paid': 0 }
+
+    exportVisits.forEach(v => {
+      const fee = v.consultationFee || 0
+      const bill = v.bill || {}
+      const paid = bill.paidAmount || (v.paymentStatus === 'Paid' ? fee : 0)
+      const balance = bill.balanceAmount ?? (v.paymentStatus === 'Paid' ? 0 : fee)
+      
+      totalRevenue += fee
+      totalPaid += paid
+      totalBalance += balance
+
+      const st = v.paymentStatus || 'Unpaid'
+      statusBreakdown[st] = (statusBreakdown[st] || 0) + 1
+    })
+
+    let dateRangeText = 'All Time'
+    if (filterStartDate.value && filterEndDate.value) {
+      dateRangeText = `${filterStartDate.value} to ${filterEndDate.value}`
+    } else if (filterStartDate.value) {
+      dateRangeText = `From ${filterStartDate.value}`
+    } else if (filterEndDate.value) {
+      dateRangeText = `Up to ${filterEndDate.value}`
+    }
+
+    const statusText = paymentStatusFilter.value || 'All Statuses'
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Emergency Revenue & Payment Report - ${new Date().toLocaleDateString('en-IN')}</title>
+          <style>
+            @page { size: A4 portrait; margin: 12mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 18px; line-height: 1.5; font-size: 11px; }
+            .header { text-align: center; border-bottom: 2px solid #e11d48; padding-bottom: 10px; margin-bottom: 18px; }
+            .header h1 { margin: 0; font-size: 20px; color: #be123c; text-transform: uppercase; letter-spacing: 0.8px; }
+            .header p { margin: 4px 0 0 0; font-size: 11px; color: #64748b; }
+            
+            .meta-bar { display: flex; justify-content: space-between; background: #fff1f2; border: 1px solid #fecdd3; padding: 10px 14px; border-radius: 8px; font-size: 11px; margin-bottom: 16px; }
+            .meta-item { display: flex; flex-direction: column; }
+            .meta-label { font-weight: 700; color: #be123c; text-transform: uppercase; font-size: 9.5px; }
+            .meta-val { font-weight: 600; color: #1e293b; margin-top: 2px; }
+
+            .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+            .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; text-align: center; }
+            .stat-title { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+            .stat-value { font-size: 14px; font-weight: 800; color: #be123c; margin-top: 3px; }
+
+            table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 16px; }
+            th { background: #be123c; color: #ffffff; text-align: left; padding: 7px 9px; font-weight: 700; text-transform: uppercase; font-size: 9.5px; }
+            td { border-bottom: 1px solid #e2e8f0; padding: 7px 9px; color: #334155; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+
+            .amount-col { text-align: right; font-weight: 700; font-family: monospace; }
+            .status-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+            .status-paid { background: #dcfce7; color: #15803d; }
+            .status-unpaid { background: #ffe4e6; color: #be123c; }
+            .status-partial { background: #fef3c7; color: #b45309; }
+
+            .summary-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
+            .summary-table td { padding: 7px 10px; border: 1px solid #cbd5e1; }
+            .summary-table .label { font-weight: 700; background: #f1f5f9; text-align: right; width: 75%; }
+            .summary-table .value { font-weight: 800; color: #be123c; text-align: right; font-size: 13px; font-family: monospace; }
+
+            .footer { margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px; color: #64748b; page-break-inside: avoid; }
+            .sig-box { text-align: center; width: 170px; }
+            .sig-line { border-top: 1px solid #475569; margin-top: 45px; padding-top: 5px; font-weight: 700; color: #1e293b; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Emergency Department Billing & Revenue Report</h1>
+            <p>Hospital Emergency & Triage Fee Register</p>
+          </div>
+
+          <div class="meta-bar">
+            <div class="meta-item">
+              <span class="meta-label">Date Range</span>
+              <span class="meta-val">${dateRangeText}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Status Filter</span>
+              <span class="meta-val">${statusText}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Visits</span>
+              <span class="meta-val">${exportVisits.length} Visits</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Generated On</span>
+              <span class="meta-val">${new Date().toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-title">Total Consultation Fees</div>
+              <div class="stat-value">₹${totalRevenue.toFixed(2)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Total Paid</div>
+              <div class="stat-value" style="color: #15803d;">₹${totalPaid.toFixed(2)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Total Balance Due</div>
+              <div class="stat-value" style="color: #be123c;">₹${totalBalance.toFixed(2)}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-title">Paid / Unpaid Ratio</div>
+              <div class="stat-value" style="color: #0369a1;">${statusBreakdown.Paid || 0} / ${statusBreakdown.Unpaid || 0}</div>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 4%;">#</th>
+                <th style="width: 14%;">Visit No</th>
+                <th style="width: 15%;">Arrival Date</th>
+                <th style="width: 27%;">Patient Details</th>
+                <th style="width: 20%;">Triage Doctor</th>
+                <th style="width: 10%; text-align: center;">Status</th>
+                <th style="width: 10%; text-align: right;">Fee (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${exportVisits.map((v, idx) => {
+                const dt = v.arrivalDateTime ? new Date(v.arrivalDateTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
+                const st = v.paymentStatus || 'Unpaid'
+                const stClass = st === 'Paid' ? 'status-paid' : (st === 'Partially Paid' ? 'status-partial' : 'status-unpaid')
+                const pName = v.patientId?.fullName || 'Walk-in / Emergency'
+                const pCode = v.patientId?.patientCode || '-'
+                const docName = v.doctorId?.fullName ? 'Dr. ' + v.doctorId.fullName : 'On Duty Doctor'
+
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td style="font-family: monospace; font-weight: bold;">${v.visitNo || '-'}</td>
+                    <td>${dt}</td>
+                    <td><strong>${pName}</strong><br><span style="color:#64748b; font-size:9.5px;">Code: ${pCode}</span></td>
+                    <td>${docName}</td>
+                    <td class="text-center"><span class="status-badge ${stClass}">${st}</span></td>
+                    <td class="amount-col">₹${(v.consultationFee || 0).toFixed(2)}</td>
+                  </tr>
+                `
+              }).join('')}
+            </tbody>
+          </table>
+
+          <table class="summary-table">
+            <tr>
+              <td class="label">Grand Total Emergency Fees (${exportVisits.length} Records):</td>
+              <td class="value">₹${totalRevenue.toFixed(2)}</td>
+            </tr>
+          </table>
+
+          <div class="footer">
+            <div>Report generated automatically by EHMS Emergency Management Module.</div>
+            <div class="sig-box">
+              <div class="sig-line">Emergency Cashier / Admin</div>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          <\/script>
+        </body>
+      </html>
+    `
+
+    const printWin = window.open('', '_blank')
+    printWin.document.write(printContent)
+    printWin.document.close()
+
+    fetchVisits()
+  } catch (err) {
+    console.error(err)
+    snackbarStore.show({ message: 'Failed to export emergency payments PDF report', type: 'error' })
+  } finally {
+    isExportingPdf.value = false
+  }
+}
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -201,25 +441,73 @@ const formatCurrency = (val) => {
           <div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
             <h2 class="text-lg font-semibold text-slate-800 self-start">Emergency Visits</h2>
             
-            <!-- Filters Tabs -->
-            <div class="flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold w-full sm:w-auto">
+            <div class="flex items-center gap-2">
+              <!-- Export PDF Button -->
               <button 
-                @click="paymentStatusFilter = 'Unpaid'"
-                :class="['px-3 py-1.5 rounded-md transition-all flex-1 sm:flex-none text-center', paymentStatusFilter === 'Unpaid' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600 hover:text-slate-900']"
+                v-if="isSuperAdmin"
+                @click="handleExportPdf"
+                :disabled="isExportingPdf"
+                class="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-rose-700 font-bold text-xs rounded-lg shadow-sm transition-all flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50"
               >
-                Pending
+                <svg v-if="isExportingPdf" class="animate-spin h-3.5 w-3.5 text-rose-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <svg v-else class="w-3.5 h-3.5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export PDF
               </button>
+
+              <!-- Filters Tabs -->
+              <div class="flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold w-full sm:w-auto">
+                <button 
+                  @click="paymentStatusFilter = 'Unpaid'"
+                  :class="['px-3 py-1 rounded-md transition-all flex-1 sm:flex-none text-center', paymentStatusFilter === 'Unpaid' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600 hover:text-slate-900']"
+                >
+                  Pending
+                </button>
+                <button 
+                  @click="paymentStatusFilter = 'Paid'"
+                  :class="['px-3 py-1 rounded-md transition-all flex-1 sm:flex-none text-center', paymentStatusFilter === 'Paid' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600 hover:text-slate-900']"
+                >
+                  Paid
+                </button>
+                <button 
+                  @click="paymentStatusFilter = ''"
+                  :class="['px-3 py-1 rounded-md transition-all flex-1 sm:flex-none text-center', paymentStatusFilter === '' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600 hover:text-slate-900']"
+                >
+                  All
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Date Range Filters & Reset -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block text-[9.5px] font-bold uppercase tracking-wider text-slate-400 mb-1">From Date</label>
+              <input 
+                v-model="filterStartDate"
+                type="date"
+                class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-500"
+              />
+            </div>
+            <div>
+              <label class="block text-[9.5px] font-bold uppercase tracking-wider text-slate-400 mb-1">To Date</label>
+              <input 
+                v-model="filterEndDate"
+                type="date"
+                class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-500"
+              />
+            </div>
+            <div class="flex items-end justify-between">
               <button 
-                @click="paymentStatusFilter = 'Paid'"
-                :class="['px-3 py-1.5 rounded-md transition-all flex-1 sm:flex-none text-center', paymentStatusFilter === 'Paid' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600 hover:text-slate-900']"
+                v-if="filterStartDate || filterEndDate || searchQuery || paymentStatusFilter !== 'Unpaid'"
+                @click="clearFilters"
+                class="px-2.5 py-1.5 text-xs text-slate-500 font-bold hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
               >
-                Paid
-              </button>
-              <button 
-                @click="paymentStatusFilter = ''"
-                :class="['px-3 py-1.5 rounded-md transition-all flex-1 sm:flex-none text-center', paymentStatusFilter === '' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-600 hover:text-slate-900']"
-              >
-                All
+                Reset Filters
               </button>
             </div>
           </div>

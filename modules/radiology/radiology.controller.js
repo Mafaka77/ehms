@@ -154,8 +154,7 @@ exports.createRadiologyOrder = async (req, res) => {
 
 exports.getAllRadiologyOrders = async (req, res) => {
     try {
-        const { page, limit, search, paymentStatus, admissionId, patientId } = req.query
-        const result = await radiologyService.getAllRadiologyOrders({ page, limit, search, paymentStatus, admissionId, patientId })
+        const result = await radiologyService.getAllRadiologyOrders(req.query)
         return res.code(STATUS_CODES.OK).send({ message: 'Radiology orders fetched successfully', data: result.orders, pagination: result.pagination, status: STATUS_CODES.OK })
     } catch (error) {
         return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })

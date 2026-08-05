@@ -14,22 +14,25 @@ export const useOpdStore = defineStore('opd', {
             this.loading = true;
             try {
                 const params = new URLSearchParams();
-                params.append('page', filters.page || 1);
-                params.append('limit', filters.limit || 10);
+                if (filters.page !== undefined) params.append('page', filters.page);
+                if (filters.limit !== undefined) params.append('limit', filters.limit);
                 
                 if (filters.status) params.append('status', filters.status);
                 if (filters.doctorId) params.append('doctorId', filters.doctorId);
                 if (filters.date) params.append('date', filters.date);
                 if (filters.search) params.append('search', filters.search);
+                if (filters.paymentStatus) params.append('paymentStatus', filters.paymentStatus);
+                if (filters.startDate) params.append('startDate', filters.startDate);
+                if (filters.endDate) params.append('endDate', filters.endDate);
                 
                 const response = await api.get(`/opd/appointments?${params.toString()}`);
                 this.appointments = response.data.data.appointments;
                 this.pagination = response.data.data.pagination;
-                return { success: true };
+                return { success: true, appointments: response.data.data.appointments };
             } catch (error) {
                 console.error('Error fetching appointments:', error);
                 this.error = error.response?.data?.message || 'Failed to fetch appointments';
-                return { success: false, message: this.error };
+                return { success: false, message: this.error, appointments: [] };
             } finally {
                 this.loading = false;
             }

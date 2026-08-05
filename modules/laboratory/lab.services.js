@@ -461,13 +461,27 @@ exports.createLabOrder = async (data) => {
 exports.getAllLabOrders = async (query = {}) => { 
     try {
         const page = parseInt(query.page) || 1
-        const limit = parseInt(query.limit) || 10
-        const search = query.search || ''
-        const skip = (page - 1) * limit
+        const limit = parseInt(query.limit) === 0 ? 0 : (parseInt(query.limit) || 10)
+        const search = query.search ? query.search.trim() : ''
+        const skip = (page - 1) * (limit || 1)
  
         let filter = {}
         if (search) {
-            filter = { orderNo: { $regex: search, $options: 'i' } }
+            const searchRegex = new RegExp(search, 'i')
+            const Patient = mongoose.model('Patient')
+            const matchingPatients = await Patient.find({
+                $or: [
+                    { fullName: searchRegex },
+                    { patientCode: searchRegex },
+                    { mobileNo: searchRegex }
+                ]
+            }).select('_id')
+            const patientIds = matchingPatients.map(p => p._id)
+
+            filter.$or = [
+                { orderNo: searchRegex },
+                { patientId: { $in: patientIds } }
+            ]
         }
         if (query.paymentStatus) {
             if (query.paymentStatus === 'PAID_AND_IPD') {
@@ -489,21 +503,49 @@ exports.getAllLabOrders = async (query = {}) => {
             filter.patientId = query.patientId
         }
 
+        if (query.startDate || query.endDate) {
+            filter.createdAt = filter.createdAt || {}
+            if (query.startDate) {
+                const sStr = String(query.startDate).trim()
+                if (/^\d{4}-\d{2}-\d{2}$/.test(sStr)) {
+                    const [y, m, d] = sStr.split('-').map(Number)
+                    filter.createdAt.$gte = new Date(y, m - 1, d, 0, 0, 0, 0)
+                } else {
+                    filter.createdAt.$gte = new Date(query.startDate)
+                }
+            }
+            if (query.endDate) {
+                const eStr = String(query.endDate).trim()
+                if (/^\d{4}-\d{2}-\d{2}$/.test(eStr)) {
+                    const [y, m, d] = eStr.split('-').map(Number)
+                    filter.createdAt.$lte = new Date(y, m - 1, d, 23, 59, 59, 999)
+                } else {
+                    const end = new Date(query.endDate)
+                    end.setHours(23, 59, 59, 999)
+                    filter.createdAt.$lte = end
+                }
+            }
+        }
+
         const total = await LabOrder.countDocuments(filter)
-        const orders = await LabOrder.find(filter)
+        let queryExec = LabOrder.find(filter)
             .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
             .populate('patientId')
             .populate('doctorId')
+
+        if (limit > 0) {
+            queryExec = queryExec.skip(skip).limit(limit)
+        }
+
+        const orders = await queryExec
 
         return {
             data: orders,
             pagination: {
                 total,
                 page,
-                limit,
-                pages: Math.ceil(total / limit)
+                limit: limit > 0 ? limit : total,
+                pages: limit > 0 ? Math.ceil(total / limit) : 1
             }
         }
     } catch (error) {

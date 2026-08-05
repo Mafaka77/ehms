@@ -14,22 +14,25 @@ export const useEmergencyStore = defineStore('emergency', {
             this.loading = true;
             try {
                 const params = new URLSearchParams();
-                params.append('page', filters.page || 1);
-                params.append('limit', filters.limit || 10);
+                if (filters.page !== undefined) params.append('page', filters.page);
+                if (filters.limit !== undefined) params.append('limit', filters.limit);
                 
                 if (filters.priority) params.append('priority', filters.priority);
                 if (filters.doctorId) params.append('doctorId', filters.doctorId);
                 if (filters.date) params.append('date', filters.date);
                 if (filters.search) params.append('search', filters.search);
+                if (filters.paymentStatus) params.append('paymentStatus', filters.paymentStatus);
+                if (filters.startDate) params.append('startDate', filters.startDate);
+                if (filters.endDate) params.append('endDate', filters.endDate);
                 
                 const response = await api.get(`/emergency/visits?${params.toString()}`);
                 this.visits = response.data.data.visits;
                 this.pagination = response.data.data.pagination;
-                return { success: true };
+                return { success: true, visits: response.data.data.visits };
             } catch (error) {
                 console.error('Error fetching emergency visits:', error);
                 this.error = error.response?.data?.message || 'Failed to fetch emergency visits';
-                return { success: false, message: this.error };
+                return { success: false, message: this.error, visits: [] };
             } finally {
                 this.loading = false;
             }

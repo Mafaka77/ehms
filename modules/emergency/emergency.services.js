@@ -19,8 +19,8 @@ exports.getEmergencyDoctors = async () => {
 exports.getEmergencyVisits = async (query) => {
     try {
         const page = parseInt(query.page) || 1;
-        const limit = parseInt(query.limit) || 10;
-        const skip = (page - 1) * limit;
+        const limit = parseInt(query.limit) === 0 ? 0 : (parseInt(query.limit) || 10);
+        const skip = (page - 1) * (limit || 1);
 
         const filter = {};
         if (query.priority) {
@@ -33,11 +33,21 @@ exports.getEmergencyVisits = async (query) => {
             filter.paymentStatus = query.paymentStatus;
         }
         if (query.search) {
-            let searchStr = query.search;
-            if (!searchStr.toUpperCase().startsWith('EH-ER-')) {
-                searchStr = 'EH-ER-' + searchStr;
-            }
-            filter.visitNo = { $regex: searchStr, $options: 'i' };
+            const searchRegex = new RegExp(query.search.trim(), 'i');
+            const Patient = mongoose.model('Patient');
+            const matchingPatients = await Patient.find({
+                $or: [
+                    { fullName: searchRegex },
+                    { patientCode: searchRegex },
+                    { mobileNo: searchRegex }
+                ]
+            }).select('_id');
+            const patientIds = matchingPatients.map(p => p._id);
+
+            filter.$or = [
+                { visitNo: searchRegex },
+                { patientId: { $in: patientIds } }
+            ];
         }
         if (query.date) {
             const startOfDay = new Date(query.date);
@@ -46,8 +56,31 @@ exports.getEmergencyVisits = async (query) => {
             endOfDay.setUTCHours(23, 59, 59, 999);
             filter.arrivalDateTime = { $gte: startOfDay, $lte: endOfDay };
         }
+        if (query.startDate || query.endDate) {
+            filter.arrivalDateTime = filter.arrivalDateTime || {};
+            if (query.startDate) {
+                const sStr = String(query.startDate).trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(sStr)) {
+                    const [y, m, d] = sStr.split('-').map(Number);
+                    filter.arrivalDateTime.$gte = new Date(y, m - 1, d, 0, 0, 0, 0);
+                } else {
+                    filter.arrivalDateTime.$gte = new Date(query.startDate);
+                }
+            }
+            if (query.endDate) {
+                const eStr = String(query.endDate).trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(eStr)) {
+                    const [y, m, d] = eStr.split('-').map(Number);
+                    filter.arrivalDateTime.$lte = new Date(y, m - 1, d, 23, 59, 59, 999);
+                } else {
+                    const end = new Date(query.endDate);
+                    end.setHours(23, 59, 59, 999);
+                    filter.arrivalDateTime.$lte = end;
+                }
+            }
+        }
 
-        const visits = await EmergencyVisit.find(filter)
+        let queryExec = EmergencyVisit.find(filter)
             .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth address')
             .populate({
                 path: 'doctorId',
@@ -57,10 +90,13 @@ exports.getEmergencyVisits = async (query) => {
                     select: 'name'
                 }
             })
-            .sort({ arrivalDateTime: -1, createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
+            .sort({ arrivalDateTime: -1, createdAt: -1 });
 
+        if (limit > 0) {
+            queryExec = queryExec.skip(skip).limit(limit);
+        }
+
+        const visits = await queryExec;
         const total = await EmergencyVisit.countDocuments(filter);
 
         // Fetch corresponding Bill records for these visits
@@ -81,7 +117,8 @@ exports.getEmergencyVisits = async (query) => {
             pagination: {
                 total,
                 page,
-                pages: Math.ceil(total / limit)
+                limit: limit > 0 ? limit : total,
+                pages: limit > 0 ? Math.ceil(total / limit) : 1
             }
         };
     } catch (error) {

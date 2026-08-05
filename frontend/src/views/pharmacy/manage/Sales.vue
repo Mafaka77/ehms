@@ -25,6 +25,11 @@ const filterEndDate = ref('')
 const filterPaymentMethod = ref('')
 const isExportingPdf = ref(false)
 
+const isSuperAdmin = computed(() => {
+  const r = authStore.user?.roleName || authStore.user?.role?.name
+  return r === 'SuperAdmin'
+})
+
 // Selected sale details for printing modal
 const showReceiptModal = ref(false)
 const selectedSale = ref(null)
@@ -576,6 +581,7 @@ const formatDate = (dateStr) => {
 
               <!-- Export PDF Button -->
               <button 
+                v-if="isSuperAdmin"
                 @click="handleExportPdf"
                 :disabled="isExportingPdf"
                 class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-teal-700 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"

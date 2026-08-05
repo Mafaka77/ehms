@@ -233,8 +233,7 @@ exports.createLabOrder = async (req, res) => {
 
 exports.getAllLabOrders = async (req, res) => { 
     try {
-        const { page, limit, search, paymentStatus, admissionId, patientId } = req.query
-        const result = await labService.getAllLabOrders({ page, limit, search, paymentStatus, admissionId, patientId });
+        const result = await labService.getAllLabOrders(req.query);
         return res.code(STATUS_CODES.OK).send({ 
             message: 'Lab orders fetched successfully', 
             data: result.data || result.orders, 

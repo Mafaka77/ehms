@@ -36,8 +36,8 @@ exports.getOpdDoctors = async () => {
 exports.getAppointments = async (query) => {
     try {
         const page = parseInt(query.page) || 1;
-        const limit = parseInt(query.limit) || 10;
-        const skip = (page - 1) * limit;
+        const limit = parseInt(query.limit) === 0 ? 0 : (parseInt(query.limit) || 10);
+        const skip = (page - 1) * (limit || 1);
 
         const filter = {};
         if (query.status) {
@@ -50,22 +50,54 @@ exports.getAppointments = async (query) => {
             filter.paymentStatus = query.paymentStatus;
         }
         if (query.search) {
-            let searchStr = query.search;
-            if (!searchStr.toUpperCase().startsWith('EH-OPD-')) {
-                searchStr = 'EH-OPD-' + searchStr;
-            }
-            filter.appointmentId = { $regex: searchStr, $options: 'i' };
+            const searchRegex = new RegExp(query.search.trim(), 'i');
+            const Patient = mongoose.model('Patient');
+            const matchingPatients = await Patient.find({
+                $or: [
+                    { fullName: searchRegex },
+                    { patientCode: searchRegex },
+                    { mobileNo: searchRegex }
+                ]
+            }).select('_id');
+            const patientIds = matchingPatients.map(p => p._id);
+
+            filter.$or = [
+                { appointmentId: searchRegex },
+                { patientId: { $in: patientIds } }
+            ];
         }
         if (query.date) {
-            // Match any time on that specific date
             const startOfDay = new Date(query.date);
             startOfDay.setUTCHours(0, 0, 0, 0);
             const endOfDay = new Date(query.date);
             endOfDay.setUTCHours(23, 59, 59, 999);
             filter.appointmentDate = { $gte: startOfDay, $lte: endOfDay };
         }
+        if (query.startDate || query.endDate) {
+            filter.appointmentDate = filter.appointmentDate || {};
+            if (query.startDate) {
+                const sStr = String(query.startDate).trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(sStr)) {
+                    const [y, m, d] = sStr.split('-').map(Number);
+                    filter.appointmentDate.$gte = new Date(y, m - 1, d, 0, 0, 0, 0);
+                } else {
+                    filter.appointmentDate.$gte = new Date(query.startDate);
+                }
+            }
+            if (query.endDate) {
+                const eStr = String(query.endDate).trim();
+                if (/^\d{4}-\d{2}-\d{2}$/.test(eStr)) {
+                    const [y, m, d] = eStr.split('-').map(Number);
+                    filter.appointmentDate.$lte = new Date(y, m - 1, d, 23, 59, 59, 999);
+                } else {
+                    const end = new Date(query.endDate);
+                    end.setHours(23, 59, 59, 999);
+                    filter.appointmentDate.$lte = end;
+                }
+            }
+        }
 
-        const appointments = await OpdAppointment.find(filter)
+        let queryExec = OpdAppointment.find(filter)
             .populate('patientId', 'fullName patientCode mobileNo gender age dateOfBirth address')
             .populate({
                 path: 'doctorId',
@@ -75,10 +107,13 @@ exports.getAppointments = async (query) => {
                     select: 'name'
                 }
             })
-            .sort({ appointmentDate: -1, createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
+            .sort({ appointmentDate: -1, createdAt: -1 });
 
+        if (limit > 0) {
+            queryExec = queryExec.skip(skip).limit(limit);
+        }
+
+        const appointments = await queryExec;
         const total = await OpdAppointment.countDocuments(filter);
 
         // Fetch corresponding Bill records for these appointments
@@ -99,7 +134,8 @@ exports.getAppointments = async (query) => {
             pagination: {
                 total,
                 page,
-                pages: Math.ceil(total / limit)
+                limit: limit > 0 ? limit : total,
+                pages: limit > 0 ? Math.ceil(total / limit) : 1
             }
         };
     } catch (error) {
