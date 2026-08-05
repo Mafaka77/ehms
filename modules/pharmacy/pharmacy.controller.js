@@ -196,8 +196,7 @@ exports.createSale = async (req, res) => {
 
 exports.getAllSales = async (req, res) => {
     try {
-        const { page, limit, search } = req.query
-        const result = await pharmacyService.getAllSales({ page, limit, search })
+        const result = await pharmacyService.getAllSales(req.query)
         return res.code(STATUS_CODES.OK).send({ message: 'Sales fetched successfully', data: result.sales, pagination: result.pagination, status: STATUS_CODES.OK })
     } catch (error) {
         return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
