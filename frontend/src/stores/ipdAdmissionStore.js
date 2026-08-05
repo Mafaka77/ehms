@@ -119,6 +119,36 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async postAdmissionBedCharge(historyId, days = null) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post(`/ipd/admission/bed-history/${historyId}/post-charge`, { days })
+        return { success: true, data: response.data.data, message: response.data.message || 'Bed charge posted successfully' }
+      } catch (err) {
+        console.error('Error posting bed charge:', err)
+        this.error = err.response?.data?.message || 'Failed to post bed charge'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async postAllAdmissionBedCharges(admissionId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post(`/ipd/admission/${admissionId}/post-all-bed-charges`)
+        return { success: true, data: response.data.data, message: response.data.message || 'All bed charges posted successfully' }
+      } catch (err) {
+        console.error('Error posting all bed charges:', err)
+        this.error = err.response?.data?.message || 'Failed to post all bed charges'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async deleteAdmission(id) {
       this.loading = true
       this.error = null

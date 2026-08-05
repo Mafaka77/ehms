@@ -20,6 +20,10 @@ const currentView = ref('list')
 const currentPage = ref(1)
 const limit = ref(10)
 const searchQuery = ref('')
+const filterStartDate = ref('')
+const filterEndDate = ref('')
+const filterPaymentMethod = ref('')
+const isExportingPdf = ref(false)
 
 // Selected sale details for printing modal
 const showReceiptModal = ref(false)
@@ -53,7 +57,12 @@ const draftItems = ref([])
 // Fetch sales log on mount/change
 const fetchSalesLog = async () => {
   try {
-    await pharmacyStore.fetchSales(currentPage.value, limit.value, searchQuery.value)
+    const additionalParams = {}
+    if (filterStartDate.value) additionalParams.startDate = filterStartDate.value
+    if (filterEndDate.value) additionalParams.endDate = filterEndDate.value
+    if (filterPaymentMethod.value) additionalParams.paymentMethod = filterPaymentMethod.value
+
+    await pharmacyStore.fetchSales(currentPage.value, limit.value, searchQuery.value, additionalParams)
   } catch (err) {
     console.error(err)
   }
@@ -72,9 +81,201 @@ watch(searchQuery, () => {
   }, 400)
 })
 
+watch([filterStartDate, filterEndDate, filterPaymentMethod], () => {
+  currentPage.value = 1
+  fetchSalesLog()
+})
+
 watch([currentPage, limit], () => {
   fetchSalesLog()
 })
+
+const clearFilters = () => {
+  filterStartDate.value = ''
+  filterEndDate.value = ''
+  filterPaymentMethod.value = ''
+  searchQuery.value = ''
+  currentPage.value = 1
+  fetchSalesLog()
+}
+
+const handleExportPdf = async () => {
+  isExportingPdf.value = true
+  try {
+    const additionalParams = {}
+    if (filterStartDate.value) additionalParams.startDate = filterStartDate.value
+    if (filterEndDate.value) additionalParams.endDate = filterEndDate.value
+    if (filterPaymentMethod.value) additionalParams.paymentMethod = filterPaymentMethod.value
+
+    const exportSales = await pharmacyStore.fetchSales(1, 0, searchQuery.value, additionalParams)
+
+    if (!exportSales || exportSales.length === 0) {
+      snackbarStore.show({ message: 'No sales records found for the selected criteria to export.', type: 'warning' })
+      isExportingPdf.value = false
+      return
+    }
+
+    let totalAmountSum = 0
+    const modeBreakdown = {}
+
+    exportSales.forEach(s => {
+      const amt = s.totalAmount || 0
+      totalAmountSum += amt
+      const mode = s.paymentMethod || 'CASH'
+      modeBreakdown[mode] = (modeBreakdown[mode] || 0) + amt
+    })
+
+    let dateRangeText = 'All Time'
+    if (filterStartDate.value && filterEndDate.value) {
+      dateRangeText = `${filterStartDate.value} to ${filterEndDate.value}`
+    } else if (filterStartDate.value) {
+      dateRangeText = `From ${filterStartDate.value}`
+    } else if (filterEndDate.value) {
+      dateRangeText = `Up to ${filterEndDate.value}`
+    }
+
+    const modeText = filterPaymentMethod.value || 'All Payment Modes'
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Pharmacy Sales Report - ${new Date().toLocaleDateString('en-IN')}</title>
+          <style>
+            @page { size: A4 portrait; margin: 15mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 20px; line-height: 1.5; }
+            .header { text-align: center; border-bottom: 2px solid #0d9488; padding-bottom: 12px; margin-bottom: 20px; }
+            .header h1 { margin: 0; font-size: 22px; color: #0f766e; text-transform: uppercase; letter-spacing: 1px; }
+            .header p { margin: 4px 0 0 0; font-size: 12px; color: #64748b; }
+            
+            .meta-bar { display: flex; justify-content: space-between; background: #f0fdf4; border: 1px solid #ccfbf1; padding: 12px 16px; border-radius: 8px; font-size: 12px; margin-bottom: 20px; }
+            .meta-item { display: flex; flex-direction: column; }
+            .meta-label { font-weight: 700; color: #0f766e; text-transform: uppercase; font-size: 10px; }
+            .meta-val { font-weight: 600; color: #1e293b; margin-top: 2px; }
+
+            .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; margin-bottom: 20px; }
+            .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 8px; text-align: center; }
+            .stat-title { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; }
+            .stat-value { font-size: 15px; font-weight: 800; color: #0f766e; margin-top: 4px; }
+
+            table { width: 100%; border-collapse: collapse; font-size: 11px; margin-bottom: 20px; }
+            th { background: #0f766e; color: #ffffff; text-align: left; padding: 8px 10px; font-weight: 700; text-transform: uppercase; font-size: 10px; }
+            td { border-bottom: 1px solid #e2e8f0; padding: 8px 10px; color: #334155; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+
+            .amount-col { text-align: right; font-weight: 700; }
+            .mode-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; background: #e0f2fe; color: #0369a1; text-transform: uppercase; }
+            
+            .summary-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
+            .summary-table td { padding: 8px 12px; border: 1px solid #cbd5e1; }
+            .summary-table .label { font-weight: 700; background: #f1f5f9; text-align: right; width: 80%; }
+            .summary-table .value { font-weight: 800; color: #0f766e; text-align: right; font-size: 14px; }
+
+            .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 11px; color: #64748b; page-break-inside: avoid; }
+            .sig-box { text-align: center; width: 180px; }
+            .sig-line { border-top: 1px solid #475569; margin-top: 50px; padding-top: 6px; font-weight: 700; color: #1e293b; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Pharmacy Sales & Revenue Report</h1>
+            <p>Hospital Inpatient & Outpatient Pharmacy Dispensation Register</p>
+          </div>
+
+          <div class="meta-bar">
+            <div class="meta-item">
+              <span class="meta-label">Date Range</span>
+              <span class="meta-val">${dateRangeText}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Payment Mode</span>
+              <span class="meta-val">${modeText}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Invoices</span>
+              <span class="meta-val">${exportSales.length} Sales</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Generated On</span>
+              <span class="meta-val">${new Date().toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-title">Total Sales Revenue</div>
+              <div class="stat-value">₹${totalAmountSum.toFixed(2)}</div>
+            </div>
+            ${Object.entries(modeBreakdown).map(([m, val]) => `
+              <div class="stat-card">
+                <div class="stat-title">${m} Total</div>
+                <div class="stat-value">₹${val.toFixed(2)}</div>
+              </div>
+            `).join('')}
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 5%;">#</th>
+                <th style="width: 15%;">Invoice No</th>
+                <th style="width: 25%;">Customer / Patient</th>
+                <th style="width: 15%;">Date & Time</th>
+                <th style="width: 15%;">Payment Mode</th>
+                <th style="width: 25%; text-align: right;">Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${exportSales.map((s, idx) => {
+                const pName = s.patientId ? `${s.patientId.fullName} (Patient)` : (s.customerName || 'Walk-in Customer')
+                const dt = s.createdAt ? new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td style="font-family: monospace; font-weight: bold;">${s.saleNo || '-'}</td>
+                    <td><strong>${pName}</strong>${s.customerPhone ? '<br><span style="color:#64748b; font-size:10px;">Mob: ' + s.customerPhone + '</span>' : ''}</td>
+                    <td>${dt}</td>
+                    <td><span class="mode-badge">${s.paymentMethod || 'CASH'}</span></td>
+                    <td class="amount-col">₹${(s.totalAmount || 0).toFixed(2)}</td>
+                  </tr>
+                `
+              }).join('')}
+            </tbody>
+          </table>
+
+          <table class="summary-table">
+            <tr>
+              <td class="label">Grand Total Pharmacy Sales (${exportSales.length} Invoices):</td>
+              <td class="value">₹${totalAmountSum.toFixed(2)}</td>
+            </tr>
+          </table>
+
+          <div class="footer">
+            <div>Report generated automatically by EHMS Pharmacy Management Module.</div>
+            <div class="sig-box">
+              <div class="sig-line">Pharmacist / Admin Signature</div>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          <\/script>
+        </body>
+      </html>
+    `
+
+    const printWin = window.open('', '_blank')
+    printWin.document.write(printContent)
+    printWin.document.close()
+
+    fetchSalesLog()
+  } catch (err) {
+    console.error(err)
+    snackbarStore.show({ message: 'Failed to export sales PDF report', type: 'error' })
+  } finally {
+    isExportingPdf.value = false
+  }
+}
 
 // Patient Search
 let patientDebounce = null
@@ -354,32 +555,94 @@ const formatDate = (dateStr) => {
 
       <!-- Dispensation Log Table Card -->
       <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="p-5 border-b border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h3 class="text-base font-bold text-slate-800">Dispensation & Billing History</h3>
-          <div class="flex items-center gap-3 w-full sm:w-auto">
-            <!-- Search -->
-            <div class="relative w-full sm:w-64">
-              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        <div class="p-5 border-b border-slate-100 bg-slate-50/30 space-y-4">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <h3 class="text-base font-bold text-slate-800">Dispensation & Billing History</h3>
+            <div class="flex items-center gap-3 w-full lg:w-auto">
+              <!-- Search -->
+              <div class="relative w-full lg:w-64">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+                <input 
+                  v-model="searchQuery"
+                  type="text" 
+                  placeholder="Search by Invoice No, Customer Name..." 
+                  class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500 transition-all shadow-inner"
+                />
+              </div>
+
+              <!-- Export PDF Button -->
+              <button 
+                @click="handleExportPdf"
+                :disabled="isExportingPdf"
+                class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-teal-700 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                <svg v-if="isExportingPdf" class="animate-spin h-4 w-4 text-teal-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-              </span>
+                <svg v-else class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export PDF
+              </button>
+
+              <!-- Create Bill Button -->
+              <button 
+                v-if="authStore.hasPermission('supplier.create')"
+                @click="currentView = 'create'"
+                class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg shadow-teal-100 transition-all flex items-center gap-2 transform active:scale-95 shrink-0 cursor-pointer"
+              >
+                <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                New Sale
+              </button>
+            </div>
+          </div>
+
+          <!-- Date Range & Payment Method Filters Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-2">
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">From Date</label>
               <input 
-                v-model="searchQuery"
-                type="text" 
-                placeholder="Search by Invoice No, Customer Name..." 
-                class="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500 transition-all shadow-inner"
+                v-model="filterStartDate"
+                type="date"
+                class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
               />
             </div>
-            <!-- Create Bill Button -->
-            <button 
-              v-if="authStore.hasPermission('supplier.create')"
-              @click="currentView = 'create'"
-              class="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg shadow-teal-100 transition-all flex items-center gap-2 transform active:scale-95 shrink-0"
-            >
-              <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-              New Sale
-            </button>
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">To Date</label>
+              <input 
+                v-model="filterEndDate"
+                type="date"
+                class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
+              />
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Payment Mode</label>
+              <select 
+                v-model="filterPaymentMethod"
+                class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
+              >
+                <option value="">All Payment Modes</option>
+                <option value="CASH">Cash</option>
+                <option value="UPI">UPI</option>
+                <option value="CARD">Card</option>
+                <option value="NET_BANKING">Net Banking</option>
+                <option value="CHEQUE">Cheque</option>
+              </select>
+            </div>
+            <div class="flex items-end gap-2">
+              <button 
+                v-if="filterStartDate || filterEndDate || filterPaymentMethod"
+                @click="clearFilters"
+                class="px-3 py-1.5 text-xs text-slate-500 font-bold hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            </div>
           </div>
         </div>
 
@@ -408,6 +671,7 @@ const formatDate = (dateStr) => {
               <tr class="bg-slate-50 border-b border-slate-100">
                 <th class="text-slate-500 font-semibold text-xs uppercase px-6 py-4 tracking-wider">Invoice No</th>
                 <th class="text-slate-500 font-semibold text-xs uppercase px-6 py-4 tracking-wider">Patient / Customer Details</th>
+                <th class="text-slate-500 font-semibold text-xs uppercase px-6 py-4 tracking-wider">Payment Mode</th>
                 <th class="text-slate-500 font-semibold text-xs uppercase px-6 py-4 tracking-wider">Total Bill Amount</th>
                 <th class="text-slate-500 font-semibold text-xs uppercase px-6 py-4 tracking-wider">Remarks / Note</th>
                 <th class="text-slate-500 font-semibold text-xs uppercase px-6 py-4 tracking-wider">Date & Time</th>
@@ -429,6 +693,11 @@ const formatDate = (dateStr) => {
                     <div v-if="sale.customerPhone" class="text-[10px] text-slate-500 mt-0.5">Mob: {{ sale.customerPhone }}</div>
                   </div>
                 </td>
+                <td class="px-6 py-4 font-semibold text-slate-700 text-xs">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-50 text-sky-700 border border-sky-100 uppercase">
+                    {{ sale.paymentMethod || 'CASH' }}
+                  </span>
+                </td>
                 <td class="px-6 py-4 font-bold text-slate-900 text-sm">
                   ₹{{ sale.totalAmount?.toFixed(2) }}
                 </td>
@@ -441,7 +710,7 @@ const formatDate = (dateStr) => {
                 <td class="px-6 py-4 text-center">
                   <button 
                     @click="handleViewSale(sale)"
-                    class="bg-slate-50 border border-slate-200 hover:border-teal-500 hover:bg-teal-50 text-slate-700 hover:text-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all transform active:scale-95"
+                    class="bg-slate-50 border border-slate-200 hover:border-teal-500 hover:bg-teal-50 text-slate-700 hover:text-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-all transform active:scale-95 cursor-pointer"
                   >
                     View Invoice
                   </button>

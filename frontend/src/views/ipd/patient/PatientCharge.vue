@@ -46,6 +46,7 @@ const chargeForm = ref({
   chargeMasterId: '',
   doctorId: '',
   description: '',
+  ot_description: '',
   rate: 0,
   quantity: 1,
   chargeDate: getLocalDateString()
@@ -193,7 +194,10 @@ const isDoctorCategory = computed(() => {
 
 const isOtCategory = computed(() => {
   const selectedCat = chargeCategories.value.find(c => c._id === chargeForm.value.chargeCategoryId)
-  return selectedCat?.code === 'OT'
+  if (!selectedCat) return false
+  const code = (selectedCat.code || '').toUpperCase()
+  const name = (selectedCat.name || '').toLowerCase()
+  return code === 'OT' || name.includes('operation') || name.includes('ot') || name.includes('theatre') || name.includes('theater')
 })
 
 const onCategoryChange = async () => {
@@ -201,6 +205,7 @@ const onCategoryChange = async () => {
   chargeForm.value.chargeMasterId = ''
   chargeForm.value.doctorId = ''
   chargeForm.value.description = ''
+  chargeForm.value.ot_description = ''
   chargeForm.value.rate = 0
   otPackageItems.value = []
   selectedAddons.value = []
@@ -306,6 +311,23 @@ const removeCustomAddon = (id) => {
   updateRateAndDescriptionFromAddons()
 }
 
+// Amount breakdown computed properties for modal
+const selectedActiveAddons = computed(() => {
+  return otPackageItems.value.filter(item => selectedAddons.value.includes(item._id))
+})
+
+const baseChargeSubtotal = computed(() => {
+  return (chargeForm.value.rate || 0) * (chargeForm.value.quantity || 1)
+})
+
+const addonsSubtotal = computed(() => {
+  return selectedActiveAddons.value.reduce((sum, item) => sum + (item.defaultAmount || 0), 0)
+})
+
+const totalCalculatedCharge = computed(() => {
+  return baseChargeSubtotal.value + addonsSubtotal.value
+})
+
 // Helper: total amount for a charge = base amount + all addon amounts
 const getChargeTotal = (charge) => {
   const base = charge.amount || 0
@@ -395,6 +417,7 @@ const openAddModal = async () => {
     chargeMasterId: '',
     doctorId: '',
     description: '',
+    ot_description: '',
     rate: 0,
     quantity: 1,
     chargeDate: getLocalDateString()
@@ -441,6 +464,7 @@ const submitCharge = async () => {
     chargeCategoryId: chargeForm.value.chargeCategoryId,
     chargeMasterId: chargeForm.value.chargeMasterId || null,
     description: chargeForm.value.description,
+    ot_description: isOtCategory.value ? (chargeForm.value.ot_description?.trim() || null) : null,
     rate: chargeForm.value.rate,
     quantity: chargeForm.value.quantity,
     chargeDate: chargeForm.value.chargeDate,
@@ -650,6 +674,14 @@ onBeforeUnmount(() => {
                 </td>
                 <td class="px-5 py-3 font-semibold text-slate-800">
                   <div>{{ charge.description }}</div>
+
+                  <!-- OT Description Details -->
+                  <div v-if="charge.ot_description" class="mt-1 text-[11px] font-normal text-slate-600 bg-rose-50/60 border border-rose-100 p-1.5 rounded-lg flex items-start gap-1.5">
+                    <svg class="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 01-2-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <span><strong>OT Notes:</strong> {{ charge.ot_description }}</span>
+                  </div>
                   
                   <!-- Addons list -->
                   <div v-if="charge.addons && charge.addons.length > 0" class="mt-1.5 flex flex-wrap gap-1">
@@ -1078,6 +1110,22 @@ onBeforeUnmount(() => {
             />
           </div>
 
+          <!-- OT Description (Visible only when Operation Theater Charges / OT is selected) -->
+          <div v-if="isOtCategory" class="space-y-1 animate-in fade-in duration-200">
+            <label class="text-xs font-bold text-rose-600 uppercase tracking-wide flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 01-2-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              OT Description / Procedure Notes
+            </label>
+            <textarea 
+              v-model="chargeForm.ot_description"
+              rows="2"
+              placeholder="Procedure notes, OT room details, surgical observations, or anesthesia notes..."
+              class="w-full px-3.5 py-2 rounded-xl border border-rose-200 focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 text-slate-700 bg-rose-50/20 font-medium text-xs transition-all placeholder-slate-400"
+            ></textarea>
+          </div>
+
           <!-- Charge Date (Backdating) -->
           <div class="space-y-1">
             <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Charge Date</label>
@@ -1111,10 +1159,39 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Summary calculated amount block -->
-          <div class="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 flex justify-between items-center text-xs">
-            <span class="font-bold text-slate-500">Calculated Charge Amount:</span>
-            <span class="font-extrabold text-indigo-700 text-sm">₹{{ (chargeForm.rate * chargeForm.quantity).toLocaleString() }}</span>
+          <!-- Detailed calculated charge amount breakdown card -->
+          <div class="bg-gradient-to-br from-indigo-50/70 to-slate-50 border border-indigo-100/80 rounded-2xl p-4 space-y-3 text-xs">
+            <div class="flex justify-between items-center pb-2 border-b border-indigo-100/60">
+              <span class="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Charge Amount Breakdown</span>
+              <span class="font-black text-indigo-700 text-base">₹{{ totalCalculatedCharge.toLocaleString() }}</span>
+            </div>
+
+            <div class="space-y-1.5 text-slate-600">
+              <div class="flex justify-between items-center text-[11px]">
+                <span>Base Charge Rate (₹{{ (chargeForm.rate || 0).toLocaleString() }} × {{ chargeForm.quantity }} qty):</span>
+                <span class="font-bold text-slate-800">₹{{ baseChargeSubtotal.toLocaleString() }}</span>
+              </div>
+
+              <template v-if="selectedActiveAddons.length > 0">
+                <div class="pt-1.5 border-t border-slate-200/50 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  <span>Included Addons / Package Components ({{ selectedActiveAddons.length }})</span>
+                  <span>₹{{ addonsSubtotal.toLocaleString() }}</span>
+                </div>
+                <div 
+                  v-for="addon in selectedActiveAddons" 
+                  :key="addon._id" 
+                  class="flex justify-between items-center pl-2 text-[11px] text-slate-600"
+                >
+                  <span class="truncate max-w-[220px]">• {{ addon.itemName }}</span>
+                  <span class="font-medium text-slate-700">₹{{ (addon.defaultAmount || 0).toLocaleString() }}</span>
+                </div>
+              </template>
+
+              <div class="pt-2 border-t border-indigo-200/60 flex justify-between items-center font-bold text-xs text-slate-900">
+                <span>Total Calculated Amount:</span>
+                <span class="font-extrabold text-indigo-700 text-sm">₹{{ totalCalculatedCharge.toLocaleString() }}</span>
+              </div>
+            </div>
           </div>
         </div>
 

@@ -42,13 +42,23 @@ const newPatient = ref({
 })
 const isCreatingPatient = ref(false)
 
+const getLocalDatetimeString = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
 // STEP 2: Doctor, Ward & Bed Selection
 const admissionForm = ref({
   consultantDoctorId: '',
   wardId: '',
   bedId: '',
   admissionType: 'NORMAL',
-  admissionDate: new Date().toISOString().split('T')[0],
+  admissionDate: getLocalDatetimeString(),
   diagnosis: '',
   remarks: ''
 })
@@ -180,7 +190,7 @@ const openAdmitModal = () => {
     wardId: '',
     bedId: '',
     admissionType: 'NORMAL',
-    admissionDate: new Date().toISOString().split('T')[0],
+    admissionDate: getLocalDatetimeString(),
     diagnosis: '',
     remarks: ''
   }
@@ -310,8 +320,16 @@ const getAdmissionTypeColor = (type) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  const dateObj = new Date(dateString)
+  if (isNaN(dateObj.getTime())) return String(dateString)
+
+  return dateObj.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
   })
 }
 
@@ -438,7 +456,7 @@ const doctorOptions = computed(() => {
               <!-- IPD No & Date -->
               <td class="px-6 py-4">
                 <span class="font-mono text-indigo-600 font-bold block">{{ adm.admissionNo }}</span>
-                <span class="text-slate-400 text-xs mt-0.5 block">{{ formatDate(adm.admissionDate) }}</span>
+                <span class="text-slate-400 text-xs mt-0.5 block">{{ formatDate(adm.createdAt || adm.admissionDate) }}</span>
               </td>
               
               <!-- Patient Details -->
@@ -754,9 +772,9 @@ const doctorOptions = computed(() => {
                 
                 <BaseInput 
                   v-model="admissionForm.admissionDate"
-                  type="date"
+                  type="datetime-local"
                   id="admissionDate"
-                  label="Admission Date"
+                  label="Admission Date & Time"
                   required
                 />
               </div>

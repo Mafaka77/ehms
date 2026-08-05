@@ -56,6 +56,11 @@ const patientChargeSchema = new mongoose.Schema({
     required: true
   },
 
+  ot_description: {
+    type: String,
+    default: null
+  },
+
   sourceId: {
     type: mongoose.Schema.Types.ObjectId,
     default: null

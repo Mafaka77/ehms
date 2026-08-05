@@ -7,7 +7,7 @@ import PharmacyOrder from './PharmacyOrder.vue'
 import BedHistory from './BedHistory.vue'
 import PatientCharge from './PatientCharge.vue'
 
-import PatientFiles from './PatientFIles.vue'
+import DischargeSummary from './DischargeSummary.vue'
 import Test from './Test.vue'
 import Transactions from './Transactions.vue'
 import { useIpdWardStore } from '../../../stores/ipdWardStore'
@@ -340,14 +340,14 @@ onMounted(async () => {
           Test
         </button>
         <button 
-          @click="activeTab = 'files'"
+          @click="activeTab = 'discharge_summary'"
           class="flex-1 sm:flex-initial px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
-          :class="activeTab === 'files' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
+          :class="activeTab === 'discharge_summary' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
         >
           <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          Patient Files
+          Discharge Summary
         </button>
         <button 
           @click="activeTab = 'bed_history'"
@@ -383,9 +383,9 @@ onMounted(async () => {
           <PharmacyOrder :admissionId="admission._id" :admission="admission" />
         </div>
 
-        <!-- Tab: Patient Files -->
-        <div v-else-if="activeTab === 'files'" class="space-y-4 animate-in fade-in duration-200">
-          <PatientFiles :admissionId="admission._id" :admission="admission" />
+        <!-- Tab: Discharge Summary -->
+        <div v-else-if="activeTab === 'discharge_summary'" class="space-y-4 animate-in fade-in duration-200">
+          <DischargeSummary :admissionId="admission._id" :admission="admission" />
         </div>
 
         <!-- Tab: Test & Diagnostics -->

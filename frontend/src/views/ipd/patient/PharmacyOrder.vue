@@ -78,10 +78,65 @@ const form = ref({
   doctorId: '',
   priority: 'NORMAL',
   remarks: '',
-  items: [
-    { medicineId: '', quantity: 1, remarks: '' }
-  ]
+  items: []
 })
+
+// Search Medicine States (Like Indent.vue)
+const medSearchQuery = ref('')
+const matchingMedicines = ref([])
+const selectedMedicine = ref(null)
+const selectedQty = ref(1)
+const selectedDirections = ref('')
+
+let medDebounce = null
+const handleMedicineSearch = () => {
+  if (medDebounce) clearTimeout(medDebounce)
+  if (!medSearchQuery.value || medSearchQuery.value.length < 2) {
+    matchingMedicines.value = []
+    return
+  }
+  medDebounce = setTimeout(async () => {
+    const res = await pharmacyStore.fetchMedicines(1, 15, medSearchQuery.value, '', '', 'true')
+    matchingMedicines.value = res || []
+  }, 300)
+}
+
+const selectMedicine = (med) => {
+  selectedMedicine.value = med
+  medSearchQuery.value = ''
+  matchingMedicines.value = []
+  selectedQty.value = 1
+  selectedDirections.value = ''
+}
+
+const addDraftItem = () => {
+  if (!selectedMedicine.value) return
+  if (selectedQty.value <= 0) {
+    snackbarStore.show({ message: 'Quantity must be at least 1.', type: 'warning' })
+    return
+  }
+
+  const existing = form.value.items.find(item => item.medicineId === selectedMedicine.value._id)
+  if (existing) {
+    existing.quantity += selectedQty.value
+    if (selectedDirections.value) existing.remarks = selectedDirections.value
+  } else {
+    form.value.items.push({
+      medicineId: selectedMedicine.value._id,
+      medicineName: selectedMedicine.value.medicineName,
+      medicineCode: selectedMedicine.value.medicineCode,
+      dosageForm: selectedMedicine.value.dosageForm,
+      strength: selectedMedicine.value.strength,
+      unit: selectedMedicine.value.unit,
+      quantity: selectedQty.value,
+      remarks: selectedDirections.value
+    })
+  }
+
+  selectedMedicine.value = null
+  selectedQty.value = 1
+  selectedDirections.value = ''
+}
 
 // Fetch current IPD orders
 const fetchOrders = async () => {
@@ -132,21 +187,18 @@ const openModal = () => {
     doctorId: props.admission.consultantDoctorId?._id || props.admission.consultantDoctorId || '',
     priority: 'NORMAL',
     remarks: '',
-    items: [
-      { medicineId: '', quantity: 1, remarks: '' }
-    ]
+    items: []
   }
+  medSearchQuery.value = ''
+  matchingMedicines.value = []
+  selectedMedicine.value = null
+  selectedQty.value = 1
+  selectedDirections.value = ''
   showCreateModal.value = true
 }
 
-const addItem = () => {
-  form.value.items.push({ medicineId: '', quantity: 1, remarks: '' })
-}
-
 const removeItem = (idx) => {
-  if (form.value.items.length > 1) {
-    form.value.items.splice(idx, 1)
-  }
+  form.value.items.splice(idx, 1)
 }
 
 const submitOrder = async () => {
@@ -326,7 +378,7 @@ onMounted(async () => {
       v-if="showCreateModal" 
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity"
     >
-      <div class="bg-white w-full max-w-3xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div class="bg-white w-full max-w-5xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <!-- Modal Title Header -->
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div>
@@ -345,7 +397,138 @@ onMounted(async () => {
 
         <!-- Scrollable Modal Body Form -->
         <div class="p-6 overflow-y-auto space-y-4 flex-1">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Select & Request Medicines (Like Indent.vue) -->
+          <div class="bg-white rounded-2xl border border-slate-200/70 p-5 shadow-sm space-y-4">
+            <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider pb-2 border-b border-slate-100">Select & Request Medicines</h4>
+            
+            <!-- Search Medicine Input -->
+            <div class="space-y-1.5 relative">
+              <label class="block text-xs font-bold text-slate-700">Search Medicine *</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                  <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </span>
+                <input 
+                  v-model="medSearchQuery"
+                  @input="handleMedicineSearch"
+                  type="text" 
+                  placeholder="Type name, code, brand or formula..."
+                  class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all shadow-inner"
+                />
+              </div>
+
+              <!-- Dropdown Results -->
+              <div v-if="matchingMedicines.length > 0" class="absolute z-30 w-full mt-1.5 bg-white border border-slate-100 shadow-xl rounded-xl overflow-hidden max-h-56 overflow-y-auto divide-y divide-slate-50">
+                <div 
+                  v-for="med in matchingMedicines" 
+                  :key="med._id"
+                  @click="selectMedicine(med)"
+                  class="px-4 py-2.5 hover:bg-indigo-50/50 cursor-pointer flex justify-between items-center text-xs"
+                >
+                  <div>
+                    <p class="font-bold text-slate-800">{{ med.medicineName }}</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Code: {{ med.medicineCode }} • {{ med.dosageForm || 'TAB' }} - {{ med.strength || '' }} (Stock: {{ med.currentStock || 0 }})</p>
+                  </div>
+                  <button type="button" class="text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded-lg font-bold">Select</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Selected Medicine Form Card -->
+            <div v-if="selectedMedicine" class="bg-indigo-50/40 border border-indigo-100 rounded-xl p-4 grid grid-cols-1 sm:grid-cols-6 gap-3 items-end">
+              <div class="sm:col-span-2 space-y-1">
+                <span class="text-[10px] uppercase font-bold text-indigo-500">Selected Medicine</span>
+                <p class="text-xs font-bold text-slate-800">{{ selectedMedicine.medicineName }}</p>
+                <p class="text-[10px] text-slate-500">{{ selectedMedicine.dosageForm || 'TAB' }} {{ selectedMedicine.strength || '' }} (Code: {{ selectedMedicine.medicineCode }})</p>
+              </div>
+
+              <div class="space-y-1 sm:col-span-1">
+                <label class="block text-xs font-bold text-slate-700">Qty *</label>
+                <input 
+                  v-model.number="selectedQty" 
+                  type="number" 
+                  min="1" 
+                  class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                >
+              </div>
+
+              <div class="space-y-1 sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-700">Directions / Remarks</label>
+                <input 
+                  v-model="selectedDirections" 
+                  type="text" 
+                  placeholder="e.g. 1-0-1 TDS after meals"
+                  class="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                >
+              </div>
+
+              <div class="sm:col-span-1">
+                <button 
+                  @click="addDraftItem"
+                  type="button"
+                  class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 rounded-lg transition-all shadow-md flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  Add Item
+                </button>
+              </div>
+            </div>
+
+            <!-- Added Items Table -->
+            <div class="border border-slate-200/80 rounded-xl overflow-hidden mt-3">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-50 border-b border-slate-100 text-slate-500 font-bold">
+                  <tr>
+                    <th class="px-4 py-2.5">Medicine Name</th>
+                    <th class="px-4 py-2.5 text-center w-24">Qty</th>
+                    <th class="px-4 py-2.5">Directions / Remarks</th>
+                    <th class="px-4 py-2.5 text-right w-16">Action</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-slate-600">
+                  <tr v-for="(item, idx) in form.items" :key="idx" class="hover:bg-slate-50/50">
+                    <td class="px-4 py-2.5 font-bold text-slate-800">
+                      {{ item.medicineName || 'Medicine' }}
+                      <span v-if="item.strength || item.dosageForm" class="text-[10px] text-slate-400 font-normal ml-1">
+                        ({{ item.dosageForm || 'TAB' }} - {{ item.strength || '' }})
+                      </span>
+                    </td>
+                    <td class="px-4 py-2.5">
+                      <input 
+                        v-model.number="item.quantity" 
+                        type="number" 
+                        min="1" 
+                        class="w-full px-2 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-center outline-none focus:border-indigo-500"
+                      />
+                    </td>
+                    <td class="px-4 py-2.5">
+                      <input 
+                        v-model="item.remarks" 
+                        type="text" 
+                        placeholder="Directions..." 
+                        class="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-indigo-500"
+                      />
+                    </td>
+                    <td class="px-4 py-2.5 text-right">
+                      <button 
+                        @click="removeItem(idx)" 
+                        type="button"
+                        class="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                      </button>
+                    </td>
+                  </tr>
+                  <tr v-if="form.items.length === 0">
+                    <td colspan="4" class="px-4 py-6 text-center text-slate-400 italic">
+                      No medicines added yet. Search and select medicines above.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <!-- Doctor Input Selection -->
             <div class="space-y-1">
               <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Prescribed By (Doctor)</label>
@@ -388,82 +571,6 @@ onMounted(async () => {
               placeholder="E.g. Take with warm water, check patient allergies, notes to pharmacist..."
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
             ></textarea>
-          </div>
-
-          <!-- Add Medicines Section -->
-          <div class="space-y-3 pt-2">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-2">
-              <h4 class="text-xs font-bold text-slate-600 uppercase tracking-wider">Medicines Checklist</h4>
-              <button 
-                type="button"
-                @click="addItem"
-                class="text-indigo-600 hover:text-indigo-800 text-xs font-bold flex items-center gap-1 cursor-pointer"
-              >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Add Medicine
-              </button>
-            </div>
-
-            <!-- List of dynamic medicine inputs -->
-            <div class="space-y-3">
-              <div 
-                v-for="(item, idx) in form.items" 
-                :key="idx"
-                class="flex flex-col sm:flex-row gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200/50 items-start sm:items-center relative"
-              >
-                <!-- Medicine Dropdown selection -->
-                <div class="flex-1 w-full space-y-1">
-                  <select 
-                    v-model="item.medicineId"
-                    class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-slate-700 bg-white text-xs"
-                  >
-                    <option value="">Select Medicine...</option>
-                    <option 
-                      v-for="med in pharmacyStore.medicines" 
-                      :key="med._id" 
-                      :value="med._id"
-                    >
-                      {{ med.medicineName }} (Code: {{ med.medicineCode }} / {{ med.dosageForm || 'TAB' }} - {{ med.strength || '' }})
-                    </option>
-                  </select>
-                </div>
-
-                <!-- Quantity -->
-                <div class="w-full sm:w-28 space-y-1">
-                  <input 
-                    type="number" 
-                    v-model.number="item.quantity" 
-                    min="1"
-                    placeholder="Qty"
-                    class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-slate-700 text-xs text-center"
-                  />
-                </div>
-
-                <!-- Dosage / Directions Remarks -->
-                <div class="flex-1 w-full space-y-1">
-                  <input 
-                    type="text" 
-                    v-model="item.remarks" 
-                    placeholder="Directions (e.g. 1-0-1 TDS, after meals)"
-                    class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-slate-700 text-xs"
-                  />
-                </div>
-
-                <!-- Remove item button -->
-                <button 
-                  type="button"
-                  @click="removeItem(idx)"
-                  :disabled="form.items.length === 1"
-                  class="p-1.5 rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-rose-500 hover:bg-white disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                >
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 

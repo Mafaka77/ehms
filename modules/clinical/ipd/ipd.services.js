@@ -469,22 +469,14 @@ exports.updateAdmission = async (id, data) => {
                     currentHistory.totalAmount = diffDays * currentHistory.dailyRate
                     await currentHistory.save({ session })
 
-                    // Add charge to PatientCharge
+                    // If charge was already posted for this bed history, update it; otherwise do not auto-create
                     const PatientCharge = require('../../common/patient_charge.model')
-                    const ChargeCategory = require('./ipd_charge_category.model')
-                    const roomCategory = await ChargeCategory.findOne({ code: 'ROOM' })
-
-                    await PatientCharge.create([{
-                        admissionId: id,
-                        patientId: admission.patientId,
-                        chargeCategoryId: roomCategory?._id,
-                        description: `IPD Bed Rental (Bed Rate: ₹${currentHistory.dailyRate}/day)`,
-                        sourceId: currentHistory._id,
-                        quantity: currentHistory.totalDays,
-                        rate: currentHistory.dailyRate,
-                        amount: currentHistory.totalAmount,
-                        isBilled: false
-                    }], { session })
+                    const existingCharge = await PatientCharge.findOne({ sourceId: currentHistory._id }).session(session)
+                    if (existingCharge && !existingCharge.isBilled) {
+                        existingCharge.quantity = currentHistory.totalDays
+                        existingCharge.amount = currentHistory.totalAmount
+                        await existingCharge.save({ session })
+                    }
                 }
             } else if (data.status === 'ADMITTED') {
                 const bed = await Bed.findById(admission.bedId).session(session)
@@ -545,23 +537,14 @@ exports.updateAdmission = async (id, data) => {
                 currentHistory.totalAmount = diffDays * currentHistory.dailyRate
                 await currentHistory.save({ session })
 
-                // Add charge to PatientCharge
+                // If charge was already posted for this bed history, update it; otherwise do not auto-create
                 const PatientCharge = require('../../common/patient_charge.model')
-                const ChargeCategory = require('./ipd_charge_category.model')
-                const roomCategory = await ChargeCategory.findOne({ code: 'ROOM' })
-
-                await PatientCharge.create([{
-                    admissionId: id,
-                    sourceType: 'IPD',
-                    patientId: admission.patientId,
-                    chargeCategoryId: roomCategory?._id,
-                    description: `IPD Bed Rental (Bed Rate: ₹${currentHistory.dailyRate}/day)`,
-                    sourceId: currentHistory._id,
-                    quantity: currentHistory.totalDays,
-                    rate: currentHistory.dailyRate,
-                    amount: currentHistory.totalAmount,
-                    isBilled: false
-                }], { session })
+                const existingCharge = await PatientCharge.findOne({ sourceId: currentHistory._id }).session(session)
+                if (existingCharge && !existingCharge.isBilled) {
+                    existingCharge.quantity = currentHistory.totalDays
+                    existingCharge.amount = currentHistory.totalAmount
+                    await existingCharge.save({ session })
+                }
             }
 
             await AdmissionBedHistory.create([{
@@ -692,11 +675,128 @@ exports.deletePatientFile = async (fileId) => {
 exports.getAdmissionBedHistory = async (admissionId) => {
     try {
         const AdmissionBedHistory = require('./admission_bed_history.model')
-        return await AdmissionBedHistory.find({ admissionId })
+        const PatientCharge = require('../../common/patient_charge.model')
+
+        const histories = await AdmissionBedHistory.find({ admissionId })
             .populate('wardId')
             .populate('bedId')
             .populate('createdBy', 'fullName')
             .sort({ fromDate: -1 })
+            .lean()
+
+        const historyIds = histories.map(h => h._id)
+        const charges = await PatientCharge.find({ sourceId: { $in: historyIds } }).lean()
+
+        const chargeMap = {}
+        charges.forEach(c => {
+            if (c.sourceId) {
+                chargeMap[c.sourceId.toString()] = c
+            }
+        })
+
+        return histories.map(h => ({
+            ...h,
+            postedCharge: chargeMap[h._id.toString()] || null
+        }))
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.postAdmissionBedCharge = async (historyId, customDays = null) => {
+    try {
+        const AdmissionBedHistory = require('./admission_bed_history.model')
+        const PatientCharge = require('../../common/patient_charge.model')
+        const ChargeCategory = require('./ipd_charge_category.model')
+        const Admission = require('./admission.model')
+
+        const history = await AdmissionBedHistory.findById(historyId).populate('wardId bedId')
+        if (!history) {
+            const error = new Error('Bed history record not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const admission = await Admission.findById(history.admissionId)
+        if (!admission) {
+            const error = new Error('Admission record not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        let days = 1
+        if (customDays && Number(customDays) > 0) {
+            days = Number(customDays)
+        } else if (history.isCurrent) {
+            const from = new Date(history.fromDate)
+            const to = new Date()
+            days = Math.max(1, Math.ceil((to - from) / (1000 * 60 * 60 * 24)))
+        } else {
+            days = history.totalDays || 1
+        }
+
+        const dailyRate = history.dailyRate || 0
+        const totalAmount = days * dailyRate
+
+        let roomCategory = await ChargeCategory.findOne({ code: 'ROOM' })
+        if (!roomCategory) {
+            roomCategory = await ChargeCategory.findOne({ name: /room|bed/i })
+        }
+
+        const bedNo = history.bedId?.bedNo || 'N/A'
+        const wardName = history.wardId?.name || 'N/A'
+        const description = `IPD Bed Rental - Bed ${bedNo} (${wardName}) (${days} Days @ ₹${dailyRate}/day)`
+
+        let charge = await PatientCharge.findOne({ sourceId: history._id })
+        if (charge) {
+            if (charge.isBilled) {
+                const error = new Error('This bed charge has already been billed in an invoice and cannot be updated.')
+                error.status = STATUS_CODES.BAD_REQUEST
+                throw error
+            }
+            charge.quantity = days
+            charge.rate = dailyRate
+            charge.amount = totalAmount
+            charge.description = description
+            if (roomCategory) charge.chargeCategoryId = roomCategory._id
+            await charge.save()
+        } else {
+            charge = await PatientCharge.create({
+                admissionId: history.admissionId,
+                patientId: admission.patientId,
+                chargeCategoryId: roomCategory?._id,
+                sourceType: 'IPD',
+                sourceId: history._id,
+                description,
+                quantity: days,
+                rate: dailyRate,
+                amount: totalAmount,
+                isBilled: false
+            })
+        }
+
+        if (history.isCurrent) {
+            history.totalDays = days
+            history.totalAmount = totalAmount
+            await history.save()
+        }
+
+        return { history, charge }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.postAllAdmissionBedCharges = async (admissionId) => {
+    try {
+        const AdmissionBedHistory = require('./admission_bed_history.model')
+        const histories = await AdmissionBedHistory.find({ admissionId })
+        const results = []
+        for (const h of histories) {
+            const res = await exports.postAdmissionBedCharge(h._id)
+            results.push(res)
+        }
+        return results
     } catch (error) {
         throw error
     }
@@ -918,6 +1018,7 @@ exports.createAdmissionCharge = async (admissionId, data, userId) => {
             chargeCategoryId: data.chargeCategoryId,
             chargeMasterId: data.chargeMasterId || null,
             description: data.description,
+            ot_description: data.ot_description || null,
             quantity,
             rate,
             amount,

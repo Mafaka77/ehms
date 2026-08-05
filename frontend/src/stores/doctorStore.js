@@ -74,6 +74,20 @@ export const useDoctorStore = defineStore('doctor', {
             }
         },
 
+        async deleteDoctor(id) {
+            this.loading = true;
+            try {
+                const response = await api.delete(`/doctors/${id}`);
+                this.doctors = this.doctors.filter(d => d._id !== id);
+                return { success: true, message: response.data.message || 'Doctor deleted successfully' };
+            } catch (error) {
+                const message = error.response?.data?.message || error.message || 'Failed to delete doctor';
+                return { success: false, message };
+            } finally {
+                this.loading = false;
+            }
+        },
+
         async fetchDoctorById(id) {
             this.loading = true;
             try {

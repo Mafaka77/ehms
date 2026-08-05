@@ -186,6 +186,25 @@ exports.updateDoctor = async (id, data) => {
     }
 }
 
+exports.deleteDoctor = async (id) => {
+    try {
+        const doctor = await Doctor.findById(id);
+        if (!doctor) {
+            const error = new Error('Doctor not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+        if (doctor.employeeId) {
+            await Employee.findByIdAndDelete(doctor.employeeId);
+        }
+        await DoctorRemunerationRule.deleteMany({ doctorId: id });
+        await Doctor.findByIdAndDelete(id);
+        return doctor;
+    } catch (error) {
+        throw error;
+    }
+}
+
 
 // Remuneration Rules Services
 exports.getRemunerationRules = async (doctorId) => {

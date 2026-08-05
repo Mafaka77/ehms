@@ -495,10 +495,9 @@ exports.createSale = async (createdBy, data) => {
 exports.getAllSales = async (query = {}) => {
     try {
         const page = parseInt(query.page) || 1
-        const limit = parseInt(query.limit) || 10
+        const limit = parseInt(query.limit) === 0 ? 0 : (parseInt(query.limit) || 10)
         const search = query.search || ''
-        const skip = (page - 1) * limit
-
+        const skip = (page - 1) * (limit || 1)
         let filter = {}
         if (search) {
             filter.$or = [
@@ -512,16 +511,35 @@ exports.getAllSales = async (query = {}) => {
         if (query.patientId) {
             filter.patientId = query.patientId
         }
+        if (query.paymentMethod) {
+            filter.paymentMethod = query.paymentMethod
+        }
+        if (query.startDate || query.endDate) {
+            filter.createdAt = {}
+            if (query.startDate) {
+                filter.createdAt.$gte = new Date(query.startDate)
+            }
+            if (query.endDate) {
+                const end = new Date(query.endDate)
+                end.setHours(23, 59, 59, 999)
+                filter.createdAt.$lte = end
+            }
+        }
 
         const total = await PharmacySale.countDocuments(filter)
-        const sales = await PharmacySale.find(filter)
+        
+        let queryExec = PharmacySale.find(filter)
             .populate('patientId')
             .populate('createdBy')
             .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
 
-        return { sales, pagination: { total, page, limit, pages: Math.ceil(total / limit) } }
+        if (limit > 0) {
+            queryExec = queryExec.skip(skip).limit(limit)
+        }
+
+        const sales = await queryExec
+
+        return { sales, pagination: { total, page, limit: limit > 0 ? limit : total, pages: limit > 0 ? Math.ceil(total / limit) : 1 } }
     } catch (error) {
         throw error
     }

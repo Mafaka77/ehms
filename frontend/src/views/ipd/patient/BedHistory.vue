@@ -19,6 +19,8 @@ const snackbarStore = useSnackbarStore()
 
 const loading = ref(false)
 const history = ref([])
+const postingId = ref(null)
+const postingAll = ref(false)
 
 const showEditModal = ref(false)
 const submitting = ref(false)
@@ -107,6 +109,30 @@ const submitEdit = async () => {
   submitting.value = false
 }
 
+const postSingleCharge = async (item) => {
+  postingId.value = item._id
+  const res = await admissionStore.postAdmissionBedCharge(item._id)
+  if (res.success) {
+    snackbarStore.show({ message: res.message || 'Bed charge posted to Patient Charges successfully', type: 'success' })
+    await fetchBedHistory()
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
+  postingId.value = null
+}
+
+const postAllCharges = async () => {
+  postingAll.value = true
+  const res = await admissionStore.postAllAdmissionBedCharges(props.admissionId)
+  if (res.success) {
+    snackbarStore.show({ message: 'All bed charges synced to Patient Charges for final billing', type: 'success' })
+    await fetchBedHistory()
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
+  postingAll.value = false
+}
+
 onMounted(async () => {
   await fetchBedHistory()
 })
@@ -119,9 +145,26 @@ watch(() => props.admission?.bedId?._id || props.admission?.bedId, async () => {
 <template>
   <div class="space-y-6">
     <!-- Header -->
-    <div>
-      <h3 class="font-bold text-slate-800 text-base">Bed & Ward Occupancy History</h3>
-      <p class="text-xs text-slate-400">Chronological history of patient bed transfers, ward allocations, and rentals.</p>
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div>
+        <h3 class="font-bold text-slate-800 text-base">Bed & Ward Occupancy History</h3>
+        <p class="text-xs text-slate-400">Chronological history of patient bed transfers, ward allocations, and rentals.</p>
+      </div>
+      <button 
+        v-if="history.length > 0"
+        @click="postAllCharges"
+        :disabled="postingAll"
+        class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-indigo-400 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+      >
+        <svg v-if="postingAll" class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+        </svg>
+        Sync All Bed Charges to Final Bill
+      </button>
     </div>
 
     <!-- Loading State -->
@@ -219,6 +262,43 @@ watch(() => props.admission?.bedId?._id || props.admission?.bedId, async () => {
               <span class="text-[9px] uppercase font-bold tracking-wider text-slate-400 block">Accumulated Cost</span>
               <span class="font-extrabold text-indigo-600 mt-0.5 block">₹{{ calculateAmount(item).toLocaleString() }}</span>
             </div>
+          </div>
+
+          <!-- Patient Charge Integration Status & Action -->
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-slate-100/70 text-xs">
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Patient Charge:</span>
+              <span 
+                v-if="item.postedCharge"
+                class="px-2 py-0.5 rounded text-[10px] font-bold border flex items-center gap-1"
+                :class="item.postedCharge.isBilled ? 'bg-sky-50 text-sky-700 border-sky-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'"
+              >
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Posted to Charges (₹{{ item.postedCharge.amount?.toLocaleString() }})
+                <span v-if="item.postedCharge.isBilled" class="font-normal">(Billed)</span>
+              </span>
+              <span v-else class="px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-100">
+                Not Posted to Final Bill Yet
+              </span>
+            </div>
+
+            <button 
+              v-if="!item.postedCharge || !item.postedCharge.isBilled"
+              @click="postSingleCharge(item)"
+              :disabled="postingId === item._id"
+              class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 active:bg-indigo-200 border border-indigo-100 rounded-lg text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1"
+            >
+              <svg v-if="postingId === item._id" class="animate-spin h-3 w-3 text-indigo-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <svg v-else class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              {{ item.postedCharge ? 'Update Posted Charge' : 'Add Charge to Final Bill' }}
+            </button>
           </div>
 
           <!-- Transfer Reason -->

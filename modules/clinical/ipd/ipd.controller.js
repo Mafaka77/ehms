@@ -307,6 +307,38 @@ exports.updateAdmissionBedHistory = async (req, res) => {
     }
 }
 
+exports.postAdmissionBedCharge = async (req, res) => {
+    try {
+        const result = await ipdService.postAdmissionBedCharge(req.params.id, req.body?.days)
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Bed charge added to patient charges successfully',
+            data: result,
+            status: STATUS_CODES.OK
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.postAllAdmissionBedCharges = async (req, res) => {
+    try {
+        const results = await ipdService.postAllAdmissionBedCharges(req.params.id)
+        return res.code(STATUS_CODES.OK).send({
+            message: 'All bed charges synced to patient charges successfully',
+            data: results,
+            status: STATUS_CODES.OK
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 exports.deleteAdmission = async (req, res) => {
     try {
         const admission = await ipdService.deleteAdmission(req.params.id)
