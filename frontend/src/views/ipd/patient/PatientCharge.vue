@@ -83,10 +83,51 @@ const showDoctorDropdown = ref(false)
 const doctorSearch = ref('')
 const doctorSearchInput = ref(null)
 
+// Per-addon row doctor search state — keyed by item._id
+const addonDoctorSearch = ref({})
+const addonDoctorOpen = ref({})
+
+const openAddonDoctorDropdown = (itemId) => {
+  addonDoctorOpen.value = { ...addonDoctorOpen.value, [itemId]: true }
+  if (!addonDoctorSearch.value[itemId]) addonDoctorSearch.value[itemId] = ''
+}
+const closeAddonDoctorDropdown = (itemId) => {
+  addonDoctorOpen.value = { ...addonDoctorOpen.value, [itemId]: false }
+}
+const filteredAddonDoctors = (itemId) => {
+  const q = (addonDoctorSearch.value[itemId] || '').toLowerCase()
+  return doctorStore.doctors.filter(d => d.fullName?.toLowerCase().includes(q))
+}
+const selectAddonDoctor = (item, docId, docName) => {
+  item.doctorId = docId
+  addonDoctorSearch.value[item._id] = docName ? `${docName}` : ''
+  closeAddonDoctorDropdown(item._id)
+}
+const getAddonDoctorLabel = (item) => {
+  if (!item.doctorId) return ''
+  const doc = doctorStore.doctors.find(d => d._id === item.doctorId)
+  return doc ? `${doc.fullName}` : ''
+}
+
+// Custom addon doctor search
+const customAddonDoctorSearch = ref('')
+const showCustomAddonDoctorDropdown = ref(false)
+const filteredCustomAddonDoctors = computed(() => {
+  const q = customAddonDoctorSearch.value.toLowerCase()
+  return doctorStore.doctors.filter(d => d.fullName?.toLowerCase().includes(q))
+})
+const selectCustomAddonDoctor = (docId, docName) => {
+  otCustomAddonDoctorId.value = docId
+  customAddonDoctorSearch.value = docName ? `${docName}` : ''
+  showCustomAddonDoctorDropdown.value = false
+}
+
 const closeAllDropdowns = () => {
   showCategoryDropdown.value = false
   showMasterDropdown.value = false
   showDoctorDropdown.value = false
+  showCustomAddonDoctorDropdown.value = false
+  addonDoctorOpen.value = {}
 }
 
 const handleOutsideClick = () => {
@@ -177,7 +218,7 @@ const filteredDoctors = computed(() => {
 
 const selectedDoctorName = computed(() => {
   const selected = doctorStore.doctors.find(d => d._id === chargeForm.value.doctorId)
-  return selected ? `Dr. ${selected.fullName} (${selected.specializationId?.name || 'General'})` : '-- Select Doctor --'
+  return selected ? `${selected.fullName} (${selected.specializationId?.name || 'General'})` : '-- Select Doctor --'
 })
 
 const selectDoctor = (doc) => {
@@ -266,7 +307,7 @@ const updateRateAndDescriptionFromAddons = () => {
   const descriptionWithAddons = addonNames ? `${baseName} (${addonNames})` : baseName
 
   if (doc) {
-    chargeForm.value.description = `${descriptionWithAddons} - Dr. ${doc.fullName}`.trim()
+    chargeForm.value.description = `${descriptionWithAddons} - ${doc.fullName}`.trim()
   } else {
     chargeForm.value.description = descriptionWithAddons
   }
@@ -692,7 +733,7 @@ onBeforeUnmount(() => {
                     >
                       <span>{{ addon.itemName }}</span>
                       <span v-if="addon.doctorId" class="px-1 py-0.2 text-[8px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-650 rounded">
-                        Dr. {{ addon.doctorId.fullName || addon.doctorId.name || addon.doctorId }}
+                         {{ addon.doctorId.fullName || addon.doctorId.name || addon.doctorId }}
                       </span>
                       <span class="text-slate-500 font-extrabold">(₹{{ addon.amount?.toLocaleString() }})</span>
                     </span>
@@ -702,7 +743,7 @@ onBeforeUnmount(() => {
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    Dr. {{ charge.doctorId.fullName }}
+                     {{ charge.doctorId.fullName }}
                   </div>
                 </td>
                 <td class="px-5 py-3 text-right">
@@ -796,7 +837,7 @@ onBeforeUnmount(() => {
       v-if="showAddModal" 
       class="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity overflow-y-auto"
     >
-      <div class="bg-white w-full max-w-md rounded-2xl shadow-xl flex flex-col my-8 animate-in zoom-in-95 duration-200 overflow-visible">
+      <div class="bg-white w-full max-w-xl rounded-2xl shadow-xl flex flex-col my-8 animate-in zoom-in-95 duration-200 overflow-visible">
         <!-- Header -->
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
           <div>
@@ -959,17 +1000,53 @@ onBeforeUnmount(() => {
                   />
                   <div>
                     <span class="text-xs font-bold text-slate-700 block leading-tight">{{ item.itemName }}</span>
-                    <!-- Doctor Dropdown Selector -->
-                    <div v-if="selectedAddons.includes(item._id)" class="mt-1" @click.stop.prevent>
-                      <select 
-                        v-model="item.doctorId"
-                        class="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[10px] text-slate-600 focus:outline-none focus:border-indigo-500 font-medium w-40 cursor-pointer"
+                    <!-- Doctor Searchable Combobox -->
+                    <div v-if="selectedAddons.includes(item._id)" class="mt-1.5 relative" @click.stop>
+                      <div class="flex items-center gap-1">
+                        <div class="relative flex-1">
+                          <input
+                            type="text"
+                            :placeholder="getAddonDoctorLabel(item) || 'Search doctor...' "
+                            :value="addonDoctorSearch[item._id] !== undefined ? addonDoctorSearch[item._id] : getAddonDoctorLabel(item)"
+                            @input="e => { addonDoctorSearch[item._id] = e.target.value; addonDoctorOpen[item._id] = true }"
+                            @focus="() => { if (addonDoctorSearch[item._id] === undefined) addonDoctorSearch[item._id] = ''; addonDoctorOpen[item._id] = true }"
+                            @blur="() => setTimeout(() => closeAddonDoctorDropdown(item._id), 180)"
+                            class="w-44 px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[10px] text-slate-700 focus:outline-none focus:border-indigo-500 font-medium cursor-text pr-5"
+                          />
+                          <button
+                            v-if="item.doctorId || addonDoctorSearch[item._id]"
+                            type="button"
+                            @mousedown.prevent
+                            @click.stop="selectAddonDoctor(item, '', ''); addonDoctorSearch[item._id] = ''"
+                            class="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-all cursor-pointer"
+                            title="Clear doctor"
+                          >
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        v-if="addonDoctorOpen[item._id]"
+                        class="absolute z-[60] left-0 mt-0.5 w-52 bg-white border border-slate-200 rounded-xl shadow-lg max-h-44 overflow-y-auto"
+                        @mousedown.prevent
                       >
-                        <option value="">-- Assign Doctor --</option>
-                        <option v-for="doc in doctorStore.doctors" :key="doc._id" :value="doc._id">
-                          Dr. {{ doc.fullName }}
-                        </option>
-                      </select>
+                        <button
+                          type="button"
+                          @click="selectAddonDoctor(item, '', '')"
+                          class="w-full text-left px-3 py-1.5 text-[10px] text-slate-500 hover:bg-slate-50 cursor-pointer"
+                        >-- No Doctor --</button>
+                        <button
+                          v-for="doc in filteredAddonDoctors(item._id)"
+                          :key="doc._id"
+                          type="button"
+                          @click="selectAddonDoctor(item, doc._id, doc.fullName)"
+                          class="w-full text-left px-3 py-1.5 text-[10px] text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-all"
+                          :class="{ 'bg-indigo-50 font-bold text-indigo-700': item.doctorId === doc._id }"
+                        > {{ doc.fullName }}</button>
+                        <div v-if="filteredAddonDoctors(item._id).length === 0" class="px-3 py-2 text-[10px] text-slate-400 text-center">No doctor found</div>
+                      </div>
                     </div>
                     <div class="flex gap-1 items-center mt-1">
                       <span v-if="item.isCustom" class="text-[9px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100/50 uppercase inline-block">Custom</span>
@@ -996,42 +1073,77 @@ onBeforeUnmount(() => {
             </div>
             
             <!-- Add Custom Addon Inline -->
-            <div class="mt-3 pt-3 border-t border-slate-200/60 space-y-2 bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Add Custom Addon/Fee</span>
-              <div class="flex gap-2 items-center">
+            <div class="mt-3 pt-3 border-t border-slate-200/60 space-y-2.5 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">Add Custom Addon/Fee</span>
+              <div>
                 <input 
                   type="text" 
                   v-model="otCustomAddonName" 
-                  placeholder="Custom addon name..." 
-                  class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-[11px] text-slate-700 bg-white font-medium"
-                />
-                <input 
-                  type="number" 
-                  v-model.number="otCustomAddonAmount" 
-                  placeholder="Rate (₹)..." 
-                  min="0"
-                  class="w-16 px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-[11px] text-slate-700 bg-white text-right font-semibold"
+                  placeholder="Custom addon name (e.g. Special Equipment Fee)..." 
+                  class="w-full px-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-[11px] text-slate-700 bg-white font-medium shadow-xs"
                 />
               </div>
               <div class="flex gap-2 items-center">
-                <select 
-                  v-model="otCustomAddonDoctorId"
-                  class="flex-1 px-2.5 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-[11px] text-slate-700 bg-white font-medium cursor-pointer"
-                >
-                  <option value="">-- Assign Doctor (Optional) --</option>
-                  <option v-for="doc in doctorStore.doctors" :key="doc._id" :value="doc._id">
-                    Dr. {{ doc.fullName }}
-                  </option>
-                </select>
+                <input 
+                  type="number" 
+                  v-model.number="otCustomAddonAmount" 
+                  placeholder="Amount (₹)..." 
+                  min="0"
+                  class="w-36 px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-[11px] text-slate-700 bg-white font-semibold shadow-xs"
+                />
+                <div class="flex-1 relative" @click.stop>
+                  <input
+                    type="text"
+                    v-model="customAddonDoctorSearch"
+                    :placeholder="otCustomAddonDoctorId ? (doctorStore.doctors.find(d => d._id === otCustomAddonDoctorId)?.fullName ? ' ' + doctorStore.doctors.find(d => d._id === otCustomAddonDoctorId).fullName : 'Search doctor...') : 'Search & assign doctor (optional)...'"
+                    @focus="showCustomAddonDoctorDropdown = true"
+                    @blur="() => setTimeout(() => { showCustomAddonDoctorDropdown = false }, 180)"
+                    class="w-full pl-3 pr-7 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-[11px] text-slate-700 bg-white font-medium shadow-xs cursor-text"
+                  />
+                  <!-- Clear button -->
+                  <button
+                    v-if="otCustomAddonDoctorId || customAddonDoctorSearch"
+                    type="button"
+                    @mousedown.prevent
+                    @click.stop="selectCustomAddonDoctor('', ''); customAddonDoctorSearch = ''"
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 hover:text-rose-500 transition-all cursor-pointer"
+                    title="Clear doctor"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <div
+                    v-if="showCustomAddonDoctorDropdown"
+                    class="absolute z-[60] left-0 mt-0.5 w-full bg-white border border-slate-200 rounded-xl shadow-lg max-h-44 overflow-y-auto"
+                    @mousedown.prevent
+                  >
+                    <button
+                      type="button"
+                      @click="selectCustomAddonDoctor('', '')"
+                      class="w-full text-left px-3 py-2 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer"
+                    >-- No Doctor --</button>
+                    <button
+                      v-for="doc in filteredCustomAddonDoctors"
+                      :key="doc._id"
+                      type="button"
+                      @click="selectCustomAddonDoctor(doc._id, doc.fullName)"
+                      class="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-all"
+                      :class="{ 'bg-indigo-50 font-bold text-indigo-700': otCustomAddonDoctorId === doc._id }"
+                    >{{ doc.fullName }}</button>
+                    <div v-if="filteredCustomAddonDoctors.length === 0" class="px-3 py-2 text-xs text-slate-400 text-center">No doctor found</div>
+                  </div>
+                </div>
                 <button 
                   type="button" 
                   @click="addCustomAddon" 
-                  class="p-1.5 bg-indigo-600 hover:bg-indigo-700 border border-indigo-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center shrink-0 w-8 h-8"
+                  class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 border border-indigo-600 text-white rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shrink-0 shadow-sm"
                   title="Add custom component"
                 >
-                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
+                  <span>Add</span>
                 </button>
               </div>
             </div>
@@ -1086,7 +1198,7 @@ onBeforeUnmount(() => {
                     class="w-full px-3.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-between"
                     :class="{ 'bg-indigo-50/40 text-indigo-600 font-bold': chargeForm.doctorId === doc._id }"
                   >
-                    <span class="truncate">Dr. {{ doc.fullName }} ({{ doc.specializationId?.name || 'General' }})</span>
+                    <span class="truncate">{{ doc.fullName }} ({{ doc.specializationId?.name || 'General' }})</span>
                     <svg v-if="chargeForm.doctorId === doc._id" class="w-4 h-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                     </svg>

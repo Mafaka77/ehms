@@ -14,6 +14,7 @@ const pharmacyRoutes = require('../modules/pharmacy/pharmacy.route')
 const emergencyRoutes = require('../modules/emergency/emergency.route')
 const dentalRoutes = require('../modules/dental/dental.route')
 const endoscopyRoutes = require('../modules/endoscopy/endoscopy.route')
+const dashboardRoutes = require('../modules/dashboard/dashboard.route')
 
 module.exports = async function (fastify, opts) {
     fastify.register(authRoutes, { prefix: '/api/auth' })
@@ -32,4 +33,5 @@ module.exports = async function (fastify, opts) {
     fastify.register(emergencyRoutes, { prefix: '/api' })
     fastify.register(dentalRoutes, { prefix: '/api' })
     fastify.register(endoscopyRoutes, { prefix: '/api/endoscopy' })
+    fastify.register(dashboardRoutes, { prefix: '/api/dashboard' })
 }
