@@ -320,7 +320,7 @@ const getStatusColor = (status) => {
               
               <!-- Doctor -->
               <td class="px-6 py-4">
-                <p class="font-bold text-slate-800">Dr. {{ adm.consultantDoctorId?.fullName || 'N/A' }}</p>
+                <p class="font-bold text-slate-800"> {{ adm.consultantDoctorId?.fullName || 'N/A' }}</p>
                 <p class="text-xs text-slate-500 font-medium">{{ adm.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
               </td>
               

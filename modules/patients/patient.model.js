@@ -12,6 +12,75 @@ const patientSchema = new mongoose.Schema({
 
   fullName: String,
 
+  fathersName: {
+    type: String,
+    default: null
+  },
+
+  mothersName: {
+    type: String,
+    default: null
+  },
+
+  maritalStatus: {
+    type: String,
+    enum: [
+      'Single',
+      'Married',
+      'Divorced',
+      'Widowed',
+      'Other'
+    ],
+    default: null
+  },
+
+  religion: {
+    type: String,
+    default: null
+  },
+
+  husbandwifeName: {
+    type: String,
+    default: null
+  },
+
+  contactPerson: {
+    type: String,
+    default: null
+  },
+
+  contactPersonRelation: {
+    type: String,
+    default: null
+  },
+
+  contactPersonAddress: {
+    type: String,
+    default: null
+  },
+
+  contactPersonMobile: {
+    type: String,
+    default: null
+  },
+
+  occupation: {
+    type: String,
+    enum: [
+      'Private Employee',
+      'Government Employee',
+      'Self Employed',
+      'Business',
+      'Student',
+      'Housewife',
+      'Retired',
+      'Unemployed',
+      'Farmer',
+      'Other'
+    ],
+    default: null
+  },
+
   gender: {
     type: String,
     enum: [
@@ -84,8 +153,7 @@ patientSchema.pre('validate', async function() {
   }
 })
 
-module.exports =
-mongoose.model(
+module.exports = mongoose.model(
   'Patient',
   patientSchema
 )

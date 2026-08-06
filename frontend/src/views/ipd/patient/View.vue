@@ -11,6 +11,8 @@ import DischargeSummary from './DischargeSummary.vue'
 import Test from './Test.vue'
 import Transactions from './Transactions.vue'
 import { useIpdWardStore } from '../../../stores/ipdWardStore'
+import EditPatientModal from '../../master/patient/Edit.vue'
+import logoUrl from '../../../assets/logo_final.png'
 
 const props = defineProps({
   id: {
@@ -169,6 +171,241 @@ const getAdmissionTypeColor = (type) => {
 
 
 
+// Update Patient Modal States
+const showUpdatePatientModal = ref(false)
+
+const openUpdatePatientModal = () => {
+  showUpdatePatientModal.value = true
+}
+
+const onPatientUpdated = async () => {
+  showUpdatePatientModal.value = false
+  await fetchAdmissionDetails()
+}
+
+const printPatientInfo = () => {
+  if (!admission.value?.patientId) return
+  const p = admission.value.patientId
+  const adm = admission.value
+  const doc = adm.consultantDoctorId || {}
+  const bed = adm.bedId || {}
+  const ward = bed.wardId || {}
+
+  const allergiesText = Array.isArray(p.allergies) ? p.allergies.join(', ') : (p.allergies || 'None Known')
+  const dobFormatted = p.dateOfBirth ? new Date(p.dateOfBirth).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+  const admitDateFormatted = adm.admissionDate ? new Date(adm.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'
+  const printTime = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
+
+  const content = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Patient File Record - ${p.fullName || 'Patient'} (${p.patientCode || ''})</title>
+        <style>
+          @page { size: A4; margin: 15mm; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 0; background: #fff; font-size: 12px; line-height: 1.4; }
+          .header { border-bottom: 2px solid #3b82f6; padding-bottom: 12px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-start; }
+          .logo-area h1 { font-size: 20px; color: #1e3a8a; margin: 0; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+          .logo-area p { font-size: 11px; color: #64748b; margin: 2px 0 0 0; }
+          .badge-area { text-align: right; }
+          .code-tag { display: inline-block; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 13px; font-family: monospace; }
+          
+          .section-heading { background: #f8fafc; border-left: 4px solid #3b82f6; padding: 6px 10px; font-weight: 700; font-size: 11px; color: #1e293b; text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px 0; }
+          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px; }
+          .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px 16px; }
+
+          .field-group { margin-bottom: 4px; }
+          .field-label { font-size: 10px; color: #64748b; font-weight: 600; text-transform: uppercase; }
+          .field-value { font-size: 12px; color: #0f172a; font-weight: 700; }
+          .field-value-light { font-size: 12px; color: #334155; font-weight: 500; }
+
+          .box-container { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; background: #fafafa; }
+          .alert-box { border: 1px solid #fecdd3; background: #fff1f2; color: #be123c; border-radius: 6px; padding: 8px 12px; font-weight: 600; margin-top: 6px; }
+
+          .footer-sign { margin-top: 40px; border-top: 1px solid #cbd5e1; padding-top: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
+          .sign-line { border-top: 1.5px dashed #94a3b8; width: 180px; text-align: center; padding-top: 5px; font-size: 11px; font-weight: 700; color: #475569; }
+          
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        
+        <!-- Header Logo -->
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 14px;">
+          <img src="${logoUrl}" alt="Hospital Logo" style="height: 60px; width: auto; object-fit: contain;" />
+          <div style="text-align: right;">
+            <div class="code-tag">${p.patientCode || 'EH-PATIENT'}</div>
+            <p style="font-size: 10px; color: #64748b; margin: 4px 0 0 0; font-weight: 700;">IPD No: <strong style="color: #4f46e5;">${adm.admissionNo || 'N/A'}</strong></p>
+          </div>
+        </div>
+
+        <!-- Section 1: Patient Personal Details -->
+        <div class="section-heading">1. Patient Demographic &amp; Personal Information</div>
+        <div class="box-container">
+          <div class="grid-3" style="margin-bottom: 8px;">
+            <div class="field-group">
+              <div class="field-label">Full Name</div>
+              <div class="field-value" style="font-size: 14px; color: #1e3a8a;">${p.fullName || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Gender / Age</div>
+              <div class="field-value">${p.gender || '—'}, ${p.age ? p.age + ' Yrs' : '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Date of Birth</div>
+              <div class="field-value">${dobFormatted}</div>
+            </div>
+          </div>
+
+          <div class="grid-3" style="margin-bottom: 8px;">
+            <div class="field-group">
+              <div class="field-label">Mobile Number</div>
+              <div class="field-value">${p.mobileNo || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Alternate Contact</div>
+              <div class="field-value-light">${p.alternateMobileNo || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Blood Group</div>
+              <div class="field-value" style="color: #e11d48;">${p.bloodGroup || '—'}</div>
+            </div>
+          </div>
+
+          <div class="grid-3" style="margin-bottom: 8px;">
+            <div class="field-group">
+              <div class="field-label">Marital Status</div>
+              <div class="field-value-light">${p.maritalStatus || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Occupation</div>
+              <div class="field-value-light">${p.occupation || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Religion</div>
+              <div class="field-value-light">${p.religion || '—'}</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <div class="field-label">Email Address</div>
+              <div class="field-value-light">${p.email || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Permanent Residential Address</div>
+              <div class="field-value-light">${p.address || '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Family & Emergency Contact -->
+        <div class="section-heading">2. Family Background &amp; Next of Kin (Emergency Contact)</div>
+        <div class="box-container">
+          <div class="grid-3" style="margin-bottom: 8px;">
+            <div class="field-group">
+              <div class="field-label">Father's Name</div>
+              <div class="field-value-light">${p.fathersName || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Mother's Name</div>
+              <div class="field-value-light">${p.mothersName || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Spouse Name</div>
+              <div class="field-value-light">${p.husbandwifeName || '—'}</div>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <div class="field-label">Emergency Contact Person</div>
+              <div class="field-value" style="color: #0369a1;">${p.contactPerson || '—'} (${p.contactPersonRelation || 'Kin'})</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Emergency Phone</div>
+              <div class="field-value">${p.contactPersonMobile || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Contact Person Address</div>
+              <div class="field-value-light">${p.contactPersonAddress || '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Current IPD Admission Context -->
+        <div class="section-heading">3. Current Admission &amp; Location Context</div>
+        <div class="box-container">
+          <div class="grid-3" style="margin-bottom: 8px;">
+            <div class="field-group">
+              <div class="field-label">IPD Admission Number</div>
+              <div class="field-value" style="color: #4f46e5;">${adm.admissionNo || '—'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Admission Date &amp; Time</div>
+              <div class="field-value">${admitDateFormatted}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Admission Type / Status</div>
+              <div class="field-value">${adm.admissionType || 'REGULAR'} (${adm.status || 'ADMITTED'})</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <div class="field-label">Location (Ward &amp; Bed)</div>
+              <div class="field-value" style="color: #0284c7;">Bed ${bed.bedNo || 'N/A'} - ${ward.name || 'Ward'}</div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Attending / Consultant Doctor</div>
+              <div class="field-value" style="color: #0f172a;">${doc.fullName || 'Consultant Doctor'} (${doc.specializationId?.name || 'General Medical'})</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Allergies & Clinical Remarks -->
+        <div class="section-heading">4. Known Allergies &amp; Clinical Remarks</div>
+        <div class="box-container">
+          <div class="field-group" style="margin-bottom: 6px;">
+            <div class="field-label">Known Allergies / Sensitivities</div>
+            <div class="${allergiesText !== 'None Known' ? 'alert-box' : 'field-value-light'}">
+              ${allergiesText}
+            </div>
+          </div>
+          <div class="field-group" style="margin-top: 6px;">
+            <div class="field-label">Remarks / Special Notes</div>
+            <div class="field-value-light">${p.remarks || 'No additional file remarks recorded.'}</div>
+          </div>
+        </div>
+
+        <!-- Footer Signatures -->
+        <div class="footer-sign">
+          <div>
+            <p style="font-size: 10px; color: #94a3b8; margin: 0;">Printed Date: ${printTime}</p>
+            <p style="font-size: 10px; color: #94a3b8; margin: 2px 0 0 0;">System File Reference: ${p._id || ''}</p>
+          </div>
+          <div class="sign-line">
+            Medical Records Officer / Nurse
+          </div>
+          <div class="sign-line">
+            Consultant Doctor Signature
+          </div>
+        </div>
+
+        <script>
+          window.onload = function() { window.print(); }
+        <\/script>
+      </body>
+    </html>
+  `
+  const printWin = window.open('', '_blank')
+  printWin.document.write(content)
+  printWin.document.close()
+}
+
 onMounted(async () => {
   await fetchAdmissionDetails()
 })
@@ -236,6 +473,28 @@ onMounted(async () => {
             <p><span class="font-semibold text-slate-700">Gender / Age:</span> {{ admission.patientId?.gender || 'Unknown' }}, {{ admission.patientId?.age || '?' }} Years</p>
             <p><span class="font-semibold text-slate-700">Mobile:</span> {{ admission.patientId?.mobileNo || '-' }}</p>
           </div>
+          <div class="mt-3 flex items-center gap-2">
+            <button 
+              @click="openUpdatePatientModal"
+              class="flex-1 py-1.5 border border-indigo-100 hover:border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Update Patient
+            </button>
+
+            <button 
+              @click="printPatientInfo"
+              title="Print Patient Physical File Slip"
+              class="px-2.5 py-1.5 border border-slate-200 hover:border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              Print
+            </button>
+          </div>
         </div>
 
         <!-- Column 2: Admission info -->
@@ -298,7 +557,7 @@ onMounted(async () => {
               </svg>
             </div>
             <div>
-              <p class="font-bold text-slate-800 text-sm">Dr. {{ admission.consultantDoctorId?.fullName || 'N/A' }}</p>
+              <p class="font-bold text-slate-800 text-sm">{{ admission.consultantDoctorId?.fullName || 'N/A' }}</p>
               <p class="text-xs text-slate-500">{{ admission.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
             </div>
           </div>
@@ -598,6 +857,14 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- Update Patient Modal -->
+    <EditPatientModal 
+      :show="showUpdatePatientModal"
+      :patient="admission?.patientId"
+      @close="showUpdatePatientModal = false"
+      @updated="onPatientUpdated"
+    />
 
   </div>
 </template>

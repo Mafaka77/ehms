@@ -16,12 +16,15 @@ const dentalRoutes = require('../modules/dental/dental.route')
 const endoscopyRoutes = require('../modules/endoscopy/endoscopy.route')
 const dashboardRoutes = require('../modules/dashboard/dashboard.route')
 
+const doctorActivityRoutes = require('../modules/hr/doctor_activity.route')
+
 module.exports = async function (fastify, opts) {
     fastify.register(authRoutes, { prefix: '/api/auth' })
     fastify.register(masterRoutes, { prefix: '/api/master' })
     fastify.register(hrRoutes, { prefix: '/api' })
     fastify.register(salaryBonusRoutes, { prefix: '/api' })
     fastify.register(doctorRoutes, { prefix: '/api' })
+    fastify.register(doctorActivityRoutes, { prefix: '/api' })
     fastify.register(patientRoutes, { prefix: '/api' })
     fastify.register(opdRoutes, { prefix: '/api' })
     fastify.register(labRoutes, { prefix: '/api/lab' })

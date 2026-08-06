@@ -414,6 +414,23 @@ const routes = [
       // ==========================================
       // HR MODULE
       // ==========================================
+      // Doctor Activity
+      {
+        path: 'doctor-activity',
+        children: [
+          {
+            path: '',
+            name: 'doctor-activity',
+            component: () => import('../views/hr/doctor_activity/Index.vue')
+          },
+          {
+            path: 'view/:id',
+            name: 'doctor-activity-view',
+            component: () => import('../views/hr/doctor_activity/View.vue'),
+            props: true
+          }
+        ]
+      },
       // Employees
       {
         path: 'employee',
@@ -527,8 +544,18 @@ const routes = [
       },
 
       // ==========================================
-      // MASTERS MODULE
+      // MASTERS & PATIENT MODULE
       // ==========================================
+      {
+        path: 'patients',
+        name: 'patients',
+        component: () => import('../views/master/patient/Index.vue')
+      },
+      {
+        path: 'master/patient',
+        name: 'master-patient',
+        component: () => import('../views/master/patient/Index.vue')
+      },
       {
         path: 'department',
         name: 'department',
