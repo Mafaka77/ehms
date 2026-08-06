@@ -110,9 +110,8 @@ exports.createMedicine = async (req, res) => {
 
 exports.getAllMedicines = async (req, res) => {
     try {
-        const { page, limit, search, categoryId, supplierId, isActive } = req.query
-        const result = await pharmacyService.getAllMedicines({ page, limit, search, categoryId, supplierId, isActive })
-        return res.code(STATUS_CODES.OK).send({ message: 'Medicines fetched successfully', data: result.medicines, pagination: result.pagination, status: STATUS_CODES.OK })
+        const result = await pharmacyService.getAllMedicines(req.query)
+        return res.code(STATUS_CODES.OK).send({ message: 'Medicines fetched successfully', data: result.medicines, summary: result.summary, pagination: result.pagination, status: STATUS_CODES.OK })
     } catch (error) {
         return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
     }

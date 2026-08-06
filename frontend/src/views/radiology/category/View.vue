@@ -49,6 +49,132 @@ const fetchCategory = async () => {
   }
 }
 
+const isExportingPdf = ref(false)
+
+const exportCategoryTestsPdf = async () => {
+  isExportingPdf.value = true
+  try {
+    const allCategoryTests = await radiologyStore.fetchAllTestsForExport(categoryId)
+    if (!allCategoryTests || allCategoryTests.length === 0) {
+      snackbarStore.show({ message: 'No radiology tests found in this category to export.', type: 'warning' })
+      isExportingPdf.value = false
+      return
+    }
+
+    const sortedTests = [...allCategoryTests].sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    const catName = category.value?.name || 'Radiology Category'
+    const catCode = category.value?.code ? ` (${category.value.code})` : ''
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Radiology Tests Catalogue - ${catName} - ${new Date().toLocaleDateString('en-IN')}</title>
+          <style>
+            @page { size: A4 portrait; margin: 12mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 18px; line-height: 1.5; font-size: 11px; }
+            .header { text-align: center; border-bottom: 2px solid #6366f1; padding-bottom: 10px; margin-bottom: 18px; }
+            .header h1 { margin: 0; font-size: 20px; color: #4338ca; text-transform: uppercase; letter-spacing: 0.8px; }
+            .header p { margin: 4px 0 0 0; font-size: 11px; color: #64748b; }
+            
+            .meta-bar { display: flex; justify-content: space-between; background: #eef2ff; border: 1px solid #c7d2fe; padding: 10px 14px; border-radius: 8px; font-size: 11px; margin-bottom: 16px; }
+            .meta-item { display: flex; flex-direction: column; }
+            .meta-label { font-weight: 700; color: #4338ca; text-transform: uppercase; font-size: 9.5px; }
+            .meta-val { font-weight: 600; color: #1e293b; margin-top: 2px; }
+
+            table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 16px; }
+            th { background: #4f46e5; color: #ffffff; text-align: left; padding: 7px 9px; font-weight: 700; text-transform: uppercase; font-size: 9.5px; }
+            td { border-bottom: 1px solid #e2e8f0; padding: 7px 9px; color: #334155; }
+            tr:nth-child(even) { background-color: #f8fafc; }
+
+            .amount-col { text-align: right; font-weight: 700; font-family: monospace; }
+            .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+            .badge-active { background: #dcfce7; color: #15803d; }
+            .badge-inactive { background: #f1f5f9; color: #64748b; }
+            .badge-cat { background: #dbeafe; color: #1e40af; }
+
+            .footer { margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px; color: #64748b; page-break-inside: avoid; }
+            .sig-box { text-align: center; width: 170px; }
+            .sig-line { border-top: 1px solid #475569; margin-top: 45px; padding-top: 5px; font-weight: 700; color: #1e293b; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>Hospital Radiology Directory & Price List</h1>
+            <p>Diagnostic Radiology Tests Catalogue for Category: <strong>${catName}${catCode}</strong></p>
+          </div>
+
+          <div class="meta-bar">
+            <div class="meta-item">
+              <span class="meta-label">Radiology Category</span>
+              <span class="meta-val">${catName}${catCode}</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Total Tests Offered</span>
+              <span class="meta-val">${sortedTests.length} Scans / Procedures</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Generated On</span>
+              <span class="meta-val">${new Date().toLocaleString('en-IN')}</span>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 4%;">#</th>
+                <th style="width: 14%;">Code</th>
+                <th style="width: 34%;">Test Name</th>
+                <th style="width: 24%;">Preparation / Instructions</th>
+                <th style="width: 12%; text-align: right;">Price (₹)</th>
+                <th style="width: 12%; text-align: center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${sortedTests.map((t, idx) => {
+                const rateStr = t.rate != null ? `₹${Number(t.rate).toFixed(2)}` : '₹0.00'
+                const prepStr = t.preparation || 'None'
+                const stBadge = t.isActive !== false ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>'
+
+                return `
+                  <tr>
+                    <td>${idx + 1}</td>
+                    <td style="font-family: monospace; font-weight: bold; color: #4338ca;">${t.code || '-'}</td>
+                    <td><strong>${t.name}</strong></td>
+                    <td>${prepStr}</td>
+                    <td class="amount-col">${rateStr}</td>
+                    <td style="text-align: center;">${stBadge}</td>
+                  </tr>
+                `
+              }).join('')}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            <div>Document intended for medical practitioners, doctors, and clinical nursing staff.</div>
+            <div class="sig-box">
+              <div class="sig-line">Radiology Department Head Signature</div>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          <\/script>
+        </body>
+      </html>
+    `
+
+    const printWin = window.open('', '_blank')
+    printWin.document.write(printContent)
+    printWin.document.close()
+  } catch (err) {
+    console.error(err)
+    snackbarStore.show({ message: 'Failed to export category tests PDF', type: 'error' })
+  } finally {
+    isExportingPdf.value = false
+  }
+}
+
 // ── Fetch Tests ───────────────────────────────────────────
 const fetchTests = async () => {
   loadingTests.value = true
@@ -234,6 +360,21 @@ onMounted(async () => {
                 class="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
               />
             </div>
+            <!-- Export PDF -->
+            <button
+              @click="exportCategoryTestsPdf"
+              :disabled="isExportingPdf"
+              class="px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 font-medium text-sm hover:bg-indigo-100 transition-all focus:outline-none flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 whitespace-nowrap"
+            >
+              <svg v-if="isExportingPdf" class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <svg v-else class="w-4 h-4 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Export Catalogue (PDF)
+            </button>
             <!-- Add Test -->
             <button
               v-if="authStore.hasPermission('radiology.create')"

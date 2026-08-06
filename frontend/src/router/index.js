@@ -304,6 +304,64 @@ const routes = [
         ]
       },
 
+      // ENDOSCOPY MODULE
+      {
+        path: 'endoscopy',
+       
+        children: [
+          {
+            path: 'manage',
+            name: 'endoscopy-manage',
+            component: () => import('../views/endoscopy/manage/Index.vue'),
+            meta: { permission: 'endoscopy.manage' }
+          },
+          {
+            path: 'category',
+            name: 'endoscopy-category',
+            component: () => import('../views/endoscopy/category/Index.vue'),
+            meta: { permission: 'endoscopy.view' }
+          },
+          {
+            path: 'category/create',
+            name: 'endoscopy-category-create',
+            component: () => import('../views/endoscopy/category/Create.vue'),
+            meta: { permission: 'endoscopy.create' }
+          },
+          {
+            path: 'category/view/:id',
+            name: 'endoscopy-category-view',
+            component: () => import('../views/endoscopy/category/View.vue'),
+            meta: { permission: 'endoscopy.view' },
+            props: true
+          },
+          {
+            path: 'order',
+            name: 'endoscopy-order',
+            component: () => import('../views/endoscopy/order/Index.vue'),
+            meta: { permission: 'endoscopy.order' }
+          },
+          {
+            path: 'order/create',
+            name: 'endoscopy-order-create',
+            component: () => import('../views/endoscopy/order/Create.vue'),
+            meta: { permission: 'endoscopy.create' }
+          },
+          {
+            path: 'order/edit/:id',
+            name: 'endoscopy-order-edit',
+            component: () => import('../views/endoscopy/order/Edit.vue'),
+            meta: { permission: 'endoscopy.edit' },
+            props: true
+          },
+          {
+            path: 'payment',
+            name: 'endoscopy-payment',
+            component: () => import('../views/endoscopy/payment/Index.vue'),
+            meta: { permission: 'endoscopy.payment' }
+          }
+        ]
+      },
+
       {
         path:'pharmacy',
         meta:{permission:'pharmacy.view'},

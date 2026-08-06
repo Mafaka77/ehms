@@ -23,7 +23,7 @@ const patientChargeSchema = new mongoose.Schema({
 
   sourceType: {
     type: String,
-    enum: ['IPD', 'EMERGENCY', 'DENTAL', 'OPD', 'DAYCARE', 'RADIOLOGY', 'LAB', 'PHARMACY', 'OTHER'],
+    enum: ['IPD', 'EMERGENCY', 'DENTAL', 'OPD', 'DAYCARE', 'RADIOLOGY', 'ENDOSCOPY', 'LAB', 'PHARMACY', 'OTHER'],
     default: 'OTHER'
   },
 

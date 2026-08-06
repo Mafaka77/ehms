@@ -209,6 +209,19 @@ const permissions = [
   'radiology.print',
 
   // =========================
+  // ENDOSCOPY
+  // =========================
+
+  'endoscopy.view',
+  'endoscopy.manage',
+  'endoscopy.create',
+  'endoscopy.edit',
+  'endoscopy.update',
+  'endoscopy.delete',
+  'endoscopy.order',
+  'endoscopy.payment',
+
+  // =========================
   // PHARMACY
   // =========================
 

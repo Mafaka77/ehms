@@ -36,6 +36,8 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     hasPermission(permissionCode) {
       if (!permissionCode) return true; // If no permission required, always allow
+      const roleName = this.user?.roleName || this.user?.role?.name || this.user?.role;
+      if (roleName === 'SuperAdmin') return true;
       return this.permissions.includes(permissionCode);
     },
     async login(email, password) {

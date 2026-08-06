@@ -61,6 +61,36 @@ exports.generateBillFromRadiologyOrder = async (req, res) => {
     }
 }
 
+exports.generateBillFromEndoscopyOrder = async (req, res) => {
+    try {
+        const { endoscopyOrderId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body
+        if (!endoscopyOrderId) {
+            return res.code(STATUS_CODES.BAD_REQUEST).send({
+                message: 'endoscopyOrderId is required',
+                status: STATUS_CODES.BAD_REQUEST
+            })
+        }
+        const bill = await billService.generateBillFromEndoscopyOrder(
+            endoscopyOrderId, 
+            req.user._id, 
+            discountAmount || 0,
+            discountType,
+            discountRemarks,
+            doctorId || employeeId
+        )
+        return res.code(STATUS_CODES.CREATED).send({
+            message: 'Bill generated successfully',
+            data: bill,
+            status: STATUS_CODES.CREATED
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 exports.generateBillFromOpdAppointment = async (req, res) => {
     try {
         const { opdAppointmentId, discountAmount, discountType, discountRemarks, employeeId, doctorId } = req.body

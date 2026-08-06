@@ -101,7 +101,19 @@ const navigation = [
       { name: 'Category', href: '/radiology/category', permission: 'radiology.view', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 3z' },
     ]
   },
-    {
+  {
+    name: 'Endoscopy',
+    href: 'endoscopy.view',
+    permission: null,
+    icon: 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z',
+    children: [
+      { name: 'Manage', href: '/endoscopy/manage', permission: 'endoscopy.manage', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+      { name: 'Orders', href: '/endoscopy/order', permission: 'endoscopy.order', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+      { name: 'Payment', href: '/endoscopy/payment', permission: 'endoscopy.payment', icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
+      { name: 'Category', href: '/endoscopy/category', permission: 'endoscopy.view', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 3z' }
+    ]
+  },
+  {
     name: 'Pharmacy',
     href: 'pharmacy.view',
     permission: null,

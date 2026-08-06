@@ -105,6 +105,18 @@ export const useRadiologyStore = defineStore('radiology', {
         },
 
         // --- Radiology Tests ---
+        async fetchAllTestsForExport(radiologyId = '') {
+            try {
+                const response = await api.get('/radiology/test', {
+                    params: { radiologyId, page: 1, limit: 0 }
+                })
+                return response.data.data || response.data.tests || []
+            } catch (error) {
+                console.error('Error fetching radiology tests for export:', error)
+                return []
+            }
+        },
+
         async fetchTests(radiologyId, page = 1, limit = 20, search = '') {
             this.loading = true
             this.error = null

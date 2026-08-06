@@ -408,7 +408,7 @@ exports.deleteLabTestParameter = async (id) => {
     }
 }
 
-exports.createLabOrder = async (data) => { 
+exports.createLabOrder = async (data, userId = null) => { 
     const session = await LabOrder.startSession();
     session.startTransaction();
     try {
@@ -430,12 +430,15 @@ exports.createLabOrder = async (data) => {
             opdAppointmentId: data.opdAppointmentId || null,
             admissionId: data.admissionId || null,
             priority: data.priority || 'ROUTINE',
+            status: 'ORDERED',
             totalAmount,
             clinicalNotes: data.clinicalNotes,
             remarks: data.remarks,
-            paymentStatus: data.admissionId ? 'IPD' : 'UNPAID'
+            paymentStatus: data.admissionId ? 'IPD' : 'UNPAID',
+            createdBy: userId || null
         }], { session });
 
+        let insertedItems = [];
         if (items.length > 0) {
             const orderItems = items.map(item => ({
                 orderId: order[0]._id,
@@ -445,7 +448,33 @@ exports.createLabOrder = async (data) => {
                 quantity: item.quantity || 1,
                 amount: item.amount
             }));
-            await LabOrderItem.insertMany(orderItems, { session });
+            insertedItems = await LabOrderItem.insertMany(orderItems, { session });
+        }
+
+        if (data.admissionId && insertedItems.length > 0) {
+            const ChargeCategory = require('../clinical/ipd/ipd_charge_category.model')
+            const PatientCharge = require('../common/patient_charge.model')
+
+            const labCategory = await ChargeCategory.findOne({ code: 'LAB' }).session(session)
+
+            for (const dbItem of insertedItems) {
+                await PatientCharge.create([{
+                    admissionId: data.admissionId || null,
+                    emergencyVisitId: data.emergencyVisitId || null,
+                    dentalAppointmentId: data.dentalAppointmentId || null,
+                    sourceType: 'LAB',
+                    patientId: data.patientId,
+                    chargeCategoryId: labCategory?._id || null,
+                    description: dbItem.testName || 'Laboratory Test',
+                    sourceId: dbItem._id,
+                    quantity: dbItem.quantity || 1,
+                    rate: dbItem.rate || 0,
+                    amount: dbItem.amount || 0,
+                    isBilled: false,
+                    createdBy: userId || null,
+                    updatedBy: userId || null
+                }], { session })
+            }
         }
 
         await session.commitTransaction();

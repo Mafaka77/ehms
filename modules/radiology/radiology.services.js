@@ -121,10 +121,9 @@ exports.createRadiologyTest = async (data) => {
 exports.getAllRadiologyTests = async (query = {}) => {
     try {
         const page = parseInt(query.page) || 1
-        const limit = parseInt(query.limit) || 20
+        const limit = parseInt(query.limit) === 0 ? 0 : (parseInt(query.limit) || 20)
         const search = query.search || ''
         const radiologyId = query.radiologyId || null
-        const skip = (page - 1) * limit
 
         let filter = {}
         if (radiologyId) {
@@ -138,11 +137,16 @@ exports.getAllRadiologyTests = async (query = {}) => {
         }
 
         const total = await RadiologyTest.countDocuments(filter)
-        const tests = await RadiologyTest.find(filter)
+        let queryChain = RadiologyTest.find(filter)
             .populate('radiologyId', 'name code')
             .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
+
+        if (limit > 0) {
+            const skip = (page - 1) * limit
+            queryChain = queryChain.skip(skip).limit(limit)
+        }
+
+        const tests = await queryChain
 
         return {
             tests,
@@ -150,7 +154,7 @@ exports.getAllRadiologyTests = async (query = {}) => {
                 total,
                 page,
                 limit,
-                pages: Math.ceil(total / limit)
+                pages: limit > 0 ? Math.ceil(total / limit) : 1
             }
         }
     } catch (error) {
@@ -224,7 +228,7 @@ exports.createRadiologyOrder = async (data, userId) => {
         const order = new RadiologyOrder({
             ...orderData,
             paymentStatus: orderData.admissionId ? 'IPD' : 'UNPAID',
-            status: orderData.admissionId ? 'IPD' : 'ORDERED',
+            status: 'ORDERED',
             createdBy: userId || null
         })
         await order.save({ session })

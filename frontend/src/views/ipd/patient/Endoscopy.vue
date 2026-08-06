@@ -1,7 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
-import { useDoctorStore } from '../../../stores/doctorStore'
+import { useEndoscopyStore } from '../../../stores/endoscopyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 
 const props = defineProps({
@@ -15,136 +14,180 @@ const props = defineProps({
   }
 })
 
-const admissionStore = useIpdAdmissionStore()
-const doctorStore = useDoctorStore()
+const endoscopyStore = useEndoscopyStore()
 const snackbarStore = useSnackbarStore()
 
 // State
 const loading = ref(false)
-const endoscopyCharges = ref([])
+const orders = ref([])
 const showOrderModal = ref(false)
+const showDetailModal = ref(false)
 const orderSubmitting = ref(false)
 
-// Configured IDs
-const endoscopyCategoryId = ref(null)
-const chargeMastersList = ref([])
+// Detail Modal State
+const selectedOrder = ref(null)
+const selectedOrderItems = ref([])
+const loadingDetails = ref(false)
 
-// Form state
+// Create Order Form State
 const orderForm = ref({
-  chargeMasterId: '',
-  doctorId: '',
-  chargeDate: new Date().toISOString().split('T')[0],
-  rate: 0
+  priority: 'ROUTINE',
+  clinicalHistory: '',
+  remarks: '',
+  categoryId: '',
+  tests: []
 })
+const categoriesList = ref([])
+const testsList = ref([])
+const loadingTests = ref(false)
+const testsSearch = ref('')
 
-// Get today's local date in YYYY-MM-DD for datepicker restriction
-const todayStr = computed(() => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-})
-
-// Load categories & extract Endoscopy
-const loadEndoscopyConfiguration = async () => {
-  const res = await admissionStore.fetchChargeCategories()
-  if (res.success) {
-    const category = res.data.find(cat => cat.code === 'ENDOSCOPY')
-    if (category) {
-      endoscopyCategoryId.value = category._id
-      // Fetch available endoscopy procedures
-      const mastersRes = await admissionStore.fetchChargeMasters(category._id)
-      if (mastersRes.success) {
-        chargeMastersList.value = mastersRes.data
-      }
-    } else {
-      snackbarStore.show({ message: 'Endoscopy charge category not found in setup.', type: 'warning' })
-    }
-  }
-}
-
-// Fetch admission charges & filter endoscopy
-const fetchEndoscopyCharges = async () => {
+// Fetch Endoscopy Orders for this IPD admission
+const fetchEndoscopyOrders = async () => {
   loading.value = true
-  const res = await admissionStore.fetchAdmissionCharges(props.admissionId)
-  if (res.success) {
-    // Filter charges where chargeCategoryId code is ENDOSCOPY
-    endoscopyCharges.value = res.data.filter(charge => 
-      charge.chargeCategoryId?.code === 'ENDOSCOPY' || 
-      charge.chargeCategoryId?._id === endoscopyCategoryId.value
-    )
-  } else {
-    snackbarStore.show({ message: res.message, type: 'error' })
-  }
+  await endoscopyStore.fetchOrders(1, 50, '', '', { admissionId: props.admissionId })
+  orders.value = (endoscopyStore.orders || []).filter(order =>
+    order.admissionId === props.admissionId ||
+    order.admissionId?._id === props.admissionId
+  )
   loading.value = false
 }
 
-// On procedure change, populate rate
-const onProcedureChange = () => {
-  const selected = chargeMastersList.value.find(m => m._id === orderForm.value.chargeMasterId)
-  if (selected) {
-    orderForm.value.rate = selected.rate || 0
+// Fetch categories for order form
+const fetchCategories = async () => {
+  await endoscopyStore.fetchCategories(1, 100)
+  categoriesList.value = endoscopyStore.categories
+}
+
+// Fetch tests when category changes
+const onCategoryChange = async () => {
+  orderForm.value.tests = []
+  if (!orderForm.value.categoryId) {
+    testsList.value = []
+    return
+  }
+  loadingTests.value = true
+  const res = await endoscopyStore.fetchTests(orderForm.value.categoryId, 1, 100, testsSearch.value)
+  testsList.value = res.data
+  loadingTests.value = false
+}
+
+const toggleTestSelect = (test) => {
+  const idx = orderForm.value.tests.findIndex(t => t._id === test._id)
+  if (idx === -1) {
+    orderForm.value.tests.push(test)
   } else {
-    orderForm.value.rate = 0
+    orderForm.value.tests.splice(idx, 1)
   }
 }
+
+const isTestSelected = (testId) => {
+  return orderForm.value.tests.some(t => t._id === testId)
+}
+
+const totalOrderAmount = computed(() => {
+  return orderForm.value.tests.reduce((sum, t) => sum + (t.rate || 0), 0)
+})
 
 // Open Order Modal
 const openOrderModal = async () => {
   orderForm.value = {
-    chargeMasterId: '',
-    doctorId: props.admission.consultantDoctorId?._id || props.admission.consultantDoctorId || '',
-    chargeDate: todayStr.value,
-    rate: 0
+    priority: 'ROUTINE',
+    clinicalHistory: '',
+    remarks: '',
+    categoryId: '',
+    tests: []
   }
+  testsList.value = []
+  testsSearch.value = ''
   showOrderModal.value = true
-  await doctorStore.fetchDoctors(1, 100)
+  await fetchCategories()
 }
 
 // Submit Endoscopy Order
 const submitEndoscopyOrder = async () => {
-  if (!orderForm.value.chargeMasterId) {
-    snackbarStore.show({ message: 'Please select an endoscopy procedure.', type: 'warning' })
+  if (orderForm.value.tests.length === 0) {
+    snackbarStore.show({ message: 'Please select at least one endoscopy test.', type: 'warning' })
     return
   }
 
-  const selectedMaster = chargeMastersList.value.find(m => m._id === orderForm.value.chargeMasterId)
-  if (!selectedMaster) return
-
   orderSubmitting.value = true
-
+  
   const payload = {
-    chargeCategoryId: endoscopyCategoryId.value,
-    chargeMasterId: orderForm.value.chargeMasterId,
-    description: selectedMaster.name,
-    rate: orderForm.value.rate,
-    quantity: 1,
-    doctorId: orderForm.value.doctorId || null,
-    chargeDate: orderForm.value.chargeDate
+    patientId: props.admission.patientId?._id || props.admission.patientId,
+    admissionId: props.admissionId,
+    doctorId: props.admission.consultantDoctorId?._id || props.admission.consultantDoctorId,
+    referral: 'IPD',
+    priority: orderForm.value.priority,
+    clinicalHistory: orderForm.value.clinicalHistory,
+    remarks: orderForm.value.remarks,
+    tests: orderForm.value.tests.map(t => ({
+      testId: t._id
+    }))
   }
 
-  const res = await admissionStore.addAdmissionCharge(props.admissionId, payload)
+  const res = await endoscopyStore.createOrder(payload)
   if (res.success) {
     snackbarStore.show({ message: 'Endoscopy procedure ordered successfully.', type: 'success' })
     showOrderModal.value = false
-    await fetchEndoscopyCharges()
+    await fetchEndoscopyOrders()
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
   }
   orderSubmitting.value = false
 }
 
-// Delete Endoscopy Order
-const deleteEndoscopyOrder = async (chargeId) => {
-  if (!confirm('Are you sure you want to cancel and delete this endoscopy procedure?')) return
+// View Order Details
+const viewOrderDetails = async (order) => {
+  selectedOrder.value = order
+  selectedOrderItems.value = []
+  showDetailModal.value = true
+  loadingDetails.value = true
+  
+  try {
+    const res = await endoscopyStore.getOrderById(order._id)
+    selectedOrderItems.value = res.items
+  } catch (error) {
+    console.error('Error fetching details:', error)
+    snackbarStore.show({ message: 'Could not fetch order details.', type: 'error' })
+  } finally {
+    loadingDetails.value = false
+  }
+}
 
-  const res = await admissionStore.deleteAdmissionCharge(chargeId)
+// Delete Endoscopy Order
+const deleteEndoscopyOrder = async (orderId) => {
+  if (!confirm('Are you sure you want to cancel and delete this endoscopy procedure? This will remove all associated charges and order items.')) {
+    return
+  }
+
+  const res = await endoscopyStore.deleteOrder(orderId)
   if (res.success) {
-    snackbarStore.show({ message: 'Endoscopy procedure cancelled successfully.', type: 'success' })
-    await fetchEndoscopyCharges()
+    snackbarStore.show({ message: 'Endoscopy procedure cancelled and deleted successfully.', type: 'success' })
+    await fetchEndoscopyOrders()
   } else {
-    snackbarStore.show({ message: res.message, type: 'error' })
+    snackbarStore.show({ message: res.message || 'Failed to delete endoscopy order.', type: 'error' })
+  }
+}
+
+// Status style helpers
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'PENDING': return 'bg-amber-50 text-amber-700 border-amber-100'
+    case 'COMPLETED': return 'bg-teal-50 text-teal-700 border-teal-100'
+    case 'VERIFIED': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+    case 'CANCELLED': return 'bg-rose-50 text-rose-700 border-rose-100'
+    default: return 'bg-slate-50 text-slate-700 border-slate-100'
+  }
+}
+
+const getPaymentColor = (status) => {
+  switch (status) {
+    case 'PAID': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
+    case 'PARTIALLY_PAID': return 'bg-amber-50 text-amber-700 border-amber-100'
+    case 'UNPAID': return 'bg-rose-50 text-rose-700 border-rose-100'
+    case 'IPD': return 'bg-teal-50 text-teal-700 border-teal-100'
+    default: return 'bg-slate-50 text-slate-700 border-slate-100'
   }
 }
 
@@ -160,8 +203,7 @@ const formatDate = (dateString) => {
 }
 
 onMounted(async () => {
-  await loadEndoscopyConfiguration()
-  await fetchEndoscopyCharges()
+  await fetchEndoscopyOrders()
 })
 </script>
 
@@ -175,7 +217,7 @@ onMounted(async () => {
       </div>
       <button
         @click="openOrderModal"
-        class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
+        class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer"
       >
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
@@ -184,71 +226,89 @@ onMounted(async () => {
       </button>
     </div>
 
-    <!-- Listing Table -->
+    <!-- Endoscopy Orders Table -->
     <div v-if="loading" class="p-8 text-center text-slate-400 bg-white rounded-2xl border border-slate-100">
-      <svg class="animate-spin h-6 w-6 mx-auto text-indigo-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <svg class="animate-spin h-6 w-6 mx-auto text-teal-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
       </svg>
-      Loading endoscopy procedures...
+      Loading endoscopy investigations...
     </div>
 
-    <div v-else-if="endoscopyCharges.length === 0" class="border-2 border-dashed border-slate-100 rounded-2xl p-12 text-center text-slate-400 bg-white">
+    <div v-else-if="orders.length === 0" class="border-2 border-dashed border-slate-100 rounded-2xl p-12 text-center text-slate-400 bg-white">
       <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
       </svg>
       <p class="font-bold text-slate-600">No Endoscopy Investigations Requested</p>
-      <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Click "Order Endoscopy Procedure" to add gastroscopy, colonoscopy, or ERCP imaging to the patient's record.</p>
+      <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Click "Order Endoscopy Procedure" to request diagnostic or therapeutic endoscopy procedures.</p>
     </div>
 
     <div v-else class="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <table class="w-full text-left border-collapse">
         <thead>
           <tr class="bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            <th class="p-4">Procedure Description</th>
+            <th class="p-4">Order No</th>
             <th class="p-4">Ordered Date</th>
-            <th class="p-4">Performing Doctor</th>
-            <th class="p-4 text-right">Price</th>
-            <th class="p-4">Billing Status</th>
+            <th class="p-4">Referral Doctor</th>
+            <th class="p-4">Priority</th>
+            <th class="p-4 text-right">Amount</th>
+            <th class="p-4">Payment</th>
+            <th class="p-4">Status</th>
             <th class="p-4 text-center">Action</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50 text-xs text-slate-600">
-          <tr v-for="charge in endoscopyCharges" :key="charge._id" class="hover:bg-slate-50/50 transition-colors">
-            <td class="p-4 font-bold text-slate-800">{{ charge.description }}</td>
-            <td class="p-4">{{ formatDate(charge.createdAt) }}</td>
-            <td class="p-4 font-semibold text-slate-700">Dr. {{ charge.doctorId?.fullName || 'N/A' }}</td>
-            <td class="p-4 text-right font-bold text-slate-800">₹{{ charge.amount }}</td>
+          <tr v-for="order in orders" :key="order._id" class="hover:bg-slate-50/50 transition-colors">
+            <td class="p-4 font-mono font-bold text-teal-600">{{ order.orderNo }}</td>
+            <td class="p-4">{{ formatDate(order.createdAt) }}</td>
+            <td class="p-4 font-semibold text-slate-800">Dr. {{ order.doctorId?.fullName || 'Self' }}</td>
             <td class="p-4">
-              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold border"
-                :class="charge.isBilled ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'"
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold"
+                :class="order.priority === 'STAT' ? 'bg-rose-100 text-rose-700' : order.priority === 'URGENT' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'"
               >
-                {{ charge.isBilled ? 'BILLED' : 'UNBILLED (RUNNING)' }}
+                {{ order.priority }}
+              </span>
+            </td>
+            <td class="p-4 text-right font-bold text-slate-800">₹{{ order.totalAmount }}</td>
+            <td class="p-4">
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold border" :class="getPaymentColor(order.paymentStatus)">
+                {{ order.paymentStatus }}
+              </span>
+            </td>
+            <td class="p-4">
+              <span class="px-2.5 py-0.5 rounded text-[10px] font-bold border" :class="getStatusColor(order.status)">
+                {{ order.status }}
               </span>
             </td>
             <td class="p-4 text-center">
-              <button
-                @click="deleteEndoscopyOrder(charge._id)"
-                :disabled="charge.isBilled"
-                class="px-2.5 py-1 border border-rose-100 hover:border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-[10px] font-bold rounded-lg transition-all cursor-pointer"
-              >
-                Cancel / Delete
-              </button>
+              <div class="flex items-center justify-center gap-2">
+                <button
+                  @click="viewOrderDetails(order)"
+                  class="px-2.5 py-1 border border-teal-100 hover:border-teal-200 bg-teal-50/50 hover:bg-teal-50 text-teal-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                >
+                  View Details
+                </button>
+                <button
+                  @click="deleteEndoscopyOrder(order._id)"
+                  class="px-2.5 py-1 border border-rose-100 hover:border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                >
+                  Cancel / Delete
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Order Endoscopy Modal -->
+    <!-- Order Endoscopy Procedure Modal -->
     <div v-if="showOrderModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-200 animate-in fade-in">
-      <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col">
+      <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
         <!-- Title Header -->
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 class="font-bold text-slate-800 text-sm">Order Endoscopy Procedure</h3>
-            <p class="text-[11px] text-slate-400 mt-0.5">Select procedure type and performing consultant.</p>
+            <h3 class="font-bold text-slate-800 text-sm">Order Endoscopy Investigations</h3>
+            <p class="text-[11px] text-slate-400 mt-0.5">Select endoscopy categories and procedure tests to order.</p>
           </div>
           <button @click="showOrderModal = false" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">
             <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -257,70 +317,200 @@ onMounted(async () => {
           </button>
         </div>
 
-        <!-- Body Form -->
-        <div class="p-6 space-y-4">
-          <!-- Select Procedure -->
-          <div class="space-y-1">
-            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Endoscopy Procedure</label>
-            <select
-              v-model="orderForm.chargeMasterId"
-              @change="onProcedureChange"
-              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all animate-none"
-            >
-              <option value="">Select procedure...</option>
-              <option v-for="master in chargeMastersList" :key="master._id" :value="master._id">
-                {{ master.name }} (₹{{ master.rate }})
-              </option>
-            </select>
+        <!-- Scrollable Modal Body -->
+        <div class="p-6 overflow-y-auto grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+          
+          <!-- Column 1: Selector -->
+          <div class="space-y-3 flex flex-col h-[380px] min-h-0">
+            <!-- Select Category -->
+            <div class="space-y-1">
+              <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Endoscopy Category</label>
+              <select
+                v-model="orderForm.categoryId"
+                @change="onCategoryChange"
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-500 text-slate-700 bg-white font-medium text-xs transition-all animate-none cursor-pointer"
+              >
+                <option value="">Select category...</option>
+                <option v-for="cat in categoriesList" :key="cat._id" :value="cat._id">
+                  {{ cat.name }} ({{ cat.code }})
+                </option>
+              </select>
+            </div>
+
+            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide mt-2">Available Tests (Select multiple)</label>
+            
+            <!-- List tests scroll container -->
+            <div class="flex-1 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50 min-h-0 bg-slate-50/50 p-1">
+              <div v-if="!orderForm.categoryId" class="p-8 text-center text-slate-400 text-xs italic">
+                Please select an endoscopy category first.
+              </div>
+              <div v-else-if="loadingTests" class="p-8 text-center text-slate-400 text-xs">
+                Retrieving tests...
+              </div>
+              <div v-else-if="testsList.length === 0" class="p-8 text-center text-slate-400 text-xs">
+                No tests available under this category.
+              </div>
+              <div
+                v-else
+                v-for="test in testsList"
+                :key="test._id"
+                @click="toggleTestSelect(test)"
+                class="p-2.5 rounded-lg text-xs cursor-pointer flex items-center justify-between transition-colors"
+                :class="isTestSelected(test._id) ? 'bg-teal-50 text-teal-700 font-bold border border-teal-100' : 'hover:bg-white text-slate-600'"
+              >
+                <div>
+                  <p class="font-semibold">{{ test.name }}</p>
+                  <p class="text-[10px] font-mono text-slate-400 mt-0.5">{{ test.code }}</p>
+                </div>
+                <span class="font-bold text-slate-800">₹{{ test.rate }}</span>
+              </div>
+            </div>
           </div>
 
-          <!-- Select Doctor -->
-          <div class="space-y-1">
-            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Performing Doctor</label>
-            <select
-              v-model="orderForm.doctorId"
-              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all animate-none"
-            >
-              <option value="">Select doctor...</option>
-              <option v-for="doc in doctorStore.doctors" :key="doc._id" :value="doc._id">
-                Dr. {{ doc.fullName }}
-              </option>
-            </select>
-          </div>
+          <!-- Column 2: Order Metadata -->
+          <div class="space-y-4 flex flex-col justify-between">
+            <div class="space-y-4">
+              <!-- Priority -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Priority</label>
+                <select
+                  v-model="orderForm.priority"
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-500 text-slate-700 bg-white font-medium text-xs transition-all animate-none cursor-pointer"
+                >
+                  <option value="ROUTINE">Routine (Standard Scheduling)</option>
+                  <option value="URGENT">Urgent (Express slot)</option>
+                  <option value="STAT">STAT (Emergency Procedure - Immediately)</option>
+                </select>
+              </div>
 
-          <!-- Date Picker -->
-          <div class="space-y-1">
-            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Order Date (Backdating allowed)</label>
-            <input
-              type="date"
-              v-model="orderForm.chargeDate"
-              :max="todayStr"
-              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
-            />
-          </div>
+              <!-- Clinical History -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Clinical Indications / History</label>
+                <textarea
+                  v-model="orderForm.clinicalHistory"
+                  rows="2"
+                  placeholder="E.g. Dysphagia, upper GI bleeding..."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-500 text-slate-700 bg-white font-medium text-xs transition-all"
+                ></textarea>
+              </div>
 
-          <!-- Display Rate summary -->
-          <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 flex justify-between items-center text-xs font-bold text-indigo-900 mt-2">
-            <span>Procedure Rate:</span>
-            <span>₹{{ orderForm.rate }}</span>
+              <!-- Remarks -->
+              <div class="space-y-1">
+                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Remarks</label>
+                <textarea
+                  v-model="orderForm.remarks"
+                  rows="2"
+                  placeholder="E.g. Conscious sedation required..."
+                  class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-teal-500 text-slate-700 bg-white font-medium text-xs transition-all"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="bg-teal-50/50 border border-teal-100 rounded-2xl p-4 space-y-3">
+              <h4 class="text-xs font-bold text-teal-800">Order Summary</h4>
+              <div class="max-h-[80px] overflow-y-auto text-[11px] text-teal-700 space-y-1 pr-1 font-semibold">
+                <div v-for="t in orderForm.tests" :key="t._id" class="flex justify-between">
+                  <span class="truncate pr-4">• {{ t.name }}</span>
+                  <span>₹{{ t.rate }}</span>
+                </div>
+                <div v-if="orderForm.tests.length === 0" class="text-slate-400 italic">No tests selected.</div>
+              </div>
+              <div class="flex justify-between items-center border-t border-teal-100/60 pt-2 font-bold text-xs text-teal-900">
+                <span>Total Cost:</span>
+                <span>₹{{ totalOrderAmount }}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Footer -->
+        <!-- Footer Actions -->
         <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
           <button @click="showOrderModal = false" class="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer">
             Cancel
           </button>
           <button
             @click="submitEndoscopyOrder"
-            :disabled="orderSubmitting || !orderForm.chargeMasterId"
-            class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+            :disabled="orderSubmitting || orderForm.tests.length === 0"
+            class="px-5 py-2 bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <svg v-if="orderSubmitting" class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Confirm Order
+            Submit Order
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detail View Modal -->
+    <div v-if="showDetailModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-200 animate-in fade-in">
+      <div class="bg-white w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <!-- Header -->
+        <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div v-if="selectedOrder">
+            <h3 class="font-bold text-slate-800 text-sm">Endoscopy Investigation Details</h3>
+            <p class="text-[11px] text-slate-400 mt-0.5">Order: <span class="font-mono text-teal-600 font-bold">{{ selectedOrder.orderNo }}</span></p>
+          </div>
+          <button @click="showDetailModal = false" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer">
+            <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Scroll Body -->
+        <div class="p-6 overflow-y-auto flex-1 space-y-6">
+          <div v-if="loadingDetails" class="p-12 text-center text-slate-400">
+            <svg class="animate-spin h-6 w-6 mx-auto text-teal-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading investigation details...
+          </div>
+
+          <div v-else-if="selectedOrder" class="space-y-6">
+            <!-- Metadata Info Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 bg-slate-50/50 border border-slate-100 rounded-2xl p-4 gap-4 text-xs">
+              <div>
+                <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wide">Referral Doctor</span>
+                <p class="font-bold text-slate-800 mt-0.5">Dr. {{ selectedOrder.doctorId?.fullName || 'Self' }}</p>
+              </div>
+              <div>
+                <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wide">Order Status</span>
+                <p class="font-bold text-slate-800 mt-0.5">{{ selectedOrder.status }}</p>
+              </div>
+              <div>
+                <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wide">Ordered On</span>
+                <p class="font-bold text-slate-800 mt-0.5">{{ formatDate(selectedOrder.createdAt) }}</p>
+              </div>
+              <div v-if="selectedOrder.clinicalHistory" class="col-span-1 md:col-span-3 border-t border-slate-100 pt-2">
+                <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wide">Clinical Indications</span>
+                <p class="text-slate-600 mt-0.5 font-medium">{{ selectedOrder.clinicalHistory }}</p>
+              </div>
+            </div>
+
+            <!-- Items ordered -->
+            <div class="space-y-3">
+              <h4 class="font-bold text-slate-800 text-xs uppercase tracking-wide text-teal-700">Requested Endoscopy Procedures</h4>
+              <div class="border border-slate-100 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-50">
+                <div v-for="item in selectedOrderItems" :key="item._id" class="p-4 bg-white hover:bg-slate-50/50 transition-colors flex justify-between items-center text-xs">
+                  <div>
+                    <p class="font-bold text-slate-800">{{ item.endoscopyTestId?.name }}</p>
+                    <p class="text-[10px] font-mono text-slate-400 mt-0.5">{{ item.endoscopyTestId?.code }}</p>
+                  </div>
+                  <span class="font-bold text-slate-900">₹{{ item.amount }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+          <button @click="showDetailModal = false" class="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer">
+            Close
           </button>
         </div>
       </div>

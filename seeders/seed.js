@@ -8,6 +8,7 @@ const labCategorySeed=require('./lab_category.seed')
 const radiologySeed=require('./radiology.seed')
 const medicineCategorySeed=require('./medicine_category.seed')
 const chargeCategorySeed=require('./charge_category.seed')
+const endoscopyCategorySeed=require('./endoscopy_category.seed')
 async function runSeeders() {
   try {
     console.log('Connecting to database...')
@@ -21,6 +22,7 @@ async function runSeeders() {
     await specializationSeed();
     await labCategorySeed();
     await radiologySeed();
+    await endoscopyCategorySeed();
     await medicineCategorySeed()
     await chargeCategorySeed();
     console.log('All seeders completed successfully!')

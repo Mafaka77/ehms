@@ -30,6 +30,13 @@ export const usePharmacyStore = defineStore('pharmacy', {
       limit: 10,
       pages: 1
     },
+    stockSummary: {
+      totalItems: 0,
+      lowStockCount: 0,
+      outOfStockCount: 0,
+      reorderCount: 0,
+      inStockCount: 0
+    },
     salesPagination: {
       total: 0,
       page: 1,
@@ -216,14 +223,28 @@ export const usePharmacyStore = defineStore('pharmacy', {
 
     // ── Medicines ────────────────────────────────────────────
 
-    async fetchMedicines(page = 1, limit = 10, search = '', categoryId = '', supplierId = '', isActive = '') {
+    async fetchAllMedicinesForExport(search = '', stockStatus = '') {
+      try {
+        const response = await api.get('/pharmacy/medicines', {
+          params: { page: 1, limit: 10000, search, stockStatus }
+        })
+        return response.data.data || []
+      } catch (err) {
+        console.error('Error fetching medicines for export:', err)
+        return []
+      }
+    },
+
+    async fetchMedicines(page = 1, limit = 10, search = '', categoryId = '', supplierId = '', isActive = '', stockStatus = '') {
       this.loading = true
       this.error = null
       try {
+        const effectiveLimit = limit === 0 ? 0 : (limit || 10)
         const response = await api.get('/pharmacy/medicines', {
-          params: { page, limit, search, categoryId, supplierId, isActive }
+          params: { page, limit: effectiveLimit, search, categoryId, supplierId, isActive, stockStatus }
         })
         this.medicines = response.data.data || []
+        this.stockSummary = response.data.summary || { totalItems: 0, lowStockCount: 0, outOfStockCount: 0, reorderCount: 0, inStockCount: 0 }
         this.medicinePagination = response.data.pagination || { total: 0, page, limit, pages: 1 }
         return this.medicines
       } catch (err) {

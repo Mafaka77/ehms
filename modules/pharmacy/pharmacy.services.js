@@ -239,9 +239,9 @@ exports.createMedicine = async (data) => {
 exports.getAllMedicines = async (query = {}) => {
     try {
         const page = parseInt(query.page) || 1
-        const limit = parseInt(query.limit) || 10
+        const limit = parseInt(query.limit) === 0 ? 0 : (parseInt(query.limit) || 10)
         const search = query.search || ''
-        const skip = (page - 1) * limit
+        const stockStatus = query.stockStatus || ''
 
         let filter = {}
         if (search) {
@@ -262,19 +262,16 @@ exports.getAllMedicines = async (query = {}) => {
             filter.isActive = query.isActive === 'true' || query.isActive === true
         }
 
-        const total = await Medicine.countDocuments(filter)
-        const medicines = await Medicine.find(filter)
+        // Fetch all matching medicines to compute accurate stock and summary
+        const allMedicines = await Medicine.find(filter)
             .populate('categoryId')
             .populate('supplierId')
             .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit)
 
-        // Dynamically compute stock and sale rate from active batches
-        const medicineIds = medicines.map(m => m._id)
+        const medicineIds = allMedicines.map(m => m._id)
         const allBatches = await MedicineBatch.find({ medicineId: { $in: medicineIds }, isActive: true })
 
-        const medicinesWithStats = medicines.map(med => {
+        const medicinesWithStats = allMedicines.map(med => {
             const medObj = med.toObject()
             const medBatches = allBatches.filter(b => b.medicineId.toString() === med._id.toString())
             
@@ -287,7 +284,45 @@ exports.getAllMedicines = async (query = {}) => {
             return medObj
         })
 
-        return { medicines: medicinesWithStats, pagination: { total, page, limit, pages: Math.ceil(total / limit) } }
+        // Compute overall inventory stock summary stats
+        const summary = {
+            totalItems: medicinesWithStats.length,
+            lowStockCount: medicinesWithStats.filter(m => m.currentStock <= m.reorderLevel && m.currentStock > 0).length,
+            outOfStockCount: medicinesWithStats.filter(m => m.currentStock === 0).length,
+            reorderCount: medicinesWithStats.filter(m => m.currentStock <= m.reorderLevel).length,
+            inStockCount: medicinesWithStats.filter(m => m.currentStock > m.reorderLevel).length
+        }
+
+        // Apply stockStatus filter if specified
+        let filteredMedicines = medicinesWithStats
+        if (stockStatus) {
+            if (stockStatus === 'low') {
+                filteredMedicines = medicinesWithStats.filter(m => m.currentStock <= m.reorderLevel && m.currentStock > 0)
+            } else if (stockStatus === 'out') {
+                filteredMedicines = medicinesWithStats.filter(m => m.currentStock === 0)
+            } else if (stockStatus === 'reorder') {
+                filteredMedicines = medicinesWithStats.filter(m => m.currentStock <= m.reorderLevel)
+            } else if (stockStatus === 'in_stock') {
+                filteredMedicines = medicinesWithStats.filter(m => m.currentStock > m.reorderLevel)
+            }
+        }
+
+        const totalFiltered = filteredMedicines.length
+        let finalMedicines = filteredMedicines
+
+        // Paginate in memory
+        if (limit > 0) {
+            const skip = (page - 1) * limit
+            finalMedicines = filteredMedicines.slice(skip, skip + limit)
+        }
+
+        const totalPages = limit > 0 ? Math.ceil(totalFiltered / limit) : 1
+
+        return {
+            medicines: finalMedicines,
+            summary,
+            pagination: { total: totalFiltered, page, limit, pages: totalPages }
+        }
     } catch (error) {
         throw error
     }

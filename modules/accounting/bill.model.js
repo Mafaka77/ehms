@@ -54,6 +54,12 @@ const billSchema = new mongoose.Schema({
     default: null
   },
 
+  endoscopyOrderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'EndoscopyOrder',
+    default: null
+  },
+
   billType: {
     type: String,
     enum: [
@@ -61,6 +67,7 @@ const billSchema = new mongoose.Schema({
       'IPD',
       'LAB',
       'RADIOLOGY',
+      'ENDOSCOPY',
       'DENTAL',
       'DENTAL_CONSULTATION',
       'ADVANCE',

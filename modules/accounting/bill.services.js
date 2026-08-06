@@ -6,6 +6,8 @@ const LabOrder = require('../laboratory/lab_order.model')
 const LabOrderItem = require('../laboratory/lab_order_item.model')
 const RadiologyOrder = require('../radiology/radiology_order.model')
 const RadiologyOrderItem = require('../radiology/radiology_order_item.model')
+const EndoscopyOrder = require('../endoscopy/endoscopy_order.model')
+const EndoscopyOrderItem = require('../endoscopy/endoscopy_order_item.model')
 const OpdAppointment = require('../clinical/opd/opd_appointment.model')
 const DentalAppointment = require('../dental/dental_appointment.model')
 const Counter = require('../common/counter.model')
@@ -243,6 +245,105 @@ exports.generateBillFromRadiologyOrder = async (radiologyOrderId, userId, discou
         throw err
     }
 }
+
+// ---------------------------------------------------------------------------
+// generateBillFromEndoscopyOrder
+// ---------------------------------------------------------------------------
+exports.generateBillFromEndoscopyOrder = async (endoscopyOrderId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    try {
+        const order = await EndoscopyOrder.findById(endoscopyOrderId).session(session)
+        if (!order) {
+            const error = new Error('Endoscopy order not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        if (order.billId) {
+            const existingBill = await Bill.findById(order.billId).session(session)
+            if (existingBill) {
+                await session.abortTransaction()
+                session.endSession()
+                return existingBill
+            }
+        }
+
+        const orderItems = await EndoscopyOrderItem.find({ orderId: endoscopyOrderId })
+            .populate('endoscopyTestId', 'name')
+            .session(session)
+        if (orderItems.length === 0) {
+            const error = new Error('Endoscopy order has no items')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        const grossAmount = order.totalAmount
+        const netAmount = grossAmount - discountAmount
+
+        const [bill] = await Bill.create([{
+            patientId: order.patientId,
+            admissionId: order.admissionId || null,
+            endoscopyOrderId: order._id,
+            billType: 'ENDOSCOPY',
+            grossAmount,
+            discountAmount,
+            netAmount,
+            paidAmount: 0,
+            balanceAmount: netAmount,
+            status: 'DRAFT',
+            generatedBy: userId,
+            generatedAt: new Date()
+        }], { session })
+
+        for (const item of orderItems) {
+            const itemDiscount = grossAmount > 0 ? Number((discountAmount * (item.amount / grossAmount)).toFixed(2)) : 0
+            const itemNetAmount = item.amount - itemDiscount
+            await BillItem.create([{
+                billId: bill._id,
+                itemType: 'ENDOSCOPY',
+                sourceModule: 'ENDOSCOPY',
+                description: item.endoscopyTestId?.name || 'Endoscopy Test',
+                referenceId: item._id,
+                quantity: item.quantity || 1,
+                rate: item.rate,
+                amount: item.amount,
+                discountAmount: itemDiscount,
+                netAmount: itemNetAmount
+            }], { session })
+        }
+
+        order.billId = bill._id
+        order.paymentStatus = 'UNPAID'
+        await order.save({ session })
+
+        if (discountAmount > 0) {
+            const resolvedDoctorId = await resolveDiscountDoctor(order.patientId, doctorId, session)
+            await Discount.create([{
+                billId: bill._id,
+                patientId: order.patientId,
+                doctorId: resolvedDoctorId,
+                discountType,
+                originalAmount: grossAmount,
+                discountAmount,
+                discountPercentage: grossAmount > 0 ? Number(((discountAmount / grossAmount) * 100).toFixed(2)) : 0,
+                netAmount,
+                reason: discountRemarks || null,
+                status: 'APPROVED',
+                appliedBy: userId
+            }], { session })
+        }
+
+        await session.commitTransaction()
+        session.endSession()
+        return bill
+    } catch (err) {
+        await session.abortTransaction()
+        session.endSession()
+        throw err
+    }
+}
+
 
 // ---------------------------------------------------------------------------
 // generateBillFromOpdAppointment
@@ -932,6 +1033,15 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
             }
         }
 
+        // Sync EndoscopyOrder
+        if (txBill.billType === 'ENDOSCOPY' && txBill.endoscopyOrderId) {
+            const order = await EndoscopyOrder.findById(txBill.endoscopyOrderId).session(session)
+            if (order) {
+                order.paymentStatus = txBill.status === 'PAID' ? 'PAID' : 'PARTIAL'
+                await order.save({ session })
+            }
+        }
+
         // Sync OpdAppointment
         if (txBill.billType === 'OPD' && txBill.opdAppointmentId) {
             const appointment = await OpdAppointment.findById(txBill.opdAppointmentId).session(session)
@@ -1040,6 +1150,16 @@ exports.cancelBill = async (billId) => {
         // Revert associated radiology order status
         if (bill.billType === 'RADIOLOGY' && bill.radiologyOrderId) {
             const order = await RadiologyOrder.findById(bill.radiologyOrderId).session(session)
+            if (order) {
+                order.billId = null
+                order.paymentStatus = 'UNPAID'
+                await order.save({ session })
+            }
+        }
+
+        // Revert associated endoscopy order status
+        if (bill.billType === 'ENDOSCOPY' && bill.endoscopyOrderId) {
+            const order = await EndoscopyOrder.findById(bill.endoscopyOrderId).session(session)
             if (order) {
                 order.billId = null
                 order.paymentStatus = 'UNPAID'
@@ -1183,6 +1303,15 @@ exports.cancelPayment = async (paymentId, userId) => {
                         await PatientChargeAddon.deleteMany({ patientChargeId: { $in: chargeIds } }).session(session)
                         await PatientCharge.deleteMany({ _id: { $in: chargeIds } }).session(session)
                     }
+                }
+            }
+
+            // Sync EndoscopyOrder
+            if (bill.billType === 'ENDOSCOPY' && bill.endoscopyOrderId) {
+                const order = await EndoscopyOrder.findById(bill.endoscopyOrderId).session(session)
+                if (order) {
+                    order.paymentStatus = bill.paidAmount === 0 ? 'UNPAID' : 'PARTIAL'
+                    await order.save({ session })
                 }
             }
 
