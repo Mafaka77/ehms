@@ -12,6 +12,8 @@ import DischargeSummary from './DischargeSummary.vue'
 import Test from './Test.vue'
 import Transactions from './Transactions.vue'
 import { useIpdWardStore } from '../../../stores/ipdWardStore'
+import { useDoctorStore } from '../../../stores/doctorStore'
+import SearchableSelect from '../../../components/SearchableSelect.vue'
 import EditPatientModal from '../../master/patient/Edit.vue'
 import logoUrl from '../../../assets/logo_final.png'
 
@@ -26,6 +28,7 @@ const router = useRouter()
 const admissionStore = useIpdAdmissionStore()
 const snackbarStore = useSnackbarStore()
 const wardStore = useIpdWardStore()
+const doctorStore = useDoctorStore()
 const authStore = useAuthStore()
 
 const canViewTransactions = computed(() => {
@@ -37,6 +40,44 @@ const loading = ref(true)
 const admission = ref(null)
 const activeTab = ref('charges') // charges, pharmacy, doctor_charges, files, bed_history, transactions
 const transactionsRef = ref(null)
+
+// Change Consultant Doctor Modal States
+const showDoctorModal = ref(false)
+const doctorSubmitting = ref(false)
+const selectedDoctorId = ref('')
+
+const doctorOptions = computed(() => {
+  return doctorStore.doctors.map(doc => ({
+    value: doc._id,
+    label: `${doc.fullName} - ${doc.specializationId?.name || 'General'}`
+  }))
+})
+
+const openDoctorModal = async () => {
+  selectedDoctorId.value = admission.value?.consultantDoctorId?._id || admission.value?.consultantDoctorId || ''
+  showDoctorModal.value = true
+  await doctorStore.fetchDoctors(1, 500)
+}
+
+const submitDoctorChange = async () => {
+  if (!selectedDoctorId.value) {
+    snackbarStore.show({ message: 'Please select a consultant doctor.', type: 'warning' })
+    return
+  }
+  doctorSubmitting.value = true
+  const res = await admissionStore.updateAdmission(admission.value._id, {
+    consultantDoctorId: selectedDoctorId.value
+  })
+
+  if (res.success) {
+    snackbarStore.show({ message: 'Consultant doctor updated successfully.', type: 'success' })
+    showDoctorModal.value = false
+    await fetchAdmissionDetails()
+  } else {
+    snackbarStore.show({ message: res.message || 'Failed to update consultant doctor.', type: 'error' })
+  }
+  doctorSubmitting.value = false
+}
 
 // Transfer Bed Modal States
 const showTransferModal = ref(false)
@@ -565,9 +606,18 @@ onMounted(async () => {
             </div>
             <div>
               <p class="font-bold text-slate-800 text-sm">{{ admission.consultantDoctorId?.fullName || 'N/A' }}</p>
-              <p class="text-xs text-slate-500">{{ admission.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
+              <p class="text-xs text-slate-500">{{ admission.consultantDoctorId?.qualification || 'General Consultant' }}</p>
             </div>
           </div>
+          <button 
+            @click="openDoctorModal"
+            class="mt-3 w-full py-1.5 border border-indigo-100 hover:border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+            Edit Doctor
+          </button>
         </div>
 
       </div>
@@ -873,6 +923,55 @@ onMounted(async () => {
       @close="showUpdatePatientModal = false"
       @updated="onPatientUpdated"
     />
+
+    <!-- Change Consultant Doctor Modal -->
+    <div v-if="showDoctorModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <div class="bg-white rounded-2xl shadow-xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200 relative overflow-visible">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-t-2xl">
+          <h3 class="font-bold text-slate-800 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Edit Consultant Doctor
+          </h3>
+          <button @click="showDoctorModal = false" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div class="p-6 space-y-4 min-h-[220px]">
+          <div>
+            <SearchableSelect
+              v-model="selectedDoctorId"
+              id="consultant-doctor-select"
+              label="Select Consultant Doctor"
+              placeholder="Search & select doctor..."
+              :options="doctorOptions"
+            />
+          </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3 rounded-b-2xl">
+          <button 
+            @click="showDoctorModal = false"
+            class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            @click="submitDoctorChange"
+            :disabled="doctorSubmitting"
+            class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
+          >
+            <svg v-if="doctorSubmitting" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Save Changes</span>
+          </button>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>

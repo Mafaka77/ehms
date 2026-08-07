@@ -99,7 +99,7 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
       leave-from-class="transform scale-100 opacity-100"
       leave-to-class="transform scale-95 opacity-0"
     >
-      <div v-if="isOpen" class="absolute z-50 w-full mt-2 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden">
+      <div v-if="isOpen" class="absolute z-[100] left-0 top-full w-full mt-1 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden">
         <!-- Search Input -->
         <div class="p-2 border-b border-slate-100 bg-slate-50/50">
           <div class="relative">

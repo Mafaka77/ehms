@@ -77,22 +77,8 @@ new mongoose.Schema({
       default: null
     }
   },
-  historyOfPresentIllness: {
-    type: String,
-    default: null
-  },
-
-  pastHistory: {
-    type: String,
-    default: null
-  },
 
   clinicalFindings: {
-    type: String,
-    default: null
-  },
-
-  investigationSummary: {
     type: String,
     default: null
   },
@@ -101,7 +87,10 @@ new mongoose.Schema({
     type: String,
     default: null
   },
-
+  clinicalCourse:{
+    type:String,
+    default:null
+  },
   dischargeAdvice: {
     type: String,
     default: null
