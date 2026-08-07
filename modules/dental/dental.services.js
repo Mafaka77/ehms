@@ -61,14 +61,8 @@ exports.getAppointments = async (query) => {
             }).select('_id');
             const patientIds = matchingPatients.map(p => p._id);
 
-            let searchStr = query.search;
-            let regexSearchStr = searchStr;
-            if (!searchStr.toUpperCase().startsWith('EH-DENT-')) {
-                regexSearchStr = 'EH-DENT-' + searchStr;
-            }
-
             filter.$or = [
-                { appointmentId: { $regex: regexSearchStr, $options: 'i' } },
+                { appointmentId: { $regex: query.search, $options: 'i' } },
                 { patientId: { $in: patientIds } }
             ];
         }

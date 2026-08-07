@@ -98,6 +98,7 @@ export const useDentalStore = defineStore('dental', {
                 params.append('limit', filters.limit || 10);
                 
                 if (filters.status) params.append('status', filters.status);
+                if (filters.paymentStatus) params.append('paymentStatus', filters.paymentStatus);
                 if (filters.doctorId) params.append('doctorId', filters.doctorId);
                 if (filters.date) params.append('date', filters.date);
                 if (filters.search) params.append('search', filters.search);
