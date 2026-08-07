@@ -336,7 +336,7 @@ const formatDate = (dateString) => {
 const doctorOptions = computed(() => {
   return doctorStore.doctors.map(doc => ({
     value: doc._id,
-    label: `Dr. ${doc.fullName} - ${doc.specializationId?.name || 'General'}`
+    label: `${doc.fullName} - ${doc.specializationId?.name || 'General'}`
   }))
 })
 </script>
@@ -393,7 +393,7 @@ const doctorOptions = computed(() => {
           >
             <option value="">All Doctors</option>
             <option v-for="doc in doctorStore.doctors" :key="doc._id" :value="doc._id">
-              Dr. {{ doc.fullName }}
+              {{ doc.fullName }}
             </option>
           </select>
 
@@ -473,7 +473,7 @@ const doctorOptions = computed(() => {
               
               <!-- Doctor -->
               <td class="px-6 py-4">
-                <p class="font-bold text-slate-800">Dr. {{ adm.consultantDoctorId?.fullName || 'N/A' }}</p>
+                <p class="font-bold text-slate-800">{{ adm.consultantDoctorId?.fullName || 'N/A' }}</p>
                 <p class="text-xs text-slate-500">{{ adm.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
               </td>
               

@@ -189,7 +189,7 @@ const formatDate = (dateString) => {
           </div>
           <div>
             <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Referring Doctor</div>
-            <div class="font-semibold text-slate-800 mt-1">{{ order.referral === 'Self' ? 'Self-Referred' : `Dr. ${order.doctorId?.fullName || 'N/A'}` }}</div>
+            <div class="font-semibold text-slate-800 mt-1">{{ order.referral === 'Self' ? 'Self-Referred' : (order.doctorId?.fullName || 'N/A') }}</div>
           </div>
           <div>
             <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Order Date</div>

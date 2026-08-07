@@ -114,7 +114,7 @@ const printSummary = () => {
           </div>
           <div class="info-block">
             <div class="info-label">Attending Doctor</div>
-            <div class="info-value">Dr. ${props.visit.doctorId?.fullName || 'On Duty'}</div>
+            <div class="info-value">${props.visit.doctorId?.fullName || 'On Duty'}</div>
           </div>
         </div>
         <h3 style="margin-bottom: 15px; color: #1e293b;">Clinical Summary & Instructions</h3>

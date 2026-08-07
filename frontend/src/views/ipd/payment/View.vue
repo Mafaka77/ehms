@@ -275,7 +275,7 @@ const handleExportAllBillsAndCharges = async () => {
               </td>
               <td>
                 <span class="label">Admitting Doctor</span><br>
-                <span class="val">Dr. ${adm.doctorId?.fullName || '-'}</span>
+                <span class="val">${adm.doctorId?.fullName || '-'}</span>
               </td>
               <td>
                 <span class="label">Admission Date</span><br>

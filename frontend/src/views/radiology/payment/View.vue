@@ -285,7 +285,7 @@ const getPaymentStatusColor = (status) => {
         </div>
         <div>
           <h4 class="text-xs font-semibold uppercase text-slate-400">Clinical details</h4>
-          <p class="font-bold text-slate-800 mt-1">Dr. {{ order.doctorId?.fullName || 'Self/Referral' }}</p>
+          <p class="font-bold text-slate-800 mt-1">{{ order.doctorId?.fullName || 'Self/Referral' }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Order Date: {{ formatDate(order.orderDate) }}</p>
           <p class="text-xs text-slate-500 mt-0.5" v-if="order.clinicalNotes">Notes: {{ order.clinicalNotes }}</p>
         </div>

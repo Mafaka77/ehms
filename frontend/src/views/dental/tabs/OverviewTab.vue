@@ -23,7 +23,7 @@ const props = defineProps({
       </div>
       <div>
         <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Primary Doctor</p>
-        <p class="font-medium text-slate-800">Dr. {{ appointment.doctorId?.fullName }}</p>
+        <p class="font-medium text-slate-800">{{ appointment.doctorId?.fullName }}</p>
       </div>
       <div>
         <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Consultation Fee</p>

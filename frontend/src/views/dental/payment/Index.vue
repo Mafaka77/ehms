@@ -291,7 +291,7 @@ const formatCurrency = (val) => {
                   <p class="text-[10px] text-slate-500 font-mono mt-0.5">{{ appt.patientId?.patientCode || '-' }}</p>
                 </td>
                 <td class="px-6 py-4">
-                  <p class="text-slate-800 font-semibold">Dr. {{ appt.doctorId?.fullName || 'N/A' }}</p>
+                  <p class="text-slate-800 font-semibold">{{ appt.doctorId?.fullName || 'N/A' }}</p>
                   <p class="text-[10px] text-slate-500 mt-0.5">{{ appt.doctorId?.specializationId?.name || '-' }}</p>
                 </td>
                 <td class="px-6 py-4 text-right font-mono font-bold text-slate-900">

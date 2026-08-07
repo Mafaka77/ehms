@@ -93,7 +93,7 @@
             </thead>
             <tbody class="divide-y divide-slate-100">
               <tr class="hover:bg-slate-50/50">
-                <td class="px-2 py-3 font-medium text-slate-800">Emergency Consultation Fee - Dr. {{ visit.doctorId?.fullName || 'On Duty' }}</td>
+                <td class="px-2 py-3 font-medium text-slate-800">Emergency Consultation Fee - {{ visit.doctorId?.fullName || 'On Duty' }}</td>
                 <td class="px-2 py-3 text-right font-mono">{{ formatCurrency(visit.consultationFee) }}</td>
                 <td class="px-2 py-3 text-center font-mono">1</td>
                 <td class="px-2 py-3 text-right font-mono font-semibold">{{ formatCurrency(visit.consultationFee) }}</td>
@@ -191,7 +191,7 @@
                   <p class="text-[9px] text-slate-400 mt-0.5">{{ charge.chargeCategoryId?.name || 'Charge' }} • {{ formatDate(charge.createdAt) }}</p>
                   <!-- Doctor badge -->
                   <div v-if="charge.doctorId" class="text-[10px] text-indigo-500 font-bold mt-1 inline-flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
-                    Dr. {{ charge.doctorId.fullName || charge.doctorId.name || 'N/A' }}
+                    {{ charge.doctorId.fullName || charge.doctorId.name || 'N/A' }}
                   </div>
                   <!-- Addon badges -->
                   <div v-if="charge.addons && charge.addons.length > 0" class="mt-1.5 flex flex-wrap gap-1">
@@ -202,7 +202,7 @@
                     >
                       <span>{{ addon.itemName }}</span>
                       <span v-if="addon.doctorId" class="px-1 py-0.2 text-[8px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-600 rounded">
-                        Dr. {{ addon.doctorId.fullName || addon.doctorId.name || addon.doctorId }}
+                        {{ addon.doctorId.fullName || addon.doctorId.name || addon.doctorId }}
                       </span>
                       <span class="text-slate-500 font-extrabold">(₹{{ addon.amount?.toLocaleString() }})</span>
                     </span>

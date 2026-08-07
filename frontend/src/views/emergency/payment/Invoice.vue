@@ -240,7 +240,7 @@ const calculateAge = (patient) => {
                     <div class="truncate max-w-[200px]">{{ item.description }}</div>
                     <!-- Doctor badge -->
                     <div v-if="getChargeForItem(item)?.doctorId" class="mt-0.5" style="font-size: 7px; color: #4f46e5; font-weight: 600;">
-                      Dr. {{ getChargeForItem(item).doctorId.fullName || 'N/A' }}
+                      {{ getChargeForItem(item).doctorId.fullName || 'N/A' }}
                     </div>
                     <!-- Addon details -->
                     <div v-if="getChargeForItem(item)?.addons?.length > 0" style="margin-top: 2px;">
@@ -250,7 +250,7 @@ const calculateAge = (patient) => {
                         style="display: inline-block; font-size: 7px; padding: 1px 4px; margin: 1px 2px 1px 0; border: 1px solid #d1d5db; border-radius: 3px; color: #0f766e; background: #f0fdfa;"
                       >
                         {{ addon.itemName }} (₹{{ addon.amount?.toLocaleString() }})
-                        <span v-if="addon.doctorId" style="color: #4f46e5; font-weight: 600;">- Dr. {{ addon.doctorId.fullName || addon.doctorId.name || '' }}</span>
+                        <span v-if="addon.doctorId" style="color: #4f46e5; font-weight: 600;">- {{ addon.doctorId.fullName || addon.doctorId.name || '' }}</span>
                       </span>
                     </div>
                   </td>

@@ -253,7 +253,7 @@ onUnmounted(() => {
                 {{ formatItemsList(order.items) }}
               </td>
               <td class="px-6 py-4">
-                <div class="text-sm font-bold text-slate-700">Dr. {{ order.doctorId?.fullName || 'N/A' }}</div>
+                <div class="text-sm font-bold text-slate-700">{{ order.doctorId?.fullName || 'N/A' }}</div>
                 <div class="text-[9px] font-semibold text-slate-400">Station: {{ order.nursingStationId?.name || 'Main Station' }}</div>
               </td>
               <td class="px-6 py-4 text-center">
@@ -346,7 +346,7 @@ onUnmounted(() => {
             </div>
             <div>
               <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Prescribing Doctor</span>
-              <span class="text-sm font-bold text-slate-800 block">Dr. {{ selectedOrder?.doctorId?.fullName }}</span>
+              <span class="text-sm font-bold text-slate-800 block">{{ selectedOrder?.doctorId?.fullName }}</span>
               <span class="text-xs text-slate-500">{{ selectedOrder?.doctorId?.specializationId?.name }}</span>
             </div>
             <div>

@@ -436,7 +436,7 @@ onMounted(() => {
                 </div>
                 <div v-if="selectedItem.discountRecord.doctorId" class="flex justify-between">
                   <span class="font-semibold">Doctor Assigned:</span>
-                  <span class="font-medium text-slate-700">Dr. {{ selectedItem.discountRecord.doctorId.fullName }}</span>
+                  <span class="font-medium text-slate-700">{{ selectedItem.discountRecord.doctorId.fullName }}</span>
                 </div>
                 <div v-if="selectedItem.discountRecord.remarks" class="flex justify-between">
                   <span class="font-semibold">Remarks:</span>

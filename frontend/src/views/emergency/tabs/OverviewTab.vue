@@ -35,7 +35,7 @@ const formatDate = (dateString) => {
       </div>
       <div>
         <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Triage Doctor</p>
-        <p class="font-medium text-slate-800">Dr. {{ visit.doctorId?.fullName || 'On Duty' }}</p>
+        <p class="font-medium text-slate-800">{{ visit.doctorId?.fullName || 'On Duty' }}</p>
       </div>
       <div>
         <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Emergency Rate</p>

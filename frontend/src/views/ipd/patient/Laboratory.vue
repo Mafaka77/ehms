@@ -254,7 +254,7 @@ onMounted(async () => {
           <tr v-for="order in orders" :key="order._id" class="hover:bg-slate-50/50 transition-colors">
             <td class="p-4 font-mono font-bold text-indigo-600">{{ order.orderNo }}</td>
             <td class="p-4">{{ formatDate(order.createdAt) }}</td>
-            <td class="p-4 font-semibold text-slate-800">Dr. {{ order.doctorId?.fullName || 'Self' }}</td>
+            <td class="p-4 font-semibold text-slate-800">{{ order.doctorId?.fullName || 'Self' }}</td>
             <td class="p-4">
               <span class="px-2 py-0.5 rounded text-[10px] font-bold"
                 :class="order.priority === 'STAT' ? 'bg-rose-100 text-rose-700' : order.priority === 'URGENT' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'"
@@ -457,7 +457,7 @@ onMounted(async () => {
             <div class="grid grid-cols-1 md:grid-cols-3 bg-slate-50/50 border border-slate-100 rounded-2xl p-4 gap-4 text-xs">
               <div>
                 <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wide">Referral Doctor</span>
-                <p class="font-bold text-slate-800 mt-0.5">Dr. {{ selectedOrderResults.order?.doctorId?.fullName || 'Self' }}</p>
+                <p class="font-bold text-slate-800 mt-0.5">{{ selectedOrderResults.order?.doctorId?.fullName || 'Self' }}</p>
               </div>
               <div>
                 <span class="text-slate-400 font-bold uppercase text-[9px] tracking-wide">Order Status</span>

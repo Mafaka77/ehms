@@ -170,7 +170,7 @@ const formatCurrency = (val) => {
             </div>
 
             <div class="doctor-section">
-              <p><strong>Referring Clinician:</strong> Dr. {{ order.doctorId?.fullName || 'Self/Referral' }}</p>
+              <p><strong>Referring Clinician:</strong> {{ order.doctorId?.fullName || 'Self/Referral' }}</p>
             </div>
 
             <!-- Itemized Table -->

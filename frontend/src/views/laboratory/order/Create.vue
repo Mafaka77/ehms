@@ -394,7 +394,7 @@ onMounted(() => {
                       >
                         <span class="text-sm font-semibold text-slate-800 font-mono">{{ app.appointmentId }}</span>
                         <span class="text-xs text-slate-500" v-if="app.patientId">Patient: {{ app.patientId.fullName }} ({{ app.patientId.patientCode }})</span>
-                        <span class="text-[10px] text-slate-400" v-if="app.doctorId">Doctor: Dr. {{ app.doctorId.fullName }}</span>
+                        <span class="text-[10px] text-slate-400" v-if="app.doctorId">Doctor: {{ app.doctorId.fullName }}</span>
                       </li>
                     </ul>
                   </div>

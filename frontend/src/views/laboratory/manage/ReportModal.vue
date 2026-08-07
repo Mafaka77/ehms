@@ -403,7 +403,7 @@ const formatDate = (dateString) => {
                 <p><strong>Order No:</strong> <span class="font-mono">{{ order.orderNo }}</span></p>
                 <p><strong>Date Ordered:</strong> {{ formatDate(order.orderDate) }}</p>
                 <p><strong>Report Date:</strong> {{ formatDate(new Date()) }}</p>
-                <p><strong>Ref. Clinician:</strong> Dr. {{ order.doctorId?.fullName || 'Self/Referral' }}</p>
+                <p><strong>Ref. Clinician:</strong> {{ order.doctorId?.fullName || 'Self/Referral' }}</p>
               </div>
             </div>
                 </td>

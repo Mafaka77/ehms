@@ -65,7 +65,7 @@ const handleEdit = (doctor) => {
 const deletingId = ref(null)
 
 const handleDelete = async (doctor) => {
-  if (!confirm(`Are you sure you want to delete Dr. ${doctor.fullName}?`)) {
+  if (!confirm(`Are you sure you want to delete ${doctor.fullName}?`)) {
     return
   }
   deletingId.value = doctor._id

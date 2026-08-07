@@ -169,7 +169,7 @@ const formatCurrency = (val) => {
             </div>
 
             <div class="doctor-section">
-              <p><strong>Consulting Doctor:</strong> Dr. {{ appointment.doctorId?.fullName || 'N/A' }}
+              <p><strong>Consulting Doctor:</strong> {{ appointment.doctorId?.fullName || 'N/A' }}
                 <span v-if="appointment.doctorId?.specializationId?.name"> &mdash; {{ appointment.doctorId.specializationId.name }}</span>
               </p>
               <p><strong>Appointment Date:</strong> {{ formatDate(appointment.appointmentDate) }}</p>

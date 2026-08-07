@@ -285,7 +285,7 @@ const getPaymentStatusColor = (status) => {
         </div>
         <div>
           <h4 class="text-xs font-semibold uppercase text-slate-400">Consultation Details</h4>
-          <p class="font-bold text-slate-800 mt-1">Dr. {{ appointment.doctorId?.fullName || 'N/A' }}</p>
+          <p class="font-bold text-slate-800 mt-1">{{ appointment.doctorId?.fullName || 'N/A' }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Specialization: {{ appointment.doctorId?.specializationId?.name || '-' }}</p>
           <p class="text-xs text-slate-500 mt-0.5">Date: {{ formatDate(appointment.appointmentDate) }}</p>
           <p class="text-xs text-slate-500 mt-0.5" v-if="appointment.notes">Notes: {{ appointment.notes }}</p>
@@ -307,7 +307,7 @@ const getPaymentStatusColor = (status) => {
             </thead>
             <tbody class="divide-y divide-slate-100 text-slate-700">
               <tr class="hover:bg-slate-50/50">
-                <td class="px-4 py-3 font-medium text-slate-800">Dental Consultation Fee - Dr. {{ appointment.doctorId?.fullName || 'N/A' }}</td>
+                <td class="px-4 py-3 font-medium text-slate-800">Dental Consultation Fee - {{ appointment.doctorId?.fullName || 'N/A' }}</td>
                 <td class="px-4 py-3 text-right font-mono">{{ formatCurrency(appointment.consultationFee) }}</td>
                 <td class="px-4 py-3 text-center font-mono">1</td>
                 <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(appointment.consultationFee) }}</td>

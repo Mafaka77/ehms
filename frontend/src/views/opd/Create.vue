@@ -106,7 +106,7 @@ const isBooking = ref(false)
 const doctorOptions = computed(() => {
   return opdStore.opdDoctors.map(doctor => ({
     value: doctor._id,
-    label: `Dr. ${doctor.fullName} - ${doctor.specializationId?.name || 'General'}`
+    label: `${doctor.fullName} - ${doctor.specializationId?.name || 'General'}`
   }))
 })
 

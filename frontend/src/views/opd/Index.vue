@@ -203,7 +203,7 @@ const exportToExcel = (reportData) => {
     const patientName = appointment.patientId?.fullName || ''
     const patientAgeGender = `${appointment.patientId?.age || ''} / ${appointment.patientId?.gender || ''}`
     const patientContact = appointment.patientId?.mobileNo || ''
-    const docName = appointment.doctorId ? `Dr. ${appointment.doctorId.fullName}` : ''
+    const docName = appointment.doctorId ? appointment.doctorId.fullName : ''
     const status = appointment.status || ''
     const fee = appointment.consultationFee || 0
 
@@ -294,7 +294,7 @@ const editForm = ref({
 const doctorOptions = computed(() => {
   return opdStore.opdDoctors.map(doctor => ({
     value: doctor._id,
-    label: `Dr. ${doctor.fullName} - ${doctor.specializationId?.name || 'General'}`
+    label: `${doctor.fullName} - ${doctor.specializationId?.name || 'General'}`
   }))
 })
 
@@ -393,7 +393,7 @@ watch(() => editForm.value.doctorId, (newDocId) => {
           >
             <option value="">All Doctors</option>
             <option v-for="doc in opdStore.opdDoctors" :key="doc._id" :value="doc._id">
-              Dr. {{ doc.fullName }}
+              {{ doc.fullName }}
             </option>
           </select>
 
@@ -461,7 +461,7 @@ watch(() => editForm.value.doctorId, (newDocId) => {
                 <p class="text-xs text-slate-500">{{ app.patientId?.patientCode || '-' }} • {{ app.patientId?.mobileNo }}</p>
               </td>
               <td class="px-6 py-4">
-                <p class="font-bold text-slate-800">Dr. {{ app.doctorId?.fullName || 'N/A' }}</p>
+                <p class="font-bold text-slate-800">{{ app.doctorId?.fullName || 'N/A' }}</p>
                 <p class="text-xs text-slate-500">{{ app.doctorId?.specializationId?.name || 'General' }}</p>
               </td>
               <td class="px-6 py-4">
@@ -641,7 +641,7 @@ watch(() => editForm.value.doctorId, (newDocId) => {
             >
               <option value="">All Doctors</option>
               <option v-for="doc in opdStore.opdDoctors" :key="doc._id" :value="doc._id">
-                Dr. {{ doc.fullName }}
+                {{ doc.fullName }}
               </option>
             </select>
           </div>

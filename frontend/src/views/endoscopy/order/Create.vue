@@ -318,7 +318,7 @@ onMounted(() => fetchAllTests())
                       <li v-for="app in opdAppointmentSearchResults" :key="app._id" @click="selectOpdAppointment(app)" class="px-4 py-2.5 hover:bg-slate-50 cursor-pointer">
                         <span class="text-sm font-bold font-mono text-slate-800">{{ app.appointmentId }}</span>
                         <span class="text-xs text-slate-500 block" v-if="app.patientId">{{ app.patientId.fullName }} ({{ app.patientId.patientCode }})</span>
-                        <span class="text-[10px] text-slate-400" v-if="app.doctorId">Dr. {{ app.doctorId.fullName }}</span>
+                        <span class="text-[10px] text-slate-400" v-if="app.doctorId">{{ app.doctorId.fullName }}</span>
                       </li>
                     </ul>
                   </div>

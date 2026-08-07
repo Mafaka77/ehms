@@ -255,7 +255,7 @@ onMounted(async () => {
             <div class="flex items-center justify-between">
               <span class="text-slate-400 text-xs">Doctor</span>
               <span class="text-slate-700 text-right truncate max-w-[180px]">
-                {{ order.referral === 'Self' ? 'Self-Referred' : `Dr. ${order.doctorId?.fullName || 'N/A'}` }}
+                {{ order.referral === 'Self' ? 'Self-Referred' : ` ${order.doctorId?.fullName || 'N/A'}` }}
               </span>
             </div>
           </div>
@@ -414,7 +414,7 @@ onMounted(async () => {
             </div>
             <div>
               <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Clinician</div>
-              <div class="font-semibold text-slate-800 mt-1">{{ selectedOrder.referral === 'Self' ? 'Self-Referred' : `Dr. ${selectedOrder.doctorId?.fullName || 'N/A'}` }}</div>
+              <div class="font-semibold text-slate-800 mt-1">{{ selectedOrder.referral === 'Self' ? 'Self-Referred' : ` ${selectedOrder.doctorId?.fullName || 'N/A'}` }}</div>
             </div>
             <div>
               <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Priority & Date</div>

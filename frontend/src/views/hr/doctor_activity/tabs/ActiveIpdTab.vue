@@ -64,7 +64,7 @@ const formatDateTime = (d) => {
     </div>
 
     <div v-else class="p-12 text-center text-slate-400 text-xs">
-      No active IPD admissions under Dr. {{ doctorName }}
+      No active IPD admissions under {{ doctorName }}
     </div>
   </div>
 </template>

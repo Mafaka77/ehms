@@ -173,7 +173,7 @@ const filteredDoctors = computed(() => {
 
 const selectedDoctorName = computed(() => {
   const selected = doctorStore.doctors.find(d => d._id === chargeForm.value.doctorId)
-  return selected ? `Dr. ${selected.fullName} (${selected.specializationId?.name || 'General'})` : '-- Select Doctor --'
+  return selected ? `${selected.fullName} (${selected.specializationId?.name || 'General'})` : '-- Select Doctor --'
 })
 
 const selectDoctor = (doc) => {
@@ -259,7 +259,7 @@ const updateRateAndDescriptionFromAddons = () => {
   const descriptionWithAddons = addonNames ? `${baseName} (${addonNames})` : baseName
 
   if (doc) {
-    chargeForm.value.description = `${descriptionWithAddons} - Dr. ${doc.fullName}`.trim()
+    chargeForm.value.description = `${descriptionWithAddons} - ${doc.fullName}`.trim()
   } else {
     chargeForm.value.description = descriptionWithAddons
   }
@@ -660,7 +660,7 @@ onBeforeUnmount(() => {
                     >
                       <span>{{ addon.itemName }}</span>
                       <span v-if="addon.doctorId" class="px-1 py-0.2 text-[8px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-650 rounded">
-                        Dr. {{ addon.doctorId.fullName || addon.doctorId }}
+                        {{ addon.doctorId.fullName || addon.doctorId }}
                       </span>
                       <span class="text-slate-500 font-extrabold">(₹{{ addon.amount.toLocaleString() }})</span>
                     </span>
@@ -670,7 +670,7 @@ onBeforeUnmount(() => {
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
-                    Dr. {{ charge.doctorId.fullName }}
+                    {{ charge.doctorId.fullName }}
                   </div>
                 </td>
                 <td class="px-5 py-3 text-right">
@@ -951,7 +951,7 @@ onBeforeUnmount(() => {
                       >
                         <option value="">-- Assign Doctor --</option>
                         <option v-for="doc in doctorStore.doctors" :key="doc._id" :value="doc._id">
-                          Dr. {{ doc.fullName }}
+                          {{ doc.fullName }}
                         </option>
                       </select>
                     </div>
@@ -1004,7 +1004,7 @@ onBeforeUnmount(() => {
                 >
                   <option value="">-- Assign Doctor (Optional) --</option>
                   <option v-for="doc in doctorStore.doctors" :key="doc._id" :value="doc._id">
-                    Dr. {{ doc.fullName }}
+                    {{ doc.fullName }}
                   </option>
                 </select>
                 <button 
@@ -1071,7 +1071,7 @@ onBeforeUnmount(() => {
                     class="w-full px-3.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-between"
                     :class="{ 'bg-indigo-50/40 text-indigo-600 font-bold': chargeForm.doctorId === doc._id }"
                   >
-                    <span class="truncate">Dr. {{ doc.fullName }} ({{ doc.specializationId?.name || 'General' }})</span>
+                    <span class="truncate">{{ doc.fullName }} ({{ doc.specializationId?.name || 'General' }})</span>
                     <svg v-if="chargeForm.doctorId === doc._id" class="w-4 h-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                     </svg>

@@ -101,7 +101,7 @@ const isBooking = ref(false)
 const doctorOptions = computed(() => {
   return dentalStore.dentalDoctors.map(doctor => ({
     value: doctor._id,
-    label: `Dr. ${doctor.fullName} - ${doctor.specializationId?.name || 'General'}`
+    label: `${doctor.fullName} - ${doctor.specializationId?.name || 'General'}`
   }))
 })
 

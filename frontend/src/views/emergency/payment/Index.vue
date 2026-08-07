@@ -350,7 +350,7 @@ const handleExportPdf = async () => {
                 const stClass = st === 'Paid' ? 'status-paid' : (st === 'Partially Paid' ? 'status-partial' : 'status-unpaid')
                 const pName = v.patientId?.fullName || 'Walk-in / Emergency'
                 const pCode = v.patientId?.patientCode || '-'
-                const docName = v.doctorId?.fullName ? 'Dr. ' + v.doctorId.fullName : 'On Duty Doctor'
+                const docName = v.doctorId?.fullName ? v.doctorId.fullName : 'On Duty Doctor'
 
                 return `
                   <tr>
@@ -580,7 +580,7 @@ const formatCurrency = (val) => {
                   <p class="text-[10px] text-slate-500 font-mono mt-0.5">{{ v.patientId?.patientCode || '-' }}</p>
                 </td>
                 <td class="px-6 py-4">
-                  <p class="text-slate-800 font-semibold">Dr. {{ v.doctorId?.fullName || 'On Duty' }}</p>
+                  <p class="text-slate-800 font-semibold">{{ v.doctorId?.fullName || 'On Duty' }}</p>
                   <p class="text-[10px] text-slate-500 mt-0.5">{{ v.doctorId?.specializationId?.name || 'Emergency Services' }}</p>
                 </td>
                 <td class="px-6 py-4 text-right font-mono font-bold text-slate-900">
