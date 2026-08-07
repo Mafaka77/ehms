@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import api from '../../../axios/api'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
@@ -186,6 +186,18 @@ const getChargeTotal = (charge) => {
   const addonsTotal = (charge.addons || []).reduce((sum, a) => sum + (a.amount || 0), 0)
   return base + addonsTotal
 }
+
+const generateBillTotal = computed(() => {
+  return unbilledCharges.value
+    .filter(c => selectedChargeIds.value.includes(c._id))
+    .reduce((sum, c) => sum + getChargeTotal(c), 0)
+})
+
+const editBillTotal = computed(() => {
+  return editAvailableCharges.value
+    .filter(c => selectedEditChargeIds.value.includes(c._id))
+    .reduce((sum, c) => sum + getChargeTotal(c), 0)
+})
 
 const formatPaymentModes = (bill) => {
   if (!bill.payments || bill.payments.length === 0) return null
@@ -412,9 +424,12 @@ onMounted(() => {
       </div>
 
       <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-        <div class="text-sm">
+        <div class="text-sm flex items-center gap-2">
           <span class="text-slate-500">Selected:</span> 
           <strong class="text-slate-800">{{ selectedChargeIds.length }} items</strong>
+          <span class="text-slate-300">|</span>
+          <span class="text-slate-500">Total:</span> 
+          <strong class="text-indigo-600 font-mono text-base">₹{{ generateBillTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong>
         </div>
         <div class="flex gap-3">
           <button 
@@ -429,7 +444,7 @@ onMounted(() => {
             class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
           >
             <span v-if="generatingBill">Generating...</span>
-            <span v-else>Generate Bill</span>
+            <span v-else>Generate Bill (₹{{ generateBillTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }})</span>
           </button>
         </div>
       </div>
@@ -486,9 +501,12 @@ onMounted(() => {
       </div>
 
       <div class="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-        <div class="text-sm">
+        <div class="text-sm flex items-center gap-2">
           <span class="text-slate-500">Selected:</span> 
           <strong class="text-slate-800">{{ selectedEditChargeIds.length }} items</strong>
+          <span class="text-slate-300">|</span>
+          <span class="text-slate-500">Total:</span> 
+          <strong class="text-indigo-600 font-mono text-base">₹{{ editBillTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</strong>
         </div>
         <div class="flex gap-3">
           <button 
@@ -503,7 +521,7 @@ onMounted(() => {
             class="px-5 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
           >
             <span v-if="updatingBill">Updating...</span>
-            <span v-else>Update Bill</span>
+            <span v-else>Update Bill (₹{{ editBillTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }})</span>
           </button>
         </div>
       </div>
