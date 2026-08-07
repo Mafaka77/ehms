@@ -65,7 +65,7 @@ onMounted(() => {
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-lg font-black text-slate-900">Dr. {{ doctor.fullName }}</h2>
+              <h2 class="text-lg font-black text-slate-900"> {{ doctor.fullName }}</h2>
               <span class="px-2.5 py-0.5 rounded-md text-xs font-extrabold bg-indigo-50 text-indigo-600 border border-indigo-100">
                 {{ doctor.doctorCode }}
               </span>

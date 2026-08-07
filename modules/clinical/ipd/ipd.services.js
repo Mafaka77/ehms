@@ -6,6 +6,7 @@ const Patient = require('../../patients/patient.model')
 const Doctor = require('../../hr/doctor.model')
 const AdmissionNote = require('./admission_note.model')
 const AdmissionAdvance = require('./admission_advance.model')
+const DischargeSummary = require('./discharge_summary.model')
 const STATUS_CODES = require('../../../utils/statuscode')
 
 // ==========================================
@@ -1490,6 +1491,110 @@ exports.getAdmissionBills = async (admissionId) => {
         }
 
         return { success: true, data: bills }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getDischargeSummary = async (admissionId) => {
+    try {
+        let summary = await DischargeSummary.findOne({ admissionId })
+            .populate('consultantId', 'fullName doctorCode specializationId')
+            .populate('preparedBy', 'fullName employeeCode')
+            .populate('patientId', 'patientCode fullName age gender mobileNo')
+            .lean()
+
+        if (!summary) {
+            const admission = await Admission.findById(admissionId)
+                .populate('patientId')
+                .populate('consultantDoctorId')
+                .lean()
+
+            if (!admission) {
+                const error = new Error('Admission record not found')
+                error.status = STATUS_CODES.NOT_FOUND
+                throw error
+            }
+
+            return {
+                admissionId: admission._id,
+                patientId: admission.patientId?._id || admission.patientId,
+                consultantId: admission.consultantDoctorId?._id || admission.consultantDoctorId,
+                dischargeDate: admission.dischargeDate || new Date(),
+                dischargeType: 'NORMAL',
+                finalDiagnosis: '',
+                chiefComplaints: '',
+                vitalsOnAdmission: {
+                    temperature: '',
+                    pulse: '',
+                    respiration: '',
+                    bp: '',
+                    oxygenSaturation: ''
+                },
+                historyOfPresentIllness: '',
+                pastHistory: '',
+                clinicalFindings: '',
+                investigationSummary: '',
+                conditionAtDischarge: '',
+                dischargeAdvice: '',
+                followUpAdvice: '',
+                remarks: '',
+                status: 'DRAFT',
+                isNew: true
+            }
+        }
+        return summary
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.saveDischargeSummary = async (admissionId, data, userId) => {
+    try {
+        const admission = await Admission.findById(admissionId)
+        if (!admission) {
+            const error = new Error('Admission record not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const patientId = data.patientId || admission.patientId
+        const consultantId = data.consultantId || admission.consultantDoctorId
+        const preparedBy = userId || consultantId
+
+        const updateData = {
+            admissionId,
+            patientId,
+            consultantId,
+            preparedBy,
+            dischargeDate: data.dischargeDate || new Date(),
+            dischargeType: data.dischargeType || 'NORMAL',
+            finalDiagnosis: data.finalDiagnosis || null,
+            chiefComplaints: data.chiefComplaints || null,
+            vitalsOnAdmission: data.vitalsOnAdmission || {},
+            historyOfPresentIllness: data.historyOfPresentIllness || null,
+            pastHistory: data.pastHistory || null,
+            clinicalFindings: data.clinicalFindings || null,
+            investigationSummary: data.investigationSummary || null,
+            conditionAtDischarge: data.conditionAtDischarge || null,
+            dischargeAdvice: data.dischargeAdvice || null,
+            followUpAdvice: data.followUpAdvice || null,
+            remarks: data.remarks || null,
+            status: data.status || 'DRAFT'
+        }
+
+        const record = await DischargeSummary.findOneAndUpdate(
+            { admissionId },
+            updateData,
+            { new: true, upsert: true, runValidators: true }
+        )
+
+        const summarySnippet = `Diagnosis: ${record.finalDiagnosis || '-'}\nDischarge Advice: ${record.dischargeAdvice || '-'}`
+        await Admission.findByIdAndUpdate(admissionId, {
+            dischargeSummary: summarySnippet
+        })
+
+        return record
     } catch (error) {
         throw error
     }

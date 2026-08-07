@@ -1,17 +1,8 @@
 <script setup>
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
-import { useEditor, EditorContent } from '@tiptap/vue-3'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import TextAlign from '@tiptap/extension-text-align'
-import Link from '@tiptap/extension-link'
-import { Table } from '@tiptap/extension-table'
-import { TableRow } from '@tiptap/extension-table-row'
-import { TableCell } from '@tiptap/extension-table-cell'
-import { TableHeader } from '@tiptap/extension-table-header'
-import Placeholder from '@tiptap/extension-placeholder'
+import logoUrl from '../../../assets/logo_final.png'
 
 const props = defineProps({
   admissionId: {
@@ -27,59 +18,102 @@ const props = defineProps({
 const snackbarStore = useSnackbarStore()
 const admissionStore = useIpdAdmissionStore()
 
-const summaryText = ref(props.admission?.dischargeSummary || '')
+const loading = ref(false)
 const saving = ref(false)
 
-const editor = useEditor({
-  extensions: [
-    StarterKit.configure({
-      heading: { levels: [1, 2, 3, 4] }
-    }),
-    Underline,
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
-    Link.configure({ openOnClick: false }),
-    Table.configure({ resizable: true }),
-    TableRow,
-    TableCell,
-    TableHeader,
-    Placeholder.configure({
-      placeholder: 'Type the IPD clinical discharge summary, diagnosis, course in hospital, advice on discharge, and follow-up instructions here...'
-    })
-  ],
-  content: props.admission?.dischargeSummary || '',
-  onCreate({ editor: e }) {
-    if (props.admission?.dischargeSummary) {
-      e.commands.setContent(props.admission.dischargeSummary)
-    }
+const getNowDateTimeString = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const form = ref({
+  admissionId: props.admissionId,
+  patientId: props.admission?.patientId?._id || props.admission?.patientId,
+  consultantId: props.admission?.consultantDoctorId?._id || props.admission?.consultantDoctorId,
+  dischargeDate: getNowDateTimeString(),
+  dischargeType: 'NORMAL',
+  finalDiagnosis: '',
+  chiefComplaints: '',
+  vitalsOnAdmission: {
+    temperature: '',
+    pulse: '',
+    respiration: '',
+    bp: '',
+    oxygenSaturation: ''
   },
-  onUpdate({ editor: e }) {
-    summaryText.value = e.getHTML()
-  }
+  historyOfPresentIllness: '',
+  pastHistory: '',
+  clinicalFindings: '',
+  investigationSummary: '',
+  conditionAtDischarge: '',
+  dischargeAdvice: '',
+  followUpAdvice: '',
+  remarks: '',
+  status: 'DRAFT'
 })
 
-watch(() => props.admission?.dischargeSummary, (newVal) => {
-  const content = newVal || ''
-  summaryText.value = content
-  if (editor.value && editor.value.getHTML() !== content) {
-    editor.value.commands.setContent(content)
-  }
-}, { immediate: true })
-
-onBeforeUnmount(() => {
-  editor.value?.destroy()
-})
-
-const saveSummary = async () => {
-  saving.value = true
+const loadSummary = async () => {
+  loading.value = true
   try {
-    const res = await admissionStore.updateAdmission(props.admissionId, {
-      dischargeSummary: summaryText.value
-    })
-    if (res.success) {
-      if (props.admission) {
-        props.admission.dischargeSummary = summaryText.value
+    const res = await admissionStore.fetchDischargeSummary(props.admissionId)
+    if (res.success && res.data) {
+      const d = res.data
+      form.value.dischargeType = d.dischargeType || 'NORMAL'
+      form.value.finalDiagnosis = d.finalDiagnosis || ''
+      form.value.chiefComplaints = d.chiefComplaints || ''
+      form.value.vitalsOnAdmission = {
+        temperature: d.vitalsOnAdmission?.temperature || '',
+        pulse: d.vitalsOnAdmission?.pulse || '',
+        respiration: d.vitalsOnAdmission?.respiration || '',
+        bp: d.vitalsOnAdmission?.bp || '',
+        oxygenSaturation: d.vitalsOnAdmission?.oxygenSaturation || ''
       }
-      snackbarStore.show({ message: 'Discharge summary saved successfully', type: 'success' })
+      form.value.historyOfPresentIllness = d.historyOfPresentIllness || ''
+      form.value.pastHistory = d.pastHistory || ''
+      form.value.clinicalFindings = d.clinicalFindings || ''
+      form.value.investigationSummary = d.investigationSummary || ''
+      form.value.conditionAtDischarge = d.conditionAtDischarge || ''
+      form.value.dischargeAdvice = d.dischargeAdvice || ''
+      form.value.followUpAdvice = d.followUpAdvice || ''
+      form.value.remarks = d.remarks || ''
+      form.value.status = d.status || 'DRAFT'
+
+      if (d.dischargeDate) {
+        form.value.dischargeDate = new Date(d.dischargeDate).toISOString().slice(0, 16)
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load discharge summary record:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadSummary()
+})
+
+watch(() => props.admissionId, () => {
+  loadSummary()
+})
+
+const saveSummary = async (targetStatus = null) => {
+  saving.value = true
+  if (targetStatus) {
+    form.value.status = targetStatus
+  }
+  try {
+    const res = await admissionStore.saveDischargeSummary(props.admissionId, form.value)
+    if (res.success) {
+      snackbarStore.show({ message: 'Discharge summary saved successfully!', type: 'success' })
+      if (res.data) {
+        form.value.status = res.data.status
+      }
     } else {
       snackbarStore.show({ message: res.message || 'Failed to save discharge summary', type: 'error' })
     }
@@ -93,10 +127,13 @@ const saveSummary = async () => {
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-IN', {
+  return new Date(dateString).toLocaleString('en-IN', {
     day: '2-digit',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
   })
 }
 
@@ -105,6 +142,8 @@ const printSummary = () => {
   const doctor = props.admission?.consultantDoctorId || {}
   const bed = props.admission?.bedId || {}
   const ward = bed?.wardId || {}
+  const f = form.value
+  const v = f.vitalsOnAdmission || {}
 
   const printContent = `
     <!DOCTYPE html>
@@ -112,29 +151,57 @@ const printSummary = () => {
       <head>
         <title>Discharge Summary - ${patient.fullName || 'Patient'}</title>
         <style>
-          @page { size: A4; margin: 20mm; }
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #1e293b; line-height: 1.6; }
-          .header { text-align: center; border-bottom: 3px double #cbd5e1; padding-bottom: 15px; margin-bottom: 20px; }
-          .header h1 { margin: 0 0 5px 0; color: #0f172a; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
-          .header p { margin: 0; font-size: 13px; color: #64748b; }
-          .patient-card { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 25px; }
-          .info-block { font-size: 12px; }
-          .info-label { font-weight: 700; color: #64748b; text-transform: uppercase; font-size: 10px; margin-bottom: 2px; }
-          .info-value { font-size: 13px; font-weight: 600; color: #0f172a; }
-          .section-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 20px 0 10px 0; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
-          .summary-content { font-size: 13px; background: #fff; padding: 15px 0; min-height: 350px; }
-          .summary-content table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-          .summary-content th, .summary-content td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }
-          .summary-content th { background-color: #f1f5f9; font-weight: bold; }
-          .footer { margin-top: 60px; display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid; }
-          .signature-box { text-align: center; width: 220px; }
-          .signature-line { border-top: 1px solid #0f172a; padding-top: 8px; margin-top: 70px; font-weight: bold; font-size: 12px; }
+          @page { size: A4; margin: 15mm; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10px; color: #0f172a; line-height: 1.5; font-size: 12px; }
+          
+          .header { border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 15px; }
+          .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+          .logo-container { text-align: left; }
+          .logo-img { height: 60px; width: auto; object-fit: contain; }
+          .address-container { text-align: right; font-size: 10px; color: #475569; line-height: 1.4; }
+          .hospital-name { font-size: 13px; font-weight: 800; color: #0f172a; text-transform: uppercase; margin: 0 0 2px 0; }
+          .hospital-addr, .hospital-contact { margin: 0; font-weight: 500; }
+          .header-title { text-align: center; margin-top: 4px; }
+          .title-badge { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #0f172a; background-color: #f1f5f9; padding: 4px 20px; border-radius: 4px; border: 1px solid #cbd5e1; display: inline-block; margin: 0; }
+          
+          .patient-card { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; background: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #cbd5e1; margin-bottom: 15px; }
+          .info-block { font-size: 11px; }
+          .info-label { font-weight: 700; color: #64748b; text-transform: uppercase; font-size: 9px; margin-bottom: 1px; }
+          .info-value { font-size: 12px; font-weight: 600; color: #0f172a; }
+
+          .vitals-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; background: #fff; padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 12px; text-align: center; }
+          .vital-item { background: #f1f5f9; padding: 6px; rounded: 4px; }
+          .vital-lbl { font-size: 9px; font-weight: 700; color: #475569; text-transform: uppercase; }
+          .vital-val { font-size: 11px; font-weight: 800; color: #0f172a; margin-top: 2px; }
+
+          .section { margin-bottom: 12px; }
+          .section-title { font-size: 12px; font-weight: 800; color: #1e293b; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 3px; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+          .section-content { font-size: 11px; color: #334155; white-space: pre-wrap; word-wrap: break-word; line-height: 1.5; }
+
+          .highlight-box { background: #f0fdf4; border: 1px solid #bbf7d0; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; }
+          .highlight-title { font-size: 11px; font-weight: 800; color: #166534; text-transform: uppercase; margin-bottom: 3px; }
+          .highlight-content { font-size: 12px; font-weight: 700; color: #14532d; white-space: pre-wrap; }
+
+          .footer { margin-top: 40px; display: flex; justify-content: space-between; align-items: flex-end; page-break-inside: avoid; }
+          .signature-box { text-align: center; width: 200px; }
+          .signature-line { border-top: 1px solid #0f172a; padding-top: 4px; margin-top: 50px; font-weight: bold; font-size: 11px; }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>IPD Patient Discharge Summary</h1>
-          <p>Hospital Inpatient Clinical Discharge Record</p>
+          <div class="header-top">
+            <div class="logo-container">
+              <img src="${logoUrl}" alt="Hospital Logo" class="logo-img" />
+            </div>
+            <div class="address-container">
+              <p class="hospital-name">EMMANUEL HOSPITAL</p>
+              <p class="hospital-addr">Y-67, Luangmual, Aizawl, Mizoram - 796009</p>
+              <p class="hospital-contact">Phone: 0389-2913340 / 8974326872</p>
+            </div>
+          </div>
+          <div class="header-title">
+            <h1 class="title-badge">DISCHARGE SUMMARY</h1>
+          </div>
         </div>
         
         <div class="patient-card">
@@ -159,28 +226,114 @@ const printSummary = () => {
             <div class="info-value">${formatDate(props.admission.admissionDate)}</div>
           </div>
           <div class="info-block">
-            <div class="info-label">Ward / Bed No</div>
+            <div class="info-label">Discharge Date</div>
+            <div class="info-value">${formatDate(f.dischargeDate)}</div>
+          </div>
+          <div class="info-block">
+            <div class="info-label">Discharge Type</div>
+            <div class="info-value">${f.dischargeType}</div>
+          </div>
+          <div class="info-block">
+            <div class="info-label">Ward / Bed</div>
             <div class="info-value">Bed ${bed.bedNo || '-'} (${ward.name || '-'})</div>
           </div>
-          <div class="info-block">
-            <div class="info-label">Attending Doctor</div>
-            <div class="info-value">Dr. ${doctor.fullName || 'Consultant'}</div>
+          <div class="info-block" style="grid-column: span 2;">
+            <div class="info-label">Consultant Doctor</div>
+            <div class="info-value">${doctor.fullName || 'Consultant'}</div>
           </div>
-          <div class="info-block">
-            <div class="info-label">Status</div>
-            <div class="info-value">${props.admission.status || 'ADMITTED'}</div>
+          <div class="info-block" style="grid-column: span 2;">
+            <div class="info-label">Summary Status</div>
+            <div class="info-value">${f.status}</div>
           </div>
         </div>
 
-        <div class="section-title">Clinical Course & Discharge Summary</div>
-        <div class="summary-content">${summaryText.value || '<p>No discharge summary details entered.</p>'}</div>
+        <!-- Admission Vitals -->
+        <div class="section">
+          <div class="section-title">Vitals on Admission</div>
+          <div class="vitals-grid">
+            <div class="vital-item">
+              <div class="vital-lbl">Temperature</div>
+              <div class="vital-val">${v.temperature || '—'}</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-lbl">Pulse Rate</div>
+              <div class="vital-val">${v.pulse || '—'}</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-lbl">Respiration</div>
+              <div class="vital-val">${v.respiration || '—'}</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-lbl">Blood Pressure</div>
+              <div class="vital-val">${v.bp || '—'}</div>
+            </div>
+            <div class="vital-item">
+              <div class="vital-lbl">SpO2</div>
+              <div class="vital-val">${v.oxygenSaturation || '—'}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Final Diagnosis -->
+        <div class="highlight-box">
+          <div class="highlight-title">Final Diagnosis</div>
+          <div class="highlight-content">${f.finalDiagnosis || 'Not specified'}</div>
+        </div>
+
+        <!-- Chief Complaints -->
+        <div class="section" v-if="f.chiefComplaints">
+          <div class="section-title">Chief Complaints</div>
+          <div class="section-content">${f.chiefComplaints || '—'}</div>
+        </div>
+
+        <!-- History of Present Illness -->
+        <div class="section" v-if="f.historyOfPresentIllness">
+          <div class="section-title">History of Present Illness (HPI)</div>
+          <div class="section-content">${f.historyOfPresentIllness || '—'}</div>
+        </div>
+
+        <!-- Past History -->
+        <div class="section" v-if="f.pastHistory">
+          <div class="section-title">Past History</div>
+          <div class="section-content">${f.pastHistory || '—'}</div>
+        </div>
+
+        <!-- Clinical Findings -->
+        <div class="section" v-if="f.clinicalFindings">
+          <div class="section-title">Clinical Findings on Examination</div>
+          <div class="section-content">${f.clinicalFindings || '—'}</div>
+        </div>
+
+        <!-- Investigation Summary -->
+        <div class="section" v-if="f.investigationSummary">
+          <div class="section-title">Investigation & Lab/Radiology Summary</div>
+          <div class="section-content">${f.investigationSummary || '—'}</div>
+        </div>
+
+        <!-- Condition at Discharge -->
+        <div class="section" v-if="f.conditionAtDischarge">
+          <div class="section-title">Condition at Discharge</div>
+          <div class="section-content">${f.conditionAtDischarge || '—'}</div>
+        </div>
+
+        <!-- Discharge Advice -->
+        <div class="section">
+          <div class="section-title">Discharge Advice & Prescribed Treatment</div>
+          <div class="section-content">${f.dischargeAdvice || '—'}</div>
+        </div>
+
+        <!-- Follow-up Advice & Remarks -->
+        <div class="section">
+          <div class="section-title">Follow-up Advice & Remarks</div>
+          <div class="section-content">${f.followUpAdvice || '—'} ${f.remarks ? '\n\nRemarks: ' + f.remarks : ''}</div>
+        </div>
         
         <div class="footer">
           <div>
-            <p style="font-size: 11px; color: #64748b; margin: 0;">Report Generated: ${new Date().toLocaleString('en-IN')}</p>
+            <p style="font-size: 10px; color: #64748b; margin: 0;">Report Generated: ${new Date().toLocaleString('en-IN')}</p>
           </div>
           <div class="signature-box">
-            <div class="signature-line">Dr. ${doctor.fullName || 'Consultant Doctor'}<br><span style="font-weight: normal; font-size: 11px; color: #64748b;">(Authorized Signatory)</span></div>
+            <div class="signature-line">${doctor.fullName || 'Consultant Doctor'}<br><span style="font-weight: normal; font-size: 10px; color: #64748b;">(Attending / Authorized Consultant)</span></div>
           </div>
         </div>
         <script>
@@ -196,19 +349,28 @@ const printSummary = () => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-6 pb-8">
+    
     <!-- Action Header -->
-    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50/70 p-4 rounded-2xl border border-slate-100">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-5 rounded-2xl border border-slate-100 shadow-xs">
       <div>
-        <h3 class="font-bold text-slate-800 text-base">Inpatient Discharge Summary</h3>
-        <p class="text-xs text-slate-500">Draft, format, save, and print out clinical discharge records for the patient.</p>
+        <div class="flex items-center gap-2">
+          <h3 class="font-bold text-slate-900 text-base">Inpatient Discharge Summary</h3>
+          <span 
+            class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider"
+            :class="form.status === 'FINAL' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'"
+          >
+            {{ form.status }}
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 mt-0.5">Comprehensive clinical discharge record filled by the attending doctor.</p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
         <button 
           type="button"
           @click="printSummary"
-          class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+          class="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
         >
           <svg class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -218,9 +380,22 @@ const printSummary = () => {
 
         <button 
           type="button"
-          @click="saveSummary"
+          @click="saveSummary('DRAFT')"
           :disabled="saving"
-          class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 disabled:bg-emerald-400 text-white text-xs font-bold rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+          class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+        >
+          <svg v-if="saving" class="animate-spin h-3.5 w-3.5 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Save Draft
+        </button>
+
+        <button 
+          type="button"
+          @click="saveSummary('FINAL')"
+          :disabled="saving"
+          class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
         >
           <svg v-if="saving" class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -229,164 +404,281 @@ const printSummary = () => {
           <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
           </svg>
-          Save Summary
+          Finalize Summary
         </button>
       </div>
     </div>
 
-    <!-- Rich Tiptap Text Editor -->
-    <div class="relative">
-      <div v-if="editor" class="tiptap-wrapper border border-slate-200 rounded-2xl overflow-hidden focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-100 transition-all shadow-sm">
-        <!-- Word-like Rich Formatting Toolbar -->
-        <div class="flex flex-wrap items-center gap-1 p-2 bg-slate-50 border-b border-slate-200 select-none">
-          <!-- Headings -->
-          <button type="button" @click="editor.chain().focus().toggleHeading({ level: 1 }).run()" :class="['tiptap-btn', { active: editor.isActive('heading', { level: 1 }) }]" title="Heading 1">H1</button>
-          <button type="button" @click="editor.chain().focus().toggleHeading({ level: 2 }).run()" :class="['tiptap-btn', { active: editor.isActive('heading', { level: 2 }) }]" title="Heading 2">H2</button>
-          <button type="button" @click="editor.chain().focus().toggleHeading({ level: 3 }).run()" :class="['tiptap-btn', { active: editor.isActive('heading', { level: 3 }) }]" title="Heading 3">H3</button>
-
-          <div class="w-px h-5 bg-slate-300 mx-1"></div>
-
-          <!-- Basic Formatting: Bold, Italic, Underline, Strike -->
-          <button type="button" @click="editor.chain().focus().toggleBold().run()" :class="['tiptap-btn', { active: editor.isActive('bold') }]" title="Bold (Ctrl+B)">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().toggleItalic().run()" :class="['tiptap-btn', { active: editor.isActive('italic') }]" title="Italic (Ctrl+I)">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10 20l4-16m4 4l4-8m-8 4l-4 8"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().toggleUnderline().run()" :class="['tiptap-btn', { active: editor.isActive('underline') }]" title="Underline (Ctrl+U)">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8v8a5 5 0 0010 0V8M5 20h14"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().toggleStrike().run()" :class="['tiptap-btn', { active: editor.isActive('strike') }]" title="Strikethrough">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12h18M9 6h6M9 18h6"/></svg>
-          </button>
-
-          <div class="w-px h-5 bg-slate-300 mx-1"></div>
-
-          <!-- Alignment -->
-          <button type="button" @click="editor.chain().focus().setTextAlign('left').run()" :class="['tiptap-btn', { active: editor.isActive({ textAlign: 'left' }) }]" title="Align Left">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h14"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().setTextAlign('center').run()" :class="['tiptap-btn', { active: editor.isActive({ textAlign: 'center' }) }]" title="Align Center">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M7 12h10M5 18h14"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().setTextAlign('right').run()" :class="['tiptap-btn', { active: editor.isActive({ textAlign: 'right' }) }]" title="Align Right">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M10 12h10M6 18h14"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().setTextAlign('justify').run()" :class="['tiptap-btn', { active: editor.isActive({ textAlign: 'justify' }) }]" title="Justify">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-          </button>
-
-          <div class="w-px h-5 bg-slate-300 mx-1"></div>
-
-          <!-- Lists -->
-          <button type="button" @click="editor.chain().focus().toggleBulletList().run()" :class="['tiptap-btn', { active: editor.isActive('bulletList') }]" title="Bullet List">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16M8 6h.01M8 12h.01M8 18h.01"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().toggleOrderedList().run()" :class="['tiptap-btn', { active: editor.isActive('orderedList') }]" title="Numbered List">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h14M7 12h14M7 16h14M3 8h.01M3 12h.01M3 16h.01"/></svg>
-          </button>
-
-          <div class="w-px h-5 bg-slate-300 mx-1"></div>
-
-          <!-- Blockquote & Table -->
-          <button type="button" @click="editor.chain().focus().toggleBlockquote().run()" :class="['tiptap-btn', { active: editor.isActive('blockquote') }]" title="Blockquote">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()" class="tiptap-btn" title="Insert Table">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h18v18H3V3z M3 9h18 M9 3v18 M15 3v18"/></svg>
-          </button>
-
-          <div class="flex-grow"></div>
-
-          <!-- Undo & Redo -->
-          <button type="button" @click="editor.chain().focus().undo().run()" :disabled="!editor.can().undo()" class="tiptap-btn" title="Undo (Ctrl+Z)">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
-          </button>
-          <button type="button" @click="editor.chain().focus().redo().run()" :disabled="!editor.can().redo()" class="tiptap-btn" title="Redo (Ctrl+Y)">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6"/></svg>
-          </button>
-        </div>
-
-        <!-- Tiptap Editor Canvas -->
-        <editor-content :editor="editor" class="min-h-[380px] p-6 text-sm bg-white font-sans text-slate-800 leading-relaxed" />
-      </div>
+    <!-- Loading State -->
+    <div v-if="loading" class="p-12 text-center text-slate-400 space-y-2">
+      <svg class="animate-spin h-6 w-6 mx-auto text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <p class="text-xs font-semibold text-slate-600">Loading Discharge Summary...</p>
     </div>
+
+    <!-- Main Doctor Form Container -->
+    <div v-else class="space-y-6">
+
+      <!-- Section 1: Discharge Meta & Type -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-4">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-indigo-600 flex items-center gap-2 border-b border-slate-100 pb-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          1. Discharge Details &amp; Status
+        </h4>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <!-- Discharge Date -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Discharge Date &amp; Time <span class="text-rose-500">*</span></label>
+            <input 
+              type="datetime-local" 
+              v-model="form.dischargeDate"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            />
+          </div>
+
+          <!-- Discharge Type -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Discharge Type <span class="text-rose-500">*</span></label>
+            <select 
+              v-model="form.dischargeType"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50 cursor-pointer"
+            >
+              <option value="NORMAL">Normal Discharge</option>
+              <option value="LAMA">LAMA (Left Against Medical Advice)</option>
+              <option value="DAMA">DAMA (Discharge Against Medical Advice)</option>
+              <option value="REFERRED">Referred to Higher Center</option>
+              <option value="EXPIRED">Expired / Deceased</option>
+            </select>
+          </div>
+
+          <!-- Document Status -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Document Status</label>
+            <select 
+              v-model="form.status"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-bold text-slate-800 bg-slate-50/50 cursor-pointer"
+            >
+              <option value="DRAFT">Draft Mode</option>
+              <option value="FINAL">Finalized &amp; Locked</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Vitals on Admission -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-4">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-rose-600 flex items-center gap-2 border-b border-slate-100 pb-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+          </svg>
+          2. Vitals Recorded on Admission
+        </h4>
+
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs">
+          <div class="space-y-1">
+            <label class="font-semibold text-slate-600">Temperature</label>
+            <input 
+              type="text"
+              v-model="form.vitalsOnAdmission.temperature"
+              placeholder="e.g. 98.6 °F"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-semibold text-slate-600">Pulse Rate</label>
+            <input 
+              type="text"
+              v-model="form.vitalsOnAdmission.pulse"
+              placeholder="e.g. 78 bpm"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-semibold text-slate-600">Respiration</label>
+            <input 
+              type="text"
+              v-model="form.vitalsOnAdmission.respiration"
+              placeholder="e.g. 18 /min"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="font-semibold text-slate-600">Blood Pressure</label>
+            <input 
+              type="text"
+              v-model="form.vitalsOnAdmission.bp"
+              placeholder="e.g. 120/80 mmHg"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            />
+          </div>
+
+          <div class="space-y-1 col-span-2 sm:col-span-1">
+            <label class="font-semibold text-slate-600">SpO2 (Oxygen)</label>
+            <input 
+              type="text"
+              v-model="form.vitalsOnAdmission.oxygenSaturation"
+              placeholder="e.g. 98%"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: Clinical Diagnosis & Complaints -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-4">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-indigo-600 flex items-center gap-2 border-b border-slate-100 pb-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          3. Diagnosis &amp; Clinical Presentation
+        </h4>
+
+        <div class="space-y-4 text-xs">
+          <!-- Final Diagnosis -->
+          <div class="space-y-1 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+            <label class="font-extrabold text-emerald-900 uppercase tracking-wider text-[11px] block">Final Diagnosis <span class="text-rose-500">*</span></label>
+            <textarea 
+              v-model="form.finalDiagnosis"
+              rows="2"
+              placeholder="Enter definitive final diagnosis..."
+              class="w-full p-3 rounded-xl border border-emerald-200 focus:outline-none focus:border-emerald-500 font-bold text-slate-900 bg-white"
+            ></textarea>
+          </div>
+
+          <!-- Chief Complaints -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Chief Complaints on Admission</label>
+            <textarea 
+              v-model="form.chiefComplaints"
+              rows="2"
+              placeholder="Enter chief complaints leading to admission..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+
+          <!-- History of Present Illness (HPI) -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">History of Present Illness (HPI)</label>
+            <textarea 
+              v-model="form.historyOfPresentIllness"
+              rows="2"
+              placeholder="Detailed history of present illness..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+
+          <!-- Past History -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Past Medical / Surgical History</label>
+            <textarea 
+              v-model="form.pastHistory"
+              rows="2"
+              placeholder="Past medical history, allergies, chronic conditions..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Clinical Findings & Hospital Course -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-4">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-indigo-600 flex items-center gap-2 border-b border-slate-100 pb-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+          4. Examination, Investigations &amp; Condition
+        </h4>
+
+        <div class="space-y-4 text-xs">
+          <!-- Clinical Findings -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Clinical Findings on Examination</label>
+            <textarea 
+              v-model="form.clinicalFindings"
+              rows="3"
+              placeholder="Physical examination findings, systemic evaluation..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+
+          <!-- Investigation Summary -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Investigation &amp; Lab / Radiology Summary</label>
+            <textarea 
+              v-model="form.investigationSummary"
+              rows="3"
+              placeholder="Key diagnostic test results, blood work, X-Ray, USG, CT scans..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+
+          <!-- Condition at Discharge -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Condition of Patient at Discharge</label>
+            <textarea 
+              v-model="form.conditionAtDischarge"
+              rows="2"
+              placeholder="e.g. Patient is afebrile, clinically stable, wound clean and intact..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 5: Discharge Advice & Follow-up -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-100 shadow-xs space-y-4">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-indigo-600 flex items-center gap-2 border-b border-slate-100 pb-2">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          </svg>
+          5. Discharge Advice, Medications &amp; Follow-up
+        </h4>
+
+        <div class="space-y-4 text-xs">
+          <!-- Discharge Advice -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Discharge Advice &amp; Prescribed Treatment / Medications <span class="text-rose-500">*</span></label>
+            <textarea 
+              v-model="form.dischargeAdvice"
+              rows="4"
+              placeholder="List discharge medications with dosage, frequency, dietary advice, and activity restrictions..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+
+          <!-- Follow-up Advice -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Follow-up Advice &amp; Instructions</label>
+            <textarea 
+              v-model="form.followUpAdvice"
+              rows="2"
+              placeholder="When to return for OPD follow-up or suture removal..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+
+          <!-- Remarks -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Special Remarks / Emergency Warning Instructions</label>
+            <textarea 
+              v-model="form.remarks"
+              rows="2"
+              placeholder="Emergency contact instructions or special precautions..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
   </div>
 </template>
-
-<style scoped>
-.tiptap-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 4px;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.tiptap-btn:hover {
-  background: #e2e8f0;
-  color: #1e293b;
-}
-
-.tiptap-btn.active {
-  background: #e0e7ff;
-  color: #4338ca;
-}
-
-.tiptap-btn:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.tiptap-wrapper :deep(.tiptap) {
-  outline: none;
-}
-.tiptap-wrapper :deep(.tiptap p.is-editor-empty:first-child::before) {
-  content: attr(data-placeholder);
-  float: left;
-  color: #94a3b8;
-  pointer-events: none;
-  height: 0;
-}
-.tiptap-wrapper :deep(.tiptap h1) { font-size: 1.5em; font-weight: 800; margin: 0.6em 0 0.3em; color: #0f172a; }
-.tiptap-wrapper :deep(.tiptap h2) { font-size: 1.25em; font-weight: 700; margin: 0.5em 0 0.25em; color: #1e293b; }
-.tiptap-wrapper :deep(.tiptap h3) { font-size: 1.1em; font-weight: 600; margin: 0.5em 0 0.25em; color: #334155; }
-.tiptap-wrapper :deep(.tiptap ul),
-.tiptap-wrapper :deep(.tiptap ol) { padding-left: 1.5em; margin: 0.3em 0; }
-.tiptap-wrapper :deep(.tiptap li) { margin: 0.15em 0; }
-.tiptap-wrapper :deep(.tiptap blockquote) {
-  border-left: 3px solid #6366f1;
-  padding-left: 1em;
-  margin: 0.5em 0;
-  color: #475569;
-  font-style: italic;
-  background: #f8fafc;
-  padding-top: 0.4em;
-  padding-bottom: 0.4em;
-}
-.tiptap-wrapper :deep(.tiptap table) {
-  border-collapse: collapse;
-  margin: 1em 0;
-  width: 100%;
-}
-.tiptap-wrapper :deep(.tiptap th),
-.tiptap-wrapper :deep(.tiptap td) {
-  border: 1px solid #cbd5e1;
-  padding: 0.5em 0.8em;
-  min-width: 3em;
-}
-.tiptap-wrapper :deep(.tiptap th) {
-  background-color: #f1f5f9;
-  font-weight: bold;
-  text-align: left;
-}
-</style>

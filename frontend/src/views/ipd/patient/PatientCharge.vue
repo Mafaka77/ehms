@@ -241,6 +241,25 @@ const isOtCategory = computed(() => {
   return code === 'OT' || name.includes('operation') || name.includes('ot') || name.includes('theatre') || name.includes('theater')
 })
 
+const isOtCharge = computed(() => {
+  if (isOtCategory.value) return true
+
+  const master = (selectedMasterName.value || '').toLowerCase()
+  const desc = (chargeForm.value.description || '').toLowerCase()
+
+  const keywords = [
+    'operation theater',
+    'operation theatre',
+    'ot charges',
+    'ot charge',
+    'ot package',
+    'operation theater charges',
+    'operation theatre charges'
+  ]
+
+  return keywords.some(kw => master.includes(kw) || desc.includes(kw))
+})
+
 const onCategoryChange = async () => {
   chargeMasters.value = []
   chargeForm.value.chargeMasterId = ''
@@ -509,7 +528,7 @@ const submitCharge = async () => {
     rate: chargeForm.value.rate,
     quantity: chargeForm.value.quantity,
     chargeDate: chargeForm.value.chargeDate,
-    doctorId: chargeForm.value.doctorId || null,
+    doctorId: isOtCharge.value ? null : (chargeForm.value.doctorId || null),
     addons: otPackageItems.value
       .filter(item => selectedAddons.value.includes(item._id))
       .map(item => ({
@@ -1149,8 +1168,8 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Consulting Doctor Selection -->
-          <div class="space-y-1 relative">
+          <!-- Consulting Doctor Selection (Hidden for Operation Theater / OT Charges) -->
+          <div v-if="!isOtCharge" class="space-y-1 relative">
             <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Consulting Doctor <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
             <div class="relative">
               <button 

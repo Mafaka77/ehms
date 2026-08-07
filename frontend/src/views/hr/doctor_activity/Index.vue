@@ -234,7 +234,7 @@ onMounted(async () => {
                     {{ (doc.fullName || 'D')[0] }}
                   </div>
                   <div>
-                    <p class="font-bold text-slate-900 text-xs">Dr. {{ doc.fullName }}</p>
+                    <p class="font-bold text-slate-900 text-xs">{{ doc.fullName }}</p>
                     <p class="text-[10px] text-slate-400 font-normal">
                       {{ doc.doctorCode }} • {{ doc.mobileNo || 'No phone' }}
                     </p>

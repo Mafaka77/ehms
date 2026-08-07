@@ -559,6 +559,36 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       } finally {
         this.loading = false
       }
+    },
+
+    async fetchDischargeSummary(admissionId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get(`/ipd/admission/${admissionId}/discharge-summary`)
+        return { success: true, data: response.data.data }
+      } catch (err) {
+        console.error('Error fetching discharge summary:', err)
+        this.error = err.response?.data?.message || 'Failed to fetch discharge summary'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async saveDischargeSummary(admissionId, data) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post(`/ipd/admission/${admissionId}/discharge-summary`, data)
+        return { success: true, data: response.data.data, message: response.data.message || 'Discharge summary saved successfully' }
+      } catch (err) {
+        console.error('Error saving discharge summary:', err)
+        this.error = err.response?.data?.message || 'Failed to save discharge summary'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

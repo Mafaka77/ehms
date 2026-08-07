@@ -56,7 +56,25 @@ const onCustomDateChange = () => {
 
 const logsData = computed(() => doctorActivityStore.activityLogs)
 const summary = computed(() => logsData.value?.summary)
-const items = computed(() => logsData.value?.items || [])
+
+const allowedSources = ['OPD', 'IPD', 'EMERGENCY']
+const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'RADIOLOGY', 'ENDOSCOPY', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION', 'DENTAL']
+
+const items = computed(() => {
+  const list = logsData.value?.items || []
+  return list.filter(item => {
+    const src = (item.source || '').toUpperCase().trim()
+    const desc = (item.description || '').toUpperCase()
+
+    for (const kw of excludedKeywords) {
+      if (src.includes(kw) || desc.includes(kw)) return false
+    }
+
+    if (allowedSources.includes(src) || src === 'BILL' || src === 'ADDON') return true
+
+    return allowedSources.some(s => src.includes(s))
+  })
+})
 
 const formatDateTime = (d) => {
   if (!d) return '—'
@@ -94,6 +112,7 @@ const activityBadgeClass = (type) => {
   switch (type) {
     case 'OPD Bill Invoice': return 'bg-sky-50 text-sky-700 border-sky-100'
     case 'OPD Consultation': return 'bg-sky-50 text-sky-700 border-sky-100'
+    case 'Emergency Consultation': return 'bg-rose-50 text-rose-700 border-rose-100'
     case 'IPD Charge Involved': return 'bg-violet-50 text-violet-700 border-violet-100'
     case 'Charge Addon': return 'bg-amber-50 text-amber-700 border-amber-100'
     case 'Bill Invoice Involved': return 'bg-emerald-50 text-emerald-700 border-emerald-100'
@@ -384,6 +403,10 @@ onMounted(() => {
             <div v-if="selectedItem.patientMobile" class="flex justify-between items-center">
               <span class="text-slate-500 font-medium">Contact:</span>
               <span class="font-semibold text-slate-700">{{ selectedItem.patientMobile }}</span>
+            </div>
+            <div v-if="selectedItem.description" class="flex justify-between items-start gap-2 pt-1 border-t border-slate-200/60">
+              <span class="text-slate-500 font-medium shrink-0">Description:</span>
+              <span class="font-bold text-slate-800 text-right">{{ selectedItem.description }}</span>
             </div>
           </div>
 

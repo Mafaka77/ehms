@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useAuthStore } from '../../../stores/authStore'
 import PharmacyOrder from './PharmacyOrder.vue'
 import BedHistory from './BedHistory.vue'
 import PatientCharge from './PatientCharge.vue'
@@ -25,6 +26,12 @@ const router = useRouter()
 const admissionStore = useIpdAdmissionStore()
 const snackbarStore = useSnackbarStore()
 const wardStore = useIpdWardStore()
+const authStore = useAuthStore()
+
+const canViewTransactions = computed(() => {
+  const role = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return ['SuperAdmin', 'HospitalAdmin'].includes(role)
+})
 
 const loading = ref(true)
 const admission = ref(null)
@@ -619,6 +626,7 @@ onMounted(async () => {
           Bed History
         </button>
         <button 
+          v-if="canViewTransactions"
           @click="activeTab = 'transactions'"
           class="flex-1 sm:flex-initial px-6 py-2.5 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 cursor-pointer"
           :class="activeTab === 'transactions' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-100' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'"
@@ -660,7 +668,7 @@ onMounted(async () => {
         </div>
 
         <!-- Tab: Transactions -->
-        <div v-else-if="activeTab === 'transactions'" class="space-y-4 animate-in fade-in duration-200">
+        <div v-else-if="activeTab === 'transactions' && canViewTransactions" class="space-y-4 animate-in fade-in duration-200">
           <Transactions ref="transactionsRef" :admissionId="admission._id" :admission="admission" />
         </div>
 

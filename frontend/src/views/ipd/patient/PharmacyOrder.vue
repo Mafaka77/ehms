@@ -317,7 +317,7 @@ onMounted(async () => {
           </div>
           <div class="text-xs text-slate-500 sm:text-right">
             <span class="font-semibold text-slate-400 block text-[9px] uppercase tracking-wider">Consultant Doctor</span>
-            <span class="font-bold text-slate-700 text-xs">Dr. {{ order.doctorId?.fullName || 'N/A' }}</span>
+            <span class="font-bold text-slate-700 text-xs"> {{ order.doctorId?.fullName || 'N/A' }}</span>
           </div>
         </div>
 
@@ -542,7 +542,7 @@ onMounted(async () => {
                   :key="doc._id" 
                   :value="doc._id"
                 >
-                  Dr. {{ doc.fullName }} ({{ doc.specializationId?.name || 'General' }})
+                   {{ doc.fullName }} ({{ doc.specializationId?.name || 'General' }})
                 </option>
               </select>
             </div>

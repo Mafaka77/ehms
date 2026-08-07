@@ -16,6 +16,11 @@ try {
     OpdAppointment = require('../clinical/opd/opd_appointment.model');
 } catch (e) {}
 
+let EmergencyVisit;
+try {
+    EmergencyVisit = require('../emergency/emergency.model');
+} catch (e) {}
+
 const todayRange = () => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -347,6 +352,65 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
             } catch (e) {}
         }
 
+        // 1.5 Fetch Emergency Visits with Consultation Fees & Bill/Discount cross-references
+        if ((filterType === 'ALL' || filterType === 'EMERGENCY' || filterType === 'OPD') && EmergencyVisit) {
+            try {
+                const emergencyVisits = await EmergencyVisit.find({
+                    doctorId: { $in: targetDoctorIds },
+                    $or: [
+                        { arrivalDateTime: { $gte: start, $lte: end } },
+                        { createdAt: { $gte: start, $lte: end } }
+                    ]
+                })
+                .populate('patientId', 'patientCode fullName mobileNo')
+                .lean();
+
+                const evIds = emergencyVisits.map(v => v._id);
+                const evBills = await Bill.find({ emergencyVisitId: { $in: evIds } })
+                    .select('_id billNo billType status grossAmount discountAmount netAmount emergencyVisitId createdAt generatedAt')
+                    .lean();
+
+                const evBillIds = evBills.map(b => b._id);
+                const evDiscounts = await Discount.find({ billId: { $in: evBillIds } })
+                    .populate('appliedBy', 'fullName')
+                    .populate('doctorId', 'fullName doctorCode')
+                    .lean();
+
+                emergencyVisits.forEach(ev => {
+                    const bill = evBills.find(b => b.emergencyVisitId && b.emergencyVisitId.toString() === ev._id.toString());
+                    const billNo = bill ? bill.billNo : (ev.visitNo || 'EMG-BILL');
+                    const discountRecord = bill ? evDiscounts.find(d => d.billId && d.billId.toString() === bill._id.toString()) : null;
+
+                    const grossAmount = bill ? bill.grossAmount : (ev.consultationFee || 0);
+                    const discountAmount = discountRecord ? discountRecord.discountAmount : (bill ? bill.discountAmount : 0);
+                    const netAmount = bill ? bill.netAmount : (ev.consultationFee || 0);
+
+                    items.push({
+                        id: `EMG_BILL_${ev._id}`,
+                        activityType: 'Emergency Consultation',
+                        source: 'EMERGENCY',
+                        code: billNo,
+                        billNo: billNo,
+                        billId: bill ? bill._id : null,
+                        visitNo: ev.visitNo,
+                        date: (bill && (bill.createdAt || bill.generatedAt)) ? (bill.createdAt || bill.generatedAt) : (ev.arrivalDateTime || ev.createdAt),
+                        patientCode: ev.patientId?.patientCode || '—',
+                        patientName: ev.patientId?.fullName || '—',
+                        patientMobile: ev.patientId?.mobileNo || '—',
+                        description: discountAmount > 0
+                            ? `Emergency Consultation ${billNo} (${discountRecord?.discountType || 'Discount'}: -₹${discountAmount})`
+                            : `Emergency Consultation Fee (${billNo})`,
+                        grossAmount,
+                        discountAmount,
+                        netAmount,
+                        amount: netAmount,
+                        status: bill ? bill.status : (ev.paymentStatus || 'Unpaid'),
+                        discountRecord: discountRecord || null
+                    });
+                });
+            } catch (e) {}
+        }
+
         // 2. Fetch Patient Charges
         if ((filterType === 'ALL' || filterType === 'IPD_CHARGE') && PatientCharge) {
             try {
@@ -508,6 +572,23 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
                 });
             } catch (e) {}
         }
+
+        // Filter out Pharmacy, Test/Diagnostic, Room/Bed/Ward, and Dental charges (Include only doctor activity OPD, IPD, EMERGENCY charges)
+        const allowedSources = ['OPD', 'IPD', 'EMERGENCY'];
+        const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'RADIOLOGY', 'ENDOSCOPY', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION', 'DENTAL'];
+
+        items = items.filter(item => {
+            const src = (item.source || '').toUpperCase().trim();
+            const desc = (item.description || '').toUpperCase();
+
+            for (const kw of excludedKeywords) {
+                if (src.includes(kw) || desc.includes(kw)) return false;
+            }
+
+            if (allowedSources.includes(src) || src === 'BILL' || src === 'ADDON') return true;
+
+            return allowedSources.some(s => src.includes(s));
+        });
 
         // Sort items descending by date
         items.sort((a, b) => new Date(b.date) - new Date(a.date));

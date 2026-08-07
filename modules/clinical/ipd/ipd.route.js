@@ -63,4 +63,8 @@ module.exports = async (fastify, options) => {
 
     // Admission Bills
     fastify.get('/admission/:id/bills', { onRequest: [auth] }, ipdController.getAdmissionBills)
+
+    // Discharge Summary routes
+    fastify.get('/admission/:id/discharge-summary', { onRequest: [auth] }, ipdController.getDischargeSummary)
+    fastify.post('/admission/:id/discharge-summary', { onRequest: [auth] }, ipdController.saveDischargeSummary)
 }

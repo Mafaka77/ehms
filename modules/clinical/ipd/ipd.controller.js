@@ -778,3 +778,37 @@ exports.getAdmissionBills = async (req, res) => {
     }
 }
 
+exports.getDischargeSummary = async (req, res) => {
+    try {
+        const result = await ipdService.getDischargeSummary(req.params.id)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            data: result
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to fetch discharge summary',
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.saveDischargeSummary = async (req, res) => {
+    try {
+        const userId = req.user?._id || req.user?.id
+        const result = await ipdService.saveDischargeSummary(req.params.id, req.body, userId)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            message: 'Discharge summary saved successfully',
+            data: result
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to save discharge summary',
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
