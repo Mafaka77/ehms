@@ -620,3 +620,21 @@ exports.updatePatientCharge = async (chargeId, updateData, userId) => {
         throw error;
     }
 };
+
+exports.syncAppointmentDates = async () => {
+    try {
+        const DentalAppointment = require('./dental_appointment.model');
+        const appointments = await DentalAppointment.find({});
+        let count = 0;
+        for (let app of appointments) {
+            if (app.createdAt) {
+                app.appointmentDate = app.createdAt;
+                await app.save();
+                count++;
+            }
+        }
+        return count;
+    } catch (error) {
+        throw error;
+    }
+};

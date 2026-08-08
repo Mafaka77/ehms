@@ -80,6 +80,19 @@ export const useOpdStore = defineStore('opd', {
                 this.loading = false;
             }
         },
+        async syncAppointmentDates() {
+            this.loading = true;
+            try {
+                const response = await api.post(`/opd/appointments/sync-dates`);
+                return { success: true, message: response.data.message };
+            } catch (error) {
+                console.error('Error syncing appointment dates:', error);
+                this.error = error.response?.data?.message || 'Failed to sync appointment dates';
+                return { success: false, message: this.error };
+            } finally {
+                this.loading = false;
+            }
+        },
         async updateAppointment(id, data) {
             this.loading = true;
             try {
@@ -151,6 +164,20 @@ export const useOpdStore = defineStore('opd', {
                 this.loading = false;
             }
         },
+        async generateChargesBill(data) {
+            this.loading = true;
+            this.error = null;
+            try {
+                const response = await api.post('/billing/generate-from-opd-charges', data);
+                return response.data.data;
+            } catch (error) {
+                console.error('Error generating OPD charges bill:', error);
+                this.error = error.response?.data?.message || 'Failed to generate OPD charges bill';
+                throw error;
+            } finally {
+                this.loading = false;
+            }
+        },
         async cancelBill(billId) {
             this.loading = true;
             this.error = null;
@@ -193,6 +220,58 @@ export const useOpdStore = defineStore('opd', {
                 console.error('Error fetching appointments report:', error);
                 this.error = error.response?.data?.message || 'Failed to fetch appointments report';
                 return { success: false, message: this.error };
+            } finally {
+                this.loading = false;
+            }
+        },
+        async fetchPatientCharges(appointmentId) {
+            this.loading = true;
+            try {
+                const response = await api.get(`/opd/appointments/${appointmentId}/charges`);
+                return { success: true, data: response.data.data };
+            } catch (error) {
+                console.error('Error fetching OPD patient charges:', error);
+                const message = error.response?.data?.message || 'Failed to fetch patient charges';
+                return { success: false, message };
+            } finally {
+                this.loading = false;
+            }
+        },
+        async addPatientCharge(appointmentId, chargeData) {
+            this.loading = true;
+            try {
+                const response = await api.post(`/opd/appointments/${appointmentId}/charges`, chargeData);
+                return { success: true, data: response.data.data, message: 'Charge added successfully' };
+            } catch (error) {
+                console.error('Error adding OPD patient charge:', error);
+                const message = error.response?.data?.message || 'Failed to add patient charge';
+                return { success: false, message };
+            } finally {
+                this.loading = false;
+            }
+        },
+        async deletePatientCharge(appointmentId, chargeId) {
+            this.loading = true;
+            try {
+                const response = await api.delete(`/opd/appointments/${appointmentId}/charges/${chargeId}`);
+                return { success: true, message: 'Charge deleted successfully' };
+            } catch (error) {
+                console.error('Error deleting OPD patient charge:', error);
+                const message = error.response?.data?.message || 'Failed to delete charge';
+                return { success: false, message };
+            } finally {
+                this.loading = false;
+            }
+        },
+        async updatePatientCharge(appointmentId, chargeId, chargeData) {
+            this.loading = true;
+            try {
+                const response = await api.put(`/opd/appointments/${appointmentId}/charges/${chargeId}`, chargeData);
+                return { success: true, data: response.data.data, message: 'Charge updated successfully' };
+            } catch (error) {
+                console.error('Error updating OPD patient charge:', error);
+                const message = error.response?.data?.message || 'Failed to update charge';
+                return { success: false, message };
             } finally {
                 this.loading = false;
             }

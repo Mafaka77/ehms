@@ -258,11 +258,18 @@ exports.getAppointmentById = async (id) => {
         }
 
         const Bill = mongoose.model('Bill');
-        const bill = await Bill.findOne({ opdAppointmentId: appointment._id });
+        const consultationBill = await Bill.findOne({ opdAppointmentId: appointment._id, billType: { $in: ['OPD_CONSULTATION', 'OPD'] } });
+        const chargesBill = await Bill.findOne({ opdAppointmentId: appointment._id, billType: 'OPD_CHARGES' });
 
         const apptObj = appointment.toObject();
-        apptObj.billId = bill ? bill._id : null;
-        apptObj.bill = bill || null;
+        apptObj.consultationBillId = consultationBill ? consultationBill._id : null;
+        apptObj.consultationBill = consultationBill || null;
+        
+        apptObj.chargesBillId = chargesBill ? chargesBill._id : null;
+        apptObj.chargesBill = chargesBill || null;
+
+        apptObj.billId = apptObj.consultationBillId;
+        apptObj.bill = consultationBill || null;
 
         return apptObj;
     } catch (error) {
@@ -336,3 +343,182 @@ exports.getAppointmentsReport = async (query) => {
         throw error;
     }
 }
+
+exports.getOpdCharges = async (appointmentId) => {
+    try {
+        const PatientCharge = require('../../common/patient_charge.model');
+        const PatientChargeAddon = require('../../common/patient_charge_addon.model');
+        const charges = await PatientCharge.find({ opdAppointmentId: appointmentId })
+            .populate('chargeCategoryId')
+            .populate('doctorId', 'fullName doctorCode specializationId')
+            .sort({ createdAt: -1 });
+        
+        const chargesWithAddons = await Promise.all(charges.map(async (charge) => {
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id })
+                .populate('doctorId', 'fullName doctorCode specializationId');
+            return {
+                ...charge.toObject(),
+                addons
+            };
+        }));
+        return chargesWithAddons;
+    } catch (error) {
+        throw error;
+    }
+}
+
+exports.createOpdCharge = async (appointmentId, data, userId) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const PatientCharge = require('../../common/patient_charge.model');
+        const PatientChargeAddon = require('../../common/patient_charge_addon.model');
+
+        const appointment = await OpdAppointment.findById(appointmentId).session(session);
+        if (!appointment) {
+            const error = new Error('OPD appointment record not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        const rate = Number(data.rate);
+        const quantity = Number(data.quantity || 1);
+        const amount = rate * quantity;
+        const chargeDate = data.chargeDate ? new Date(data.chargeDate) : new Date();
+
+        const [charge] = await PatientCharge.create([{
+            opdAppointmentId: appointmentId,
+            sourceType: 'OPD',
+            patientId: appointment.patientId,
+            chargeCategoryId: data.chargeCategoryId,
+            chargeMasterId: data.chargeMasterId || null,
+            description: data.description,
+            quantity,
+            rate,
+            amount,
+            isBilled: false,
+            doctorId: data.doctorId || null,
+            createdBy: userId || null,
+            updatedBy: userId || null,
+        }], { session });
+
+        if (data.addons && Array.isArray(data.addons) && data.addons.length > 0) {
+            const addonRecords = data.addons.map(addon => ({
+                patientChargeId: charge._id,
+                itemName: addon.itemName,
+                amount: Number(addon.amount || 0),
+                packageItemId: addon.packageItemId || null,
+                chargeCategoryId: addon.chargeCategoryId || data.chargeCategoryId,
+                chargeMasterId: data.chargeMasterId || null,
+                isCustom: !!addon.isCustom,
+                doctorId: addon.doctorId || null,
+                createdBy: userId || null,
+                updatedBy: userId || null,
+            }));
+            await PatientChargeAddon.insertMany(addonRecords, { session });
+        }
+
+        await session.commitTransaction();
+        session.endSession();
+        return charge;
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
+}
+
+exports.deleteOpdCharge = async (chargeId) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const PatientCharge = require('../../common/patient_charge.model');
+        const PatientChargeAddon = require('../../common/patient_charge_addon.model');
+
+        const charge = await PatientCharge.findById(chargeId).session(session);
+        if (!charge) {
+            const error = new Error('Charge record not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
+        if (charge.isBilled) {
+            const error = new Error('Cannot delete a charge that is already billed');
+            error.status = STATUS_CODES.BAD_REQUEST;
+            throw error;
+        }
+
+        await PatientChargeAddon.deleteMany({ patientChargeId: chargeId }).session(session);
+        await charge.deleteOne({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+        return charge;
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
+}
+
+exports.updateOpdCharge = async (chargeId, updateData, userId) => {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+        const PatientCharge = require('../../common/patient_charge.model');
+        const charge = await PatientCharge.findById(chargeId).session(session);
+        if (!charge) {
+            const error = new Error('Charge record not found');
+            error.status = 404;
+            throw error;
+        }
+
+        if (charge.isBilled) {
+            const error = new Error('Cannot update a charge that is already billed');
+            error.status = 400;
+            throw error;
+        }
+
+        const rate = updateData.rate !== undefined ? Number(updateData.rate) : charge.rate;
+        const quantity = updateData.quantity !== undefined ? Number(updateData.quantity) : charge.quantity;
+        const amount = rate * quantity;
+
+        charge.chargeCategoryId = updateData.chargeCategoryId || charge.chargeCategoryId;
+        charge.chargeMasterId = updateData.chargeMasterId || charge.chargeMasterId;
+        charge.description = updateData.description || charge.description;
+        charge.rate = rate;
+        charge.quantity = quantity;
+        charge.amount = amount;
+        charge.doctorId = updateData.doctorId !== undefined ? updateData.doctorId : charge.doctorId;
+        if (updateData.chargeDate) charge.createdAt = new Date(updateData.chargeDate);
+        charge.updatedBy = userId || null;
+
+        await charge.save({ session });
+
+        await session.commitTransaction();
+        session.endSession();
+        return charge;
+    } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+    }
+}
+
+exports.syncAppointmentDates = async () => {
+    try {
+        const OpdAppointment = require('./opd_appointment.model');
+        const appointments = await OpdAppointment.find({});
+        let count = 0;
+        for (let app of appointments) {
+            if (app.createdAt) {
+                app.appointmentDate = app.createdAt;
+                await app.save();
+                count++;
+            }
+        }
+        return count;
+    } catch (error) {
+        throw error;
+    }
+};

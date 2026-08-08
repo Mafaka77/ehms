@@ -64,6 +64,8 @@ const billSchema = new mongoose.Schema({
     type: String,
     enum: [
       'OPD',
+      'OPD_CONSULTATION',
+      'OPD_CHARGES',
       'IPD',
       'LAB',
       'RADIOLOGY',

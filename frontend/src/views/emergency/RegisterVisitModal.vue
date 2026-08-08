@@ -42,10 +42,26 @@ const newPatient = ref({
 })
 const isCreatingPatient = ref(false)
 
+const getLocalDatetimeString = () => {
+  const d = new Date()
+  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+  const formatter = new Intl.DateTimeFormat('en-CA', options)
+  const parts = formatter.formatToParts(d)
+  
+  const year = parts.find(p => p.type === 'year').value
+  const month = parts.find(p => p.type === 'month').value
+  const day = parts.find(p => p.type === 'day').value
+  let hour = parts.find(p => p.type === 'hour').value
+  if (hour === '24') hour = '00'
+  const minute = parts.find(p => p.type === 'minute').value
+  
+  return `${year}-${month}-${day}T${hour}:${minute}`
+}
+
 // -- STEP 2: REGISTER VISIT --
 const visitForm = ref({
   doctorId: '',
-  arrivalDateTime: new Date().toISOString().slice(0, 16), // Format: YYYY-MM-DDThh:mm
+  arrivalDateTime: getLocalDatetimeString(), // Format: YYYY-MM-DDThh:mm
   chiefComplaint: '',
   priority: 'MEDIUM',
   notes: '',
@@ -61,7 +77,7 @@ const resetModal = () => {
   currentStep.value = 1
   visitForm.value = {
     doctorId: '',
-    arrivalDateTime: new Date().toISOString().slice(0, 16),
+    arrivalDateTime: getLocalDatetimeString(),
     chiefComplaint: '',
     priority: 'MEDIUM',
     notes: '',

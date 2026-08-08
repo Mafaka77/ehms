@@ -17,4 +17,5 @@ module.exports = async function (fastify, opts) {
     fastify.post('/dental/appointments/:id/charges/:chargeId/installments', { onRequest: [auth] }, dentalController.addInstallment);
     fastify.get('/dental/appointments/:id/installments', { onRequest: [auth] }, dentalController.getInstallments);
     fastify.put('/dental/appointments/:id/status', { onRequest: [auth] }, dentalController.updateAppointmentStatus);
+    fastify.post('/dental/appointments/sync-dates', { onRequest: [auth] }, dentalController.syncAppointmentDates);
 }

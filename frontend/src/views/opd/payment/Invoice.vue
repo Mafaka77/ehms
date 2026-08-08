@@ -15,6 +15,10 @@ const props = defineProps({
   billDetails: {
     type: Object,
     default: null
+  },
+  patientCharges: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -98,7 +102,7 @@ const patientAge = computed(() => {
     const diffTime = Math.abs(today.getTime() - lastBirthday.getTime())
     const diffDays = Math.floor(diffTime / (1000 * 3600 * 24))
     
-    return years > 0 ? `${years}Y ${diffDays}D` : `${diffDays}D`
+    return years > 0 ? `${years}Y` : `${diffDays}D`
   }
   return patient.age ? `${patient.age}Y` : '-'
 })
@@ -108,6 +112,13 @@ const formatDate = (dateString) => {
   if (!dateString) return '-'
   return new Date(dateString).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+  })
+}
+
+const formatDateOnly = (dateString) => {
+  if (!dateString) return '-'
+  return new Date(dateString).toLocaleDateString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric'
   })
 }
 
@@ -150,7 +161,7 @@ const formatCurrency = (val) => {
                 </div>
               </div>
               <hr class="receipt-divider" />
-              <h2>OPD CONSULTATION BILL / INVOICE</h2>
+              <h2>{{ billDetails.billType === 'OPD_CHARGES' ? 'TREATMENT CHARGES BILL / INVOICE' : 'OPD CONSULTATION BILL / INVOICE' }}</h2>
             </div>
 
             <!-- Demographics Block -->
@@ -159,25 +170,60 @@ const formatCurrency = (val) => {
                 <p><strong>Bill No:</strong> <span class="font-mono">{{ billDetails.billNo }}</span></p>
                 <p><strong>Date:</strong> {{ formatDate(billDetails.generatedAt || billDetails.createdAt) }}</p>
                 <p><strong>Status:</strong> <span class="uppercase font-bold">{{ billDetails.status }}</span></p>
-                <p><strong>Appt No:</strong> <span class="font-mono">{{ appointment.appointmentId }}</span></p>
+                <p v-if="billDetails.billType === 'OPD_CHARGES'"><strong>Payment Mode:</strong> <span class="uppercase font-bold">{{ billDetails.payments?.[0]?.paymentMode || 'CASH' }}</span></p>
+                <p v-else><strong>Appt No:</strong> <span class="font-mono">{{ appointment.appointmentId }}</span></p>
               </div>
               <div class="text-right">
                 <p class="patient-name truncate"><strong>Patient:</strong> {{ appointment.patientId?.fullName }}</p>
-                <p><strong>Code:</strong> <span class="font-mono">{{ appointment.patientId?.patientCode }}</span></p>
+                <p v-if="billDetails.billType === 'OPD_CHARGES'" class="truncate"><strong>Address:</strong> {{ appointment.patientId?.address || 'N/A' }}</p>
+                <p v-else><strong>Code:</strong> <span class="font-mono">{{ appointment.patientId?.patientCode }}</span></p>
                 <p><strong>Age/Gender:</strong> {{ patientAge }} / {{ appointment.patientId?.gender }}</p>
                 <p><strong>Contact:</strong> {{ appointment.patientId?.mobileNo }}</p>
               </div>
             </div>
 
-            <div class="doctor-section">
+            <div class="doctor-section" v-if="billDetails.billType !== 'OPD_CHARGES'">
               <p><strong>Consulting Doctor:</strong> {{ appointment.doctorId?.fullName || 'N/A' }}
                 <span v-if="appointment.doctorId?.specializationId?.name"> &mdash; {{ appointment.doctorId.specializationId.name }}</span>
               </p>
-              <p><strong>Appointment Date:</strong> {{ formatDate(appointment.appointmentDate) }}</p>
+              <p><strong>Appointment Date:</strong> {{ formatDateOnly(appointment.appointmentDate) }}</p>
             </div>
 
             <!-- Itemized Table -->
-            <table class="items-table">
+            <table class="items-table" v-if="billDetails.billType === 'OPD_CHARGES'">
+              <thead>
+                <tr>
+                  <th>Item Details</th>
+                  <th class="text-right">Rate</th>
+                  <th class="text-center">Qty</th>
+                  <th class="text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <template v-for="charge in patientCharges" :key="charge._id">
+                  <tr>
+                    <td class="font-medium text-slate-800">
+                      {{ charge.chargeCategoryId?.name || 'Charge' }}
+                      <span v-if="charge.description" class="text-[10px] font-normal text-slate-500 block">{{ charge.description }}</span>
+                    </td>
+                    <td class="text-right font-mono">{{ formatCurrency(charge.rate) }}</td>
+                    <td class="text-center font-mono">{{ charge.quantity }}</td>
+                    <td class="text-right font-mono font-semibold">{{ formatCurrency(charge.amount) }}</td>
+                  </tr>
+                  <tr v-for="addon in charge.addons" :key="addon._id">
+                    <td class="pl-6 text-[9px] text-slate-600">
+                      <span class="inline-block w-2 h-2 border-l border-b border-slate-300 mr-1.5 -mt-0.5 rounded-bl"></span>
+                      {{ addon.itemName }}
+                    </td>
+                    <td class="text-right font-mono text-[9px] text-slate-500">{{ formatCurrency(addon.amount) }}</td>
+                    <td class="text-center font-mono text-[9px] text-slate-500">1</td>
+                    <td class="text-right font-mono font-medium text-[9px] text-slate-600">{{ formatCurrency(addon.amount) }}</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+            
+            <table class="items-table" v-else>
               <thead>
                 <tr>
                   <th>Description</th>
@@ -209,17 +255,10 @@ const formatCurrency = (val) => {
                 <span class="font-mono">-{{ formatCurrency(billDetails.discountAmount) }}</span>
               </div>
               <div class="flex justify-between net-payable">
-                <span>Net Payable:</span>
-                <span class="font-mono">{{ formatCurrency(billDetails.netAmount) }}</span>
-              </div>
-              <div class="flex justify-between">
-                <span>Paid Amount:</span>
+                <span>Paid Total:</span>
                 <span class="font-mono">{{ formatCurrency(billDetails.paidAmount) }}</span>
               </div>
-              <div class="flex justify-between balance-due">
-                <span>Balance Due:</span>
-                <span class="font-mono">{{ formatCurrency(billDetails.balanceAmount) }}</span>
-              </div>
+              
             </div>
 
             <!-- Signatures -->

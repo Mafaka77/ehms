@@ -43,13 +43,19 @@ const newPatient = ref({
 const isCreatingPatient = ref(false)
 
 const getLocalDatetimeString = () => {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  const hours = String(now.getHours()).padStart(2, '0')
-  const minutes = String(now.getMinutes()).padStart(2, '0')
-  return `${year}-${month}-${day}T${hours}:${minutes}`
+  const d = new Date()
+  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+  const formatter = new Intl.DateTimeFormat('en-CA', options)
+  const parts = formatter.formatToParts(d)
+  
+  const year = parts.find(p => p.type === 'year').value
+  const month = parts.find(p => p.type === 'month').value
+  const day = parts.find(p => p.type === 'day').value
+  let hour = parts.find(p => p.type === 'hour').value
+  if (hour === '24') hour = '00'
+  const minute = parts.find(p => p.type === 'minute').value
+  
+  return `${year}-${month}-${day}T${hour}:${minute}`
 }
 
 // STEP 2: Doctor, Ward & Bed Selection
@@ -329,7 +335,8 @@ const formatDate = (dateString) => {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
   })
 }
 
@@ -339,6 +346,23 @@ const doctorOptions = computed(() => {
     label: `${doc.fullName} - ${doc.specializationId?.name || 'General'}`
   }))
 })
+
+// Sync Dates functionality
+const isSyncingDates = ref(false)
+const syncAdmissionDates = async () => {
+  if (!confirm('This will sync all admission dates with their creation timestamps. Are you sure?')) return
+  
+  isSyncingDates.value = true
+  const res = await admissionStore.syncDates()
+  isSyncingDates.value = false
+  
+  if (res.success) {
+    snackbarStore.show({ message: res.message, type: 'success' })
+    fetchAdmissions()
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
+}
 </script>
 
 <template>
@@ -350,6 +374,16 @@ const doctorOptions = computed(() => {
         <p class="text-slate-500 mt-1 text-sm">Manage patient admissions, bed allocations, and discharge records.</p>
       </div>
       <div class="flex items-center gap-3 w-full sm:w-auto">
+        <button 
+          v-if="authStore.hasPermission('ipd.admit')"
+          @click="syncAdmissionDates"
+          :disabled="isSyncingDates"
+          class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+        >
+          <svg v-if="isSyncingDates" class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <svg v-else class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          Sync Dates
+        </button>
         <button 
           v-if="authStore.hasPermission('ipd.admit')"
           @click="openAdmitModal"
@@ -456,7 +490,7 @@ const doctorOptions = computed(() => {
               <!-- IPD No & Date -->
               <td class="px-6 py-4">
                 <span class="font-mono text-indigo-600 font-bold block">{{ adm.admissionNo }}</span>
-                <span class="text-slate-400 text-xs mt-0.5 block">{{ formatDate(adm.createdAt || adm.admissionDate) }}</span>
+                <span class="text-slate-400 text-xs mt-0.5 block">{{ formatDate(adm.admissionDate || adm.admissionDate) }}</span>
               </td>
               
               <!-- Patient Details -->

@@ -10,4 +10,9 @@ module.exports = async function (fastify, opts) {
     fastify.post('/opd/appointments', { onRequest: [auth] }, opdController.createAppointment);
     fastify.put('/opd/appointments/:id', { onRequest: [auth] }, opdController.updateAppointment);
     fastify.delete('/opd/appointments/:id', { onRequest: [auth] }, opdController.deleteAppointment);
+    fastify.post('/opd/appointments/:id/charges', { onRequest: [auth] }, opdController.addPatientCharge);
+    fastify.get('/opd/appointments/:id/charges', { onRequest: [auth] }, opdController.getPatientCharges);
+    fastify.delete('/opd/appointments/:id/charges/:chargeId', { onRequest: [auth] }, opdController.deletePatientCharge);
+    fastify.put('/opd/appointments/:id/charges/:chargeId', { onRequest: [auth] }, opdController.updatePatientCharge);
+    fastify.post('/opd/appointments/sync-dates', { onRequest: [auth] }, opdController.syncAppointmentDates);
 }

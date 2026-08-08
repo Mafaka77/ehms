@@ -812,3 +812,20 @@ exports.saveDischargeSummary = async (req, res) => {
     }
 }
 
+exports.syncAdmissionDates = async (req, res) => {
+    try {
+        const result = await ipdService.syncAdmissionDates()
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            message: `Synced ${result.updatedCount} admission dates successfully`,
+            data: result
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to sync admission dates',
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+

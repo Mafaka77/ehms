@@ -60,6 +60,21 @@ const clearFilters = () => {
   }
 }
 
+const isSyncing = ref(false)
+const syncAppointmentDates = async () => {
+  if (confirm('Are you sure you want to sync all appointment dates with their creation dates?')) {
+    isSyncing.value = true
+    const res = await opdStore.syncAppointmentDates()
+    isSyncing.value = false
+    if (res.success) {
+      snackbarStore.show({ message: res.message, type: 'success' })
+      fetchAppointments()
+    } else {
+      snackbarStore.show({ message: res.message, type: 'error' })
+    }
+  }
+}
+
 onMounted(async () => {
   await opdStore.fetchOpdDoctors() // Preload doctors for filter
   await fetchAppointments()
@@ -360,6 +375,14 @@ watch(() => editForm.value.doctorId, (newDocId) => {
           Generate Report
         </button>
         <button 
+          @click="syncAppointmentDates"
+          :disabled="isSyncing"
+          class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 w-full sm:w-auto justify-center cursor-pointer"
+        >
+          <svg class="w-5 h-5 text-slate-500" :class="{ 'animate-spin': isSyncing }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          {{ isSyncing ? 'Syncing...' : 'Sync Appointment Date' }}
+        </button>
+        <button 
           @click="router.push({ name: 'opd-create' })"
           class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 w-full sm:w-auto justify-center"
         >
@@ -434,12 +457,23 @@ watch(() => editForm.value.doctorId, (newDocId) => {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 text-slate-700">
-            <tr v-if="loading">
-              <td colspan="6" class="px-6 py-12 text-center text-slate-400">
-                <svg class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Loading appointments...
-              </td>
-            </tr>
+            <template v-if="loading">
+              <tr v-for="i in 5" :key="i" class="animate-pulse hover:bg-slate-50 transition-colors">
+                <td class="px-6 py-4"><div class="h-4 bg-slate-200 rounded w-24"></div></td>
+                <td class="px-6 py-4">
+                  <div class="h-4 bg-slate-200 rounded w-32 mb-1"></div>
+                  <div class="h-3 bg-slate-200 rounded w-20"></div>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="h-4 bg-slate-200 rounded w-32 mb-1"></div>
+                  <div class="h-3 bg-slate-200 rounded w-24"></div>
+                </td>
+                <td class="px-6 py-4"><div class="h-4 bg-slate-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-6 bg-slate-200 rounded w-20"></div></td>
+                <td class="px-6 py-4 text-right flex justify-end"><div class="h-4 bg-slate-200 rounded w-16"></div></td>
+                <td class="px-6 py-4"><div class="h-8 mx-auto bg-slate-200 rounded w-24"></div></td>
+              </tr>
+            </template>
             <tr v-else-if="opdStore.appointments.length === 0">
               <td colspan="6" class="px-6 py-12 text-center text-slate-500">
                 <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
@@ -454,10 +488,14 @@ watch(() => editForm.value.doctorId, (newDocId) => {
               class="hover:bg-slate-50 transition-colors"
             >
               <td class="px-6 py-4">
-                <span class="font-mono text-indigo-600 font-semibold">{{ app.appointmentId }}</span>
+                <router-link :to="`/opd/view/${app._id}`" class="font-mono text-indigo-600 font-bold hover:underline">
+                  {{ app.appointmentId }}
+                </router-link>
               </td>
               <td class="px-6 py-4">
-                <p class="font-bold text-slate-800">{{ app.patientId?.fullName || 'N/A' }}</p>
+                <router-link :to="`/opd/view/${app._id}`" class="font-bold text-slate-800 hover:text-indigo-600 hover:underline block">
+                  {{ app.patientId?.fullName || 'N/A' }}
+                </router-link>
                 <p class="text-xs text-slate-500">{{ app.patientId?.patientCode || '-' }} • {{ app.patientId?.mobileNo }}</p>
               </td>
               <td class="px-6 py-4">
@@ -480,6 +518,16 @@ watch(() => editForm.value.doctorId, (newDocId) => {
               </td>
               <td class="px-6 py-4 text-center">
                 <div class="flex items-center justify-center gap-2">
+                  <!-- View Button -->
+                  <router-link
+                    v-if="app.status === 'Booked'"
+                    :to="`/opd/view/${app._id}`"
+                    class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                    title="View Patient Dashboard"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  </router-link>
+
                   <!-- Print Button -->
                   <button 
                     v-if="app.status === 'Booked'"

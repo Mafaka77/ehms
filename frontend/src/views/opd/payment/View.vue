@@ -1,3 +1,351 @@
+<template>
+  <div class="h-full flex flex-col bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <!-- Header -->
+    <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">OPD Appointment Details</span>
+        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 mt-0.5">
+          <span class="font-mono">{{ appointment.appointmentId }}</span>
+          <span 
+            v-if="appointment.status === 'Completed'" 
+            class="px-2 py-0.5 text-[10px] font-bold rounded uppercase border bg-slate-100 text-slate-700 border-slate-200"
+          >
+            COMPLETED
+          </span>
+          <span 
+            v-else-if="appointment.status === 'Booked'" 
+            class="px-2 py-0.5 text-[10px] font-bold rounded uppercase border bg-blue-100 text-blue-700 border-blue-200"
+          >
+            BOOKED
+          </span>
+        </h2>
+      </div>
+      <div class="text-right">
+        <span :class="['px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md border', getPaymentStatusColor(appointment.paymentStatus)]">
+          {{ appointment.paymentStatus || 'Unpaid' }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div v-if="isInitializing" class="flex-1 overflow-y-auto p-6 space-y-6">
+      <!-- Skeleton Loading -->
+      <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm animate-pulse">
+        <div class="bg-slate-100 border-b border-slate-200 px-5 py-4 flex justify-between items-center">
+          <div class="h-4 bg-slate-300 rounded w-1/3"></div>
+          <div class="h-6 w-16 bg-slate-300 rounded-md"></div>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="h-4 bg-slate-200 rounded w-3/4 mb-4"></div>
+          <div class="h-16 bg-slate-100 rounded-lg w-full border border-slate-200"></div>
+          <div class="flex justify-end gap-3 pt-2">
+            <div class="h-8 w-24 bg-slate-200 rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else class="flex-1 overflow-y-auto p-6 space-y-6">
+
+      <!-- Patient & Doctor Info Bar -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs">
+        <div>
+          <h4 class="font-semibold uppercase text-slate-400">Patient Details</h4>
+          <p class="font-bold text-slate-800 mt-1 flex items-center gap-1.5 flex-wrap">
+            {{ appointment.patientId?.fullName }}
+            <span v-if="appointment.patientId?.isEmployee" class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
+              Staff ({{ appointment.patientId?.employeeCode }})
+            </span>
+          </p>
+          <p class="text-slate-500 font-mono mt-0.5">{{ appointment.patientId?.patientCode }}</p>
+          <p class="text-slate-500 mt-0.5">{{ appointment.patientId?.gender }} • {{ appointment.patientId?.age }} Years • Mob: {{ appointment.patientId?.mobileNo }}</p>
+        </div>
+        <div>
+          <h4 class="font-semibold uppercase text-slate-400">Consultation Details</h4>
+          <p class="font-bold text-slate-800 mt-1">{{ appointment.doctorId?.fullName || 'N/A' }}</p>
+          <p class="text-slate-500 mt-0.5">Specialization: {{ appointment.doctorId?.specializationId?.name || '-' }}</p>
+          <p class="text-slate-500 mt-0.5">Date: {{ formatDate(appointment.appointmentDate) }}</p>
+        </div>
+      </div>
+
+      <!-- STAGE 1: REGISTRATION / CONSULTATION FEE -->
+      <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+        <div class="bg-indigo-50 border-b border-slate-200 px-5 py-3 flex justify-between items-center">
+          <h3 class="font-bold text-indigo-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            Stage 1: Registration / Consultation Fee
+          </h3>
+          <span :class="['px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border', getPaymentStatusColor(consultationStatus)]">
+            {{ consultationStatus }}
+          </span>
+        </div>
+
+        <div class="p-5 space-y-4">
+          <table class="w-full text-left text-xs">
+            <thead class="text-slate-400 uppercase font-semibold border-b border-slate-100">
+              <tr>
+                <th class="px-2 py-2">Item Details</th>
+                <th class="px-2 py-2 text-right">Rate</th>
+                <th class="px-2 py-2 text-center">Qty</th>
+                <th class="px-2 py-2 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr class="hover:bg-slate-50/50">
+                <td class="px-2 py-3 font-medium text-slate-800">OPD Consultation Fee - {{ appointment.doctorId?.fullName || 'General' }}</td>
+                <td class="px-2 py-3 text-right font-mono">{{ formatCurrency(appointment.consultationFee) }}</td>
+                <td class="px-2 py-3 text-center font-mono">1</td>
+                <td class="px-2 py-3 text-right font-mono font-semibold">{{ formatCurrency(appointment.consultationFee) }}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- Discount Options (Before Bill Generation) -->
+          <div v-if="!consultationBill" class="bg-slate-50 border border-slate-200/60 rounded-xl p-3.5 space-y-2 text-xs">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 uppercase select-none">
+                <input type="checkbox" v-model="showDiscount" class="text-indigo-600 focus:ring-indigo-500 rounded border-slate-300">
+                Apply Discount
+              </label>
+              <span v-if="showDiscount" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
+                Discount Enabled
+              </span>
+            </div>
+
+            <div v-if="showDiscount" class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/50">
+              <div class="col-span-2 sm:col-span-1">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Discount Type</label>
+                <select 
+                  v-model="discountMode"
+                  class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
+                >
+                  <option value="free">Free Clinic (100%)</option>
+                  <option value="doctor">Doctor Discount</option>
+                </select>
+              </div>
+
+              <!-- Doctor Search Select -->
+              <div v-if="discountMode === 'doctor'" class="col-span-2 sm:col-span-1 relative">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Search Doctor <span class="text-rose-500">*</span></label>
+                
+                <div v-if="selectedDoctor" class="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div class="flex flex-col overflow-hidden w-full">
+                    <span class="text-xs font-bold text-indigo-900 truncate">{{ selectedDoctor.fullName }}</span>
+                    <span class="text-[9px] text-indigo-700 font-mono truncate">{{ selectedDoctor.doctorCode }}</span>
+                  </div>
+                  <button type="button" @click="clearDoctor" class="text-indigo-400 hover:text-indigo-600 focus:outline-none ml-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                
+                <div v-else>
+                  <input 
+                    v-model="doctorSearchQuery"
+                    type="text" 
+                    placeholder="Name or doctor code..." 
+                    class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <div v-if="doctorSearchResults.length > 0" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    <ul class="py-0.5 divide-y divide-slate-50">
+                      <li 
+                        v-for="doc in doctorSearchResults" 
+                        :key="doc._id"
+                        @click="selectDoctor(doc)"
+                        class="px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer flex flex-col"
+                      >
+                        <span class="text-xs font-semibold text-slate-800">{{ doc.fullName }}</span>
+                        <span class="text-[10px] text-slate-500 font-mono">{{ doc.doctorCode }}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Reason/Remarks Input -->
+              <div class="col-span-2">
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Discount Reason / Remarks</label>
+                <input 
+                  v-model="discountRemarks"
+                  type="text"
+                  placeholder="e.g. Free clinic scheme, Doctor recommendation..."
+                  class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 placeholder-slate-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div v-if="consultationBill" class="bg-slate-50 rounded-lg p-4 flex justify-between items-center text-xs border border-slate-100">
+            <div>
+              <p class="text-slate-500 mb-1">Bill No: <span class="font-mono font-bold text-slate-800">{{ consultationBill.billNo }}</span></p>
+              <p class="text-slate-500">Generated: {{ formatDate(consultationBill.generatedAt) }}</p>
+            </div>
+            <div class="text-right">
+              <p class="font-semibold text-slate-800">Net Amount: <span class="text-sm font-mono text-indigo-600 font-bold">{{ formatCurrency(consultationBill.netAmount) }}</span></p>
+              <p class="text-slate-500 font-medium mt-0.5">Balance: {{ formatCurrency(consultationBill.balanceAmount) }}</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 justify-end pt-2">
+            <button 
+              v-if="!consultationBill"
+              @click="generateConsultationBill"
+              :disabled="loadingConsultation || (showDiscount && discountMode === 'doctor' && !selectedDoctor)"
+              class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-xl font-semibold text-xs shadow transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            >
+              <span v-if="loadingConsultation" class="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+              Generate Consultation Bill
+            </button>
+            <template v-else>
+              <button 
+                v-if="consultationBill.status !== 'PAID'"
+                @click="emit('pay-clicked', consultationBill)"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-xl font-semibold text-xs shadow transition-all cursor-pointer"
+              >
+                Process Payment ({{ formatCurrency(consultationBill.balanceAmount) }})
+              </button>
+              <button 
+                v-if="consultationBill.status === 'PAID'"
+                @click="printBill(consultationBill)"
+                class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2 px-4 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                Print Invoice
+              </button>
+              <button 
+                @click="cancelBill(consultationBill)"
+                :disabled="loadingCancel === consultationBill._id"
+                class="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 py-2 px-3 rounded-xl font-semibold text-xs transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {{ consultationBill.status === 'PAID' ? 'Refund & Cancel' : 'Cancel Bill' }}
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <!-- STAGE 2: PROCEDURES & INVESTIGATIONS (TREATMENT CHARGES) -->
+      <div class="border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+        <div class="bg-amber-50 border-b border-slate-200 px-5 py-3 flex justify-between items-center">
+          <h3 class="font-bold text-amber-900 flex items-center gap-2">
+            <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+            Stage 2: Procedures & Investigations (Treatment Charges)
+          </h3>
+          <span :class="['px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md border', getPaymentStatusColor(chargesStatus)]">
+            {{ chargesStatus }}
+          </span>
+        </div>
+
+        <div class="p-5 space-y-4">
+          <div class="max-h-80 overflow-y-auto pr-1">
+            <table class="w-full text-left text-xs relative">
+              <thead class="text-slate-400 uppercase font-semibold border-b border-slate-100 sticky top-0 bg-white z-10 shadow-xs">
+                <tr>
+                  <th class="px-2 py-2">Item Details</th>
+                  <th class="px-2 py-2 text-right">Rate</th>
+                  <th class="px-2 py-2 text-center">Qty</th>
+                  <th class="px-2 py-2 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-if="patientCharges.length === 0" class="hover:bg-slate-50/50">
+                  <td colspan="4" class="px-2 py-4 text-center text-slate-500 text-xs">No additional treatment charges added for this appointment.</td>
+                </tr>
+                <tr v-for="charge in patientCharges" :key="charge._id" class="hover:bg-slate-50/50">
+                  <td class="px-2 py-3 text-slate-700">
+                    <p class="font-bold text-slate-800">{{ charge.description }}</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">{{ charge.chargeCategoryId?.name || 'General' }} • {{ formatDate(charge.createdAt) }}</p>
+                    <div v-if="charge.doctorId" class="text-[10px] text-indigo-600 font-bold mt-1 inline-flex items-center gap-1 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded">
+                      {{ charge.doctorId.fullName || charge.doctorId.name }}
+                    </div>
+                    <!-- Addon badges -->
+                    <div v-if="charge.addons && charge.addons.length > 0" class="mt-1.5 flex flex-wrap gap-1">
+                      <span 
+                        v-for="addon in charge.addons" 
+                        :key="addon._id" 
+                        class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-teal-50 text-teal-800 border border-teal-100 inline-flex items-center gap-1.5"
+                      >
+                        <span>{{ addon.itemName }}</span>
+                        <span v-if="addon.doctorId" class="px-1 py-0.2 text-[8px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-600 rounded">
+                          {{ addon.doctorId.fullName || addon.doctorId.name || addon.doctorId }}
+                        </span>
+                        <span class="text-slate-500 font-extrabold">(₹{{ addon.amount?.toLocaleString() }})</span>
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-2 py-3 text-right font-mono">{{ formatCurrency(charge.rate) }}</td>
+                  <td class="px-2 py-3 text-center font-mono">{{ charge.quantity }}</td>
+                  <td class="px-2 py-3 text-right font-mono font-semibold">
+                    {{ formatCurrency((charge.amount || 0) + (charge.addons || []).reduce((s, a) => s + (a.amount || 0), 0)) }}
+                  </td>
+                </tr>
+                <tr class="bg-slate-50/50 font-bold border-t border-slate-100" v-if="patientCharges.length > 0">
+                  <td colspan="3" class="px-2 py-3 text-slate-800 text-right">Total Charges Subtotal:</td>
+                  <td class="px-2 py-3 text-right font-mono text-indigo-600 font-bold">{{ formatCurrency(totalChargesAmount) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-if="chargesBill" class="bg-slate-50 rounded-lg p-4 flex justify-between items-center text-xs border border-slate-100">
+            <div>
+              <p class="text-slate-500 mb-1">Bill No: <span class="font-mono font-bold text-slate-800">{{ chargesBill.billNo }}</span></p>
+              <p class="text-slate-500">Generated: {{ formatDate(chargesBill.generatedAt) }}</p>
+            </div>
+            <div class="text-right">
+              <p class="font-semibold text-slate-800">Net Amount: <span class="text-sm font-mono text-indigo-600 font-bold">{{ formatCurrency(chargesBill.netAmount) }}</span></p>
+              <p class="text-slate-500 font-medium mt-0.5">Balance: {{ formatCurrency(chargesBill.balanceAmount) }}</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 justify-end pt-2">
+            <button 
+              v-if="!chargesBill && unbilledChargesCount > 0"
+              @click="generateChargesBill"
+              :disabled="loadingCharges"
+              class="bg-amber-600 hover:bg-amber-700 text-white py-2 px-4 rounded-xl font-semibold text-xs shadow transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            >
+              <span v-if="loadingCharges" class="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full"></span>
+              Generate Charges Bill
+            </button>
+            <template v-else-if="chargesBill">
+              <button 
+                v-if="chargesBill.status !== 'PAID'"
+                @click="emit('pay-clicked', chargesBill)"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-xl font-semibold text-xs shadow transition-all cursor-pointer"
+              >
+                Process Payment ({{ formatCurrency(chargesBill.balanceAmount) }})
+              </button>
+              <button 
+                v-if="chargesBill.status === 'PAID'"
+                @click="printBill(chargesBill)"
+                class="bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 py-2 px-4 rounded-xl font-semibold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                Print Invoice
+              </button>
+              <button 
+                @click="cancelBill(chargesBill)"
+                :disabled="loadingCancel === chargesBill._id"
+                class="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 py-2 px-3 rounded-xl font-semibold text-xs transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {{ chargesBill.status === 'PAID' ? 'Refund & Cancel' : 'Cancel Bill' }}
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Printable Invoice Modal -->
+    <OpdInvoiceModal 
+      v-if="showInvoiceModal" 
+      :show="showInvoiceModal" 
+      :appointment="appointment" 
+      :bill-details="activePrintBill"
+      :patient-charges="patientCharges"
+      @close="closeInvoiceModal" 
+    />
+  </div>
+</template>
+
 <script setup>
 import { ref, watch, computed } from 'vue'
 import api from '../../../axios/api'
@@ -17,54 +365,17 @@ const snackbarStore = useSnackbarStore()
 const opdStore = useOpdStore()
 
 const showInvoiceModal = ref(false)
+const activePrintBill = ref(null)
 
-const loadingBill = ref(false)
-const billDetails = ref(null)
+const consultationBill = ref(null)
+const chargesBill = ref(null)
 
-const fetchBillDetails = async (billId) => {
-  if (!billId) {
-    billDetails.value = null
-    return
-  }
-  loadingBill.value = true
-  try {
-    const data = await opdStore.fetchBillDetails(billId)
-    billDetails.value = data
-  } catch (error) {
-    console.error('Error fetching bill details:', error)
-    snackbarStore.show({
-      message: error.response?.data?.message || error.message || 'Failed to load bill details',
-      type: 'error'
-    })
-  } finally {
-    loadingBill.value = false
-  }
-}
-
-// Watch for appointment changes to load bill if it exists
-watch(() => props.appointment, (newAppt) => {
-  if (newAppt && newAppt.billId) {
-    fetchBillDetails(newAppt.billId)
-  } else {
-    billDetails.value = null
-  }
-}, { immediate: true })
+const patientCharges = ref([])
+const isInitializing = ref(false)
 
 const showDiscount = ref(false)
 const discountMode = ref('free') // 'free', 'doctor'
 const discountRemarks = ref('')
-
-// Compute final discount amount
-const discountAmount = computed(() => {
-  if (!showDiscount.value) return 0
-  return props.appointment.consultationFee || 0
-})
-
-// Compute net total amount
-const netAmount = computed(() => {
-  return Math.max(0, (props.appointment.consultationFee || 0) - discountAmount.value)
-})
-
 const doctorSearchQuery = ref('')
 const isSearchingDoctors = ref(false)
 const doctorSearchResults = ref([])
@@ -90,7 +401,6 @@ let doctorSearchTimeout = null
 watch(doctorSearchQuery, () => {
   if (doctorSearchTimeout) clearTimeout(doctorSearchTimeout)
   if (selectedDoctor.value && doctorSearchQuery.value === selectedDoctor.value.fullName) return
-  
   doctorSearchTimeout = setTimeout(() => {
     searchDoctors()
   }, 400)
@@ -107,111 +417,158 @@ const clearDoctor = () => {
   doctorSearchQuery.value = ''
 }
 
-// Reset/Auto-detect discount when appointment changes
-watch(() => props.appointment, () => {
-  showDiscount.value = false
-  discountMode.value = 'free'
-  selectedDoctor.value = null
-  doctorSearchQuery.value = ''
-  discountRemarks.value = ''
+const fetchBillDetails = async (billId, isConsultation = true) => {
+  try {
+    const data = await opdStore.fetchBillDetails(billId)
+    if (isConsultation) {
+      consultationBill.value = data
+    } else {
+      chargesBill.value = data
+    }
+  } catch (error) {
+    console.error('Error fetching bill details:', error)
+  }
+}
+
+watch(() => props.appointment, async (newAppt, oldAppt) => {
+  if (newAppt) {
+    const isSameAppointment = oldAppt && oldAppt._id === newAppt._id
+    
+    if (!isSameAppointment) {
+      isInitializing.value = true
+      consultationBill.value = null
+      chargesBill.value = null
+      patientCharges.value = []
+    }
+
+    if (newAppt.consultationBillId || newAppt.billId) {
+      await fetchBillDetails(newAppt.consultationBillId || newAppt.billId, true)
+    }
+    
+    if (newAppt.chargesBillId) {
+      await fetchBillDetails(newAppt.chargesBillId, false)
+    }
+    
+    // Fetch patient charges
+    try {
+      const res = await opdStore.fetchPatientCharges(newAppt._id)
+      patientCharges.value = res.data || []
+    } catch (e) {
+      if (!isSameAppointment) patientCharges.value = []
+    } finally {
+      if (!isSameAppointment) {
+        isInitializing.value = false
+      }
+    }
+  } else {
+    consultationBill.value = null
+    chargesBill.value = null
+    patientCharges.value = []
+  }
+}, { immediate: true })
+
+const totalChargesAmount = computed(() => {
+  return patientCharges.value.reduce((sum, c) => {
+    const addonsTotal = (c.addons || []).reduce((s, a) => s + (a.amount || 0), 0)
+    return sum + (c.amount || 0) + addonsTotal
+  }, 0)
 })
 
-const generateBill = async () => {
-  loadingBill.value = true
+const unbilledChargesCount = computed(() => {
+  return patientCharges.value.filter(c => !c.isBilled).length
+})
+
+const consultationStatus = computed(() => {
+  if (props.appointment.consultationFee === 0 && !consultationBill.value) return 'Paid'
+  if (!consultationBill.value) return 'Unbilled'
+  if (consultationBill.value.status === 'PAID' || props.appointment.consultationFee === 0) return 'Paid'
+  if (consultationBill.value.status === 'PARTIALLY_PAID') return 'Partial'
+  return 'Billed'
+})
+
+const chargesStatus = computed(() => {
+  if (patientCharges.value.length === 0) return 'No Charges'
+  if (!chargesBill.value) return 'Unbilled'
+  if (chargesBill.value.status === 'PAID' || chargesBill.value.netAmount === 0) return 'Paid'
+  if (chargesBill.value.status === 'PARTIALLY_PAID') return 'Partial'
+  return 'Billed'
+})
+
+const loadingConsultation = ref(false)
+const generateConsultationBill = async () => {
+  loadingConsultation.value = true
   try {
     const payload = {
       opdAppointmentId: props.appointment._id,
-      discountAmount: discountAmount.value,
+      discountAmount: showDiscount.value ? props.appointment.consultationFee : 0,
       discountType: showDiscount.value ? (discountMode.value === 'free' ? 'Free Clinic' : 'Doctor Discount') : 'Free Clinic',
       discountRemarks: showDiscount.value ? (discountRemarks.value || (discountMode.value === 'free' ? 'Free Clinic 100%' : `Doctor Discount` + (selectedDoctor.value ? ` - ${selectedDoctor.value.fullName}` : ''))) : ''
     }
     if (showDiscount.value && discountMode.value === 'doctor' && selectedDoctor.value) {
       payload.doctorId = selectedDoctor.value._id
     }
-
     const data = await opdStore.generateBill(payload)
-    snackbarStore.show({
-      message: 'Bill generated successfully',
-      type: 'success'
-    })
-    await fetchBillDetails(data._id)
+    snackbarStore.show({ message: 'Consultation bill generated', type: 'success' })
+    await fetchBillDetails(data._id, true)
     emit('bill-generated', data)
   } catch (error) {
-    console.error('Error generating bill:', error)
-    snackbarStore.show({
-      message: error.response?.data?.message || error.message || 'Failed to generate bill',
-      type: 'error'
-    })
+    snackbarStore.show({ message: error.response?.data?.message || 'Failed to generate consultation bill', type: 'error' })
   } finally {
-    loadingBill.value = false
+    loadingConsultation.value = false
   }
 }
 
-const printBill = () => {
+const loadingCharges = ref(false)
+const generateChargesBill = async () => {
+  loadingCharges.value = true
+  try {
+    const payload = {
+      opdAppointmentId: props.appointment._id,
+      discountAmount: 0,
+      discountType: 'CUSTOM'
+    }
+    const data = await opdStore.generateChargesBill(payload)
+    snackbarStore.show({ message: 'Treatment charges bill generated', type: 'success' })
+    await fetchBillDetails(data._id, false)
+    emit('bill-generated', data)
+  } catch (error) {
+    snackbarStore.show({ message: error.response?.data?.message || 'Failed to generate charges bill', type: 'error' })
+  } finally {
+    loadingCharges.value = false
+  }
+}
+
+const printBill = (bill) => {
+  activePrintBill.value = bill
   showInvoiceModal.value = true
 }
 
-const loadingCancel = ref(false)
-
-const cancelBill = async () => {
-  if (!billDetails.value?._id) return
-  if (!confirm('Are you sure you want to cancel this bill? This will delete the draft bill and reset any discount details.')) return
-  
-  loadingCancel.value = true
-  try {
-    await opdStore.cancelBill(billDetails.value._id)
-    snackbarStore.show({
-      message: 'Bill cancelled successfully',
-      type: 'success'
-    })
-    billDetails.value = null
-    emit('bill-generated', null)
-  } catch (error) {
-    console.error('Error cancelling bill:', error)
-    snackbarStore.show({
-      message: error.response?.data?.message || error.message || 'Failed to cancel bill',
-      type: 'error'
-    })
-  } finally {
-    loadingCancel.value = false
-  }
+const closeInvoiceModal = () => {
+  showInvoiceModal.value = false
+  activePrintBill.value = null
 }
 
-const revertingPaymentId = ref(null)
-
-const handleRevertPayment = async (payment) => {
-  if (!confirm(`Are you sure you want to revert payment ${payment.paymentNo} of ${formatCurrency(payment.amount)}?`)) return
-  
-  revertingPaymentId.value = payment._id
+const loadingCancel = ref(null)
+const cancelBill = async (bill) => {
+  if (!confirm(`Are you sure you want to cancel bill ${bill.billNo}?`)) return
+  loadingCancel.value = bill._id
   try {
-    await opdStore.cancelPayment(payment._id)
-    snackbarStore.show({
-      message: 'Payment reverted successfully',
-      type: 'success'
-    })
-    
-    // Refresh bill details
-    if (props.appointment?.billId) {
-      await fetchBillDetails(props.appointment.billId)
-    }
-    
-    // Notify parent to refresh the appointment list
-    emit('bill-generated', billDetails.value)
+    await opdStore.cancelBill(bill._id)
+    snackbarStore.show({ message: 'Bill cancelled successfully', type: 'success' })
+    if (consultationBill.value && consultationBill.value._id === bill._id) consultationBill.value = null
+    if (chargesBill.value && chargesBill.value._id === bill._id) chargesBill.value = null
+    emit('bill-generated', null)
   } catch (error) {
-    console.error('Error reverting payment:', error)
-    snackbarStore.show({
-      message: error.response?.data?.message || error.message || 'Failed to revert payment',
-      type: 'error'
-    })
+    snackbarStore.show({ message: error.response?.data?.message || 'Failed to cancel bill', type: 'error' })
   } finally {
-    revertingPaymentId.value = null
+    loadingCancel.value = null
   }
 }
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
   return new Date(dateString).toLocaleDateString('en-IN', {
-    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata'
   })
 }
 
@@ -223,361 +580,10 @@ const getPaymentStatusColor = (status) => {
   switch (status) {
     case 'Paid': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
     case 'Unpaid': return 'bg-rose-100 text-rose-700 border-rose-200'
+    case 'Billed': return 'bg-amber-100 text-amber-700 border-amber-200'
+    case 'Partial': return 'bg-amber-100 text-amber-700 border-amber-200'
+    case 'No Charges': return 'bg-slate-100 text-slate-600 border-slate-200'
     default: return 'bg-slate-100 text-slate-700 border-slate-200'
   }
 }
 </script>
-
-<template>
-  <div>
-    <div class="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm flex flex-col h-full">
-    <!-- Header -->
-    <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-      <div>
-        <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Appointment Details</span>
-        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2 mt-0.5">
-          <span class="font-mono">{{ appointment.appointmentId }}</span>
-        </h2>
-      </div>
-      <div class="text-right">
-        <span :class="['px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md border', getPaymentStatusColor(appointment.paymentStatus)]">
-          {{ appointment.paymentStatus }}
-        </span>
-      </div>
-    </div>
-
-    <!-- Scrollable content -->
-    <div class="p-6 flex-grow overflow-y-auto space-y-6">
-      <!-- Patient & Doctor Info Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-        <div>
-          <h4 class="text-xs font-semibold uppercase text-slate-400">Patient Details</h4>
-          <p class="font-bold text-slate-800 mt-1 flex items-center gap-1.5 flex-wrap">
-            {{ appointment.patientId?.fullName }}
-            <span v-if="appointment.patientId?.isEmployee" class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
-              Staff ({{ appointment.patientId?.employeeCode }})
-            </span>
-          </p>
-          <p class="text-xs text-slate-500 font-mono mt-0.5">{{ appointment.patientId?.patientCode }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">{{ appointment.patientId?.gender }} • {{ appointment.patientId?.age }} Years</p>
-          <p class="text-xs text-slate-500 mt-0.5">Mob: {{ appointment.patientId?.mobileNo }}</p>
-        </div>
-        <div>
-          <h4 class="text-xs font-semibold uppercase text-slate-400">Consultation Details</h4>
-          <p class="font-bold text-slate-800 mt-1">{{ appointment.doctorId?.fullName || 'N/A' }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">Specialization: {{ appointment.doctorId?.specializationId?.name || '-' }}</p>
-          <p class="text-xs text-slate-500 mt-0.5">Date: {{ formatDate(appointment.appointmentDate) }}</p>
-          <p class="text-xs text-slate-500 mt-0.5" v-if="appointment.notes">Notes: {{ appointment.notes }}</p>
-        </div>
-      </div>
-
-      <!-- Item Charge List -->
-      <div>
-        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">Charges</h3>
-        <div class="border border-slate-100 rounded-xl overflow-hidden">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase font-semibold">
-              <tr>
-                <th class="px-4 py-3">Charge Description</th>
-                <th class="px-4 py-3 text-right">Rate</th>
-                <th class="px-4 py-3 text-center">Qty</th>
-                <th class="px-4 py-3 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 text-slate-700">
-              <tr class="hover:bg-slate-50/50">
-                <td class="px-4 py-3 font-medium text-slate-800">OPD Consultation Fee - {{ appointment.doctorId?.fullName || 'N/A' }}</td>
-                <td class="px-4 py-3 text-right font-mono">{{ formatCurrency(appointment.consultationFee) }}</td>
-                <td class="px-4 py-3 text-center font-mono">1</td>
-                <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(appointment.consultationFee) }}</td>
-              </tr>
-              <tr class="bg-slate-50/50 font-bold border-t border-slate-100">
-                <td colspan="3" class="px-4 py-3 text-slate-800">Total Amount</td>
-                <td class="px-4 py-3 text-right font-mono text-indigo-600 text-sm">{{ formatCurrency(appointment.consultationFee) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Discount Configuration (Only if bill not generated yet) -->
-      <div v-if="!appointment.billId && appointment.paymentStatus === 'Unpaid'" class="bg-slate-50 border border-slate-200/60 rounded-xl p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700 uppercase select-none">
-            <input type="checkbox" v-model="showDiscount" class="text-indigo-600 focus:ring-indigo-500 rounded border-slate-300">
-            Apply Discount
-          </label>
-          <span v-if="showDiscount" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
-            Discount Enabled
-          </span>
-        </div>
-
-        <div v-if="showDiscount" class="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200/50">
-          <div class="col-span-2 sm:col-span-1">
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Discount Type</label>
-            <select 
-              v-model="discountMode"
-              class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700"
-            >
-              <option value="free">Free Clinic (100%)</option>
-              <option value="doctor">Doctor Discount</option>
-            </select>
-          </div>
-
-          <!-- Doctor Search Select -->
-          <div v-if="discountMode === 'doctor'" class="col-span-2 sm:col-span-1 relative">
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Search Doctor <span class="text-rose-500">*</span></label>
-            
-            <div v-if="selectedDoctor" class="flex items-center justify-between px-2.5 py-1.5 bg-indigo-50 border border-indigo-200 rounded-lg">
-              <div class="flex flex-col overflow-hidden w-full">
-                <span class="text-xs font-bold text-indigo-900 truncate">{{ selectedDoctor.fullName }}</span>
-                <span class="text-[9px] text-indigo-700 font-mono truncate">{{ selectedDoctor.doctorCode }}</span>
-              </div>
-              <button type="button" @click="clearDoctor" class="text-indigo-400 hover:text-indigo-600 focus:outline-none ml-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            
-            <div v-else>
-              <input 
-                v-model="doctorSearchQuery"
-                type="text" 
-                placeholder="Name or doctor code..." 
-                class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              <!-- Dropdown Results -->
-              <div v-if="doctorSearchResults.length > 0" class="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                <ul class="py-0.5 divide-y divide-slate-50">
-                  <li 
-                    v-for="doc in doctorSearchResults" 
-                    :key="doc._id"
-                    @click="selectDoctor(doc)"
-                    class="px-2.5 py-1.5 hover:bg-slate-50 cursor-pointer flex flex-col"
-                  >
-                    <span class="text-xs font-semibold text-slate-800">{{ doc.fullName }}</span>
-                    <span class="text-[10px] text-slate-500 font-mono">{{ doc.doctorCode }}</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <!-- Reason/Remarks Input -->
-          <div class="col-span-2">
-            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Discount Reason / Remarks</label>
-            <input 
-              v-model="discountRemarks"
-              type="text"
-              placeholder="e.g. Free clinic scheme, Doctor recommendation..."
-              class="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-700 placeholder-slate-400"
-            />
-          </div>
-        </div>
-
-        <!-- Live Totals Summary (If discount is applied) -->
-        <div v-if="showDiscount" class="pt-2.5 border-t border-dashed border-slate-200 space-y-1.5 text-xs">
-          <div class="flex justify-between items-center text-slate-500">
-            <span>Gross Total:</span>
-            <span class="font-mono">{{ formatCurrency(appointment.consultationFee) }}</span>
-          </div>
-          <div class="flex justify-between items-center text-emerald-600 font-medium">
-            <span>Discount Applied:</span>
-            <span class="font-mono">-{{ formatCurrency(discountAmount) }}</span>
-          </div>
-          <div class="flex justify-between items-center text-slate-800 font-bold border-t border-slate-200/50 pt-1.5">
-            <span>Net Total to Bill:</span>
-            <span class="font-mono text-indigo-600">{{ formatCurrency(netAmount) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Bill summary skeleton -->
-      <div v-if="loadingBill && !billDetails" class="space-y-3 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/50 animate-pulse">
-        <div class="flex justify-between items-center border-b border-indigo-100/50 pb-2">
-          <div>
-            <div class="h-3 bg-indigo-200/70 rounded w-28 mb-1.5"></div>
-            <div class="h-4 bg-indigo-200/70 rounded w-20"></div>
-          </div>
-          <div class="h-5 bg-indigo-200/70 rounded w-16"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-3 mt-1">
-          <div>
-            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
-            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
-          </div>
-          <div>
-            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
-            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
-          </div>
-          <div>
-            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
-            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
-          </div>
-          <div>
-            <div class="h-3 bg-indigo-200/70 rounded w-20 mb-1"></div>
-            <div class="h-4 bg-indigo-200/70 rounded w-24"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Bill summary if generated -->
-      <div v-else-if="billDetails" class="space-y-3 bg-indigo-50/40 p-4 rounded-xl border border-indigo-100/50">
-        <div class="flex justify-between items-center border-b border-indigo-100/50 pb-2">
-          <div>
-            <h4 class="text-xs font-bold uppercase text-indigo-500">Associated Bill Info</h4>
-            <span class="font-mono font-bold text-xs text-indigo-950 mt-0.5">{{ billDetails.billNo }}</span>
-          </div>
-          <span :class="['px-2 py-0.5 text-[10px] font-bold rounded uppercase border', 
-            billDetails.status === 'PAID' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200']">
-            {{ billDetails.status }}
-          </span>
-        </div>
-        <div class="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <span class="text-slate-500">Gross Amount:</span>
-            <p class="font-bold text-slate-800 font-mono">{{ formatCurrency(billDetails.grossAmount) }}</p>
-          </div>
-          <div>
-            <span class="text-slate-500">Discount:</span>
-            <p class="font-bold text-emerald-600 font-mono">-{{ formatCurrency(billDetails.discountAmount) }}</p>
-          </div>
-          <div>
-            <span class="text-slate-500">Net Amount:</span>
-            <p class="font-bold text-indigo-900 font-mono">{{ formatCurrency(billDetails.netAmount) }}</p>
-          </div>
-          <div>
-            <span class="text-slate-500">Paid Amount:</span>
-            <p class="font-bold text-slate-800 font-mono">{{ formatCurrency(billDetails.paidAmount) }}</p>
-          </div>
-          <div class="col-span-2 border-t border-slate-100 pt-2 flex justify-between items-center text-sm">
-            <span class="text-slate-700 font-semibold">Balance Payable:</span>
-            <span class="font-bold text-rose-600 font-mono">{{ formatCurrency(billDetails.balanceAmount) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Payment History if payments exist -->
-      <div v-if="billDetails && billDetails.payments && billDetails.payments.length > 0" class="space-y-3">
-        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Payment History</h3>
-        <div class="max-h-48 overflow-y-auto border border-slate-100 rounded-xl bg-white">
-          <table class="w-full text-left text-xs">
-            <thead class="bg-slate-50 border-b border-slate-100 text-slate-500 uppercase font-semibold sticky top-0 z-10">
-              <tr>
-                <th class="px-4 py-2.5">Ref No</th>
-                <th class="px-4 py-2.5">Mode</th>
-                <th class="px-4 py-2.5 text-right">Amount</th>
-                <th class="px-4 py-2.5 text-center">Status</th>
-                <th class="px-4 py-2.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-100 text-slate-700">
-              <tr v-for="pay in billDetails.payments" :key="pay._id" class="hover:bg-slate-50/50">
-                <td class="px-4 py-3 font-mono">
-                  <p class="font-bold text-slate-900 text-[10px]">{{ pay.paymentNo }}</p>
-                  <p class="text-[9px] text-slate-400 mt-0.5" v-if="pay.transactionNo">TXN: {{ pay.transactionNo }}</p>
-                </td>
-                <td class="px-4 py-3">
-                  <span class="font-medium">{{ pay.paymentMode }}</span>
-                </td>
-                <td class="px-4 py-3 text-right font-mono font-bold">{{ formatCurrency(pay.amount) }}</td>
-                <td class="px-4 py-3 text-center">
-                  <span :class="['px-1.5 py-0.5 text-[9px] font-bold rounded uppercase', 
-                    pay.status === 'SUCCESS' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700']">
-                    {{ pay.status }}
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-right">
-                  <button 
-                    v-if="pay.status === 'SUCCESS'"
-                    @click="handleRevertPayment(pay)"
-                    :disabled="revertingPaymentId === pay._id"
-                    type="button"
-                    class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-2 py-1 rounded font-semibold text-[10px] transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    <span v-if="revertingPaymentId === pay._id" class="animate-spin inline-block h-2 w-2 border border-rose-600 border-t-transparent rounded-full mr-1"></span>
-                    Revert
-                  </button>
-                  <span v-else class="text-[10px] text-slate-400 font-medium">-</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Actions Footer -->
-    <div class="p-6 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
-      <!-- 1. Generate Bill: Show if no billId is set on appointment and payment status is Unpaid -->
-      <button
-        v-if="!appointment.billId && appointment.paymentStatus === 'Unpaid'"
-        @click="generateBill"
-        :disabled="loadingBill || (showDiscount && discountMode === 'doctor' && !selectedDoctor)"
-        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-5 rounded-xl font-semibold text-sm shadow-lg shadow-indigo-100 hover:shadow-indigo-200 transition-all transform active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50"
-      >
-        <span v-if="loadingBill" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
-        Generate Bill
-      </button>
-
-      <!-- 2. Process Payment: Show if billDetails exist and status is not PAID -->
-      <div v-else-if="billDetails && billDetails.status !== 'PAID'" class="w-full flex flex-col gap-2.5">
-        <button
-          @click="emit('pay-clicked', billDetails)"
-          class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 px-5 rounded-xl font-semibold text-sm shadow-lg shadow-emerald-100 hover:shadow-emerald-200 transition-all transform active:scale-95 flex items-center justify-center gap-2"
-        >
-          Process Payment ({{ formatCurrency(billDetails.balanceAmount) }})
-        </button>
-        <div class="flex gap-2.5 w-full">
-          <button 
-            @click="printBill" 
-            type="button"
-            class="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
-          >
-            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Print Bill
-          </button>
-          <button 
-            @click="cancelBill" 
-            :disabled="loadingCancel" 
-            type="button"
-            class="flex-1 bg-rose-50 border border-rose-100 hover:bg-rose-100 text-rose-600 py-2.5 px-4 rounded-xl font-semibold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50"
-          >
-            <span v-if="loadingCancel" class="animate-spin rounded-full h-3.5 w-3.5 border-2 border-rose-600 border-t-transparent"></span>
-            Cancel Bill
-          </button>
-        </div>
-      </div>
-
-      <!-- 3. Receipt Info: Show if bill is fully paid -->
-      <div v-else-if="billDetails && billDetails.status === 'PAID'" class="w-full flex flex-col gap-2.5">
-        <div class="text-center text-emerald-600 font-bold text-sm bg-emerald-50 py-2.5 rounded-xl border border-emerald-100 flex items-center justify-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          Bill Fully Settled
-        </div>
-        <button
-          @click="printBill"
-          type="button"
-          class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 px-5 rounded-xl font-semibold text-sm shadow-lg shadow-indigo-100 hover:shadow-indigo-200 transition-all transform active:scale-95 flex items-center justify-center gap-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-          </svg>
-          Print Invoice
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Printable Invoice Modal -->
-  <OpdInvoiceModal 
-    :show="showInvoiceModal" 
-    :appointment="appointment" 
-    :billDetails="billDetails" 
-    @close="showInvoiceModal = false" 
-  />
-  </div>
-</template>

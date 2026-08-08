@@ -37,6 +37,21 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async syncDates() {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post('/ipd/sync-dates')
+        return { success: true, message: response.data.message }
+      } catch (err) {
+        console.error('Error syncing dates:', err)
+        this.error = err.response?.data?.message || 'Failed to sync dates'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async createAdmission(data) {
       this.loading = true
       this.error = null

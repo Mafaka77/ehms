@@ -89,10 +89,15 @@ const saveNewPatient = async () => {
 }
 
 
+const getCurrentDateTimeLocal = () => {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+}
+
 // -- STEP 2: APPOINTMENT BOOKING --
 const appointmentData = ref({
   doctorId: '',
-  appointmentDate: new Date().toISOString().split('T')[0],
+  appointmentDate: getCurrentDateTimeLocal(),
   notes: '',
   paymentStatus: 'Unpaid'
 })
@@ -377,7 +382,7 @@ const closeModal = () => {
           <div>
             <BaseInput 
               v-model="appointmentData.appointmentDate"
-              type="date"
+              type="datetime-local"
               id="appointmentDate"
               label="Appointment Date"
               required

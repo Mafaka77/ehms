@@ -230,3 +230,19 @@ exports.getInstallments = async (req, res) => {
         });
     }
 };
+
+exports.syncAppointmentDates = async (req, res) => {
+    try {
+        const count = await dentalService.syncAppointmentDates();
+        return res.code(STATUS_CODES.OK).send({
+            status: STATUS_CODES.OK,
+            message: `Synced ${count} appointment dates successfully`
+        });
+    } catch (error) {
+        console.error(error);
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR,
+            message: error.message || 'Internal Server Error'
+        });
+    }
+};

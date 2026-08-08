@@ -44,6 +44,18 @@ const routes = [
             meta: { permission: 'opd.view' }
           },
           {
+            path: 'view/:id',
+            name: 'opd-view',
+            component: () => import('../views/opd/View.vue'),
+            meta: { permission: 'opd.view' }
+          },
+          {
+            path: ':id/view',
+            name: 'opd-view-alt',
+            component: () => import('../views/opd/View.vue'),
+            meta: { permission: 'opd.view' }
+          },
+          {
             path: 'payment',
             name: 'opd-payment',
             component: () => import('../views/opd/payment/Index.vue'),

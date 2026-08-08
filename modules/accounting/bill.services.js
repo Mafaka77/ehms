@@ -348,6 +348,8 @@ exports.generateBillFromEndoscopyOrder = async (endoscopyOrderId, userId, discou
 // ---------------------------------------------------------------------------
 // generateBillFromOpdAppointment
 // ---------------------------------------------------------------------------
+// generateBillFromOpdAppointment (Stage 1: OPD Consultation Fee)
+// ---------------------------------------------------------------------------
 exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
     const session = await mongoose.startSession()
     session.startTransaction()
@@ -362,8 +364,8 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
             throw error
         }
 
-        // Check if bill already generated
-        const existingBill = await Bill.findOne({ opdAppointmentId }).session(session)
+        // Check if consultation bill already generated
+        const existingBill = await Bill.findOne({ opdAppointmentId, billType: { $in: ['OPD_CONSULTATION', 'OPD'] } }).session(session)
         if (existingBill) {
             await session.abortTransaction()
             session.endSession()
@@ -372,25 +374,28 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
 
         // 2. Calculate amounts
         const grossAmount = appointment.consultationFee || 0
-        const netAmount = grossAmount - discountAmount
+        const netAmount = Math.max(0, grossAmount - discountAmount)
+        const isFreeOrPaid = netAmount === 0
+        const initialStatus = isFreeOrPaid ? 'PAID' : 'DRAFT'
+        const initialBalance = isFreeOrPaid ? 0 : netAmount
 
         // 3. Create Bill
         const [bill] = await Bill.create([{
             patientId: appointment.patientId,
             opdAppointmentId: appointment._id,
-            billType: 'OPD',
+            billType: 'OPD_CONSULTATION',
             grossAmount,
             discountAmount,
             netAmount,
             paidAmount: 0,
-            balanceAmount: netAmount,
-            status: 'DRAFT',
+            balanceAmount: initialBalance,
+            status: initialStatus,
             generatedBy: userId,
             generatedAt: new Date()
         }], { session })
 
-        // 4. Create BillItem
-        const doctorName = appointment.doctorId ? ` - Dr. ${appointment.doctorId.fullName}` : ''
+        // 4. Create BillItem for Consultation Fee
+        const doctorName = appointment.doctorId ? ` - ${appointment.doctorId.fullName}` : ''
         await BillItem.create([{
             billId: bill._id,
             itemType: 'CONSULTATION',
@@ -405,8 +410,130 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
         }], { session })
 
         // 5. Update OPD Appointment reference
-        appointment.paymentStatus = 'Unpaid'
-        await appointment.save({ session })
+        if (isFreeOrPaid) {
+            appointment.paymentStatus = 'Paid'
+            if (appointment.status === 'Draft') {
+                appointment.status = 'Booked'
+            }
+            await appointment.save({ session })
+        }
+
+        // 6. Create Discount record if discount is applied
+        if (discountAmount > 0) {
+            const resolvedDoctorId = await resolveDiscountDoctor(appointment.patientId, doctorId, session)
+            await Discount.create([{
+                billId: bill._id,
+                patientId: appointment.patientId,
+                doctorId: resolvedDoctorId,
+                discountType,
+                originalAmount: grossAmount,
+                discountAmount,
+                netAmount,
+                appliedBy: userId,
+                remarks: discountRemarks
+            }], { session })
+        }
+
+        await session.commitTransaction()
+        session.endSession()
+        return bill
+    } catch (err) {
+        await session.abortTransaction()
+        session.endSession()
+        throw err
+    }
+}
+
+// ---------------------------------------------------------------------------
+// generateBillFromOpdCharges (Stage 2: Treatment Charges & Procedures)
+// ---------------------------------------------------------------------------
+exports.generateBillFromOpdCharges = async (opdAppointmentId, userId, discountAmount = 0, discountType = 'CUSTOM', discountRemarks = null, doctorId = null) => {
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    try {
+        // 1. Fetch OPD appointment
+        const appointment = await OpdAppointment.findById(opdAppointmentId)
+            .populate({ path: 'doctorId', select: 'fullName' })
+            .session(session)
+        if (!appointment) {
+            const error = new Error('OPD appointment not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        // Check if charges bill already generated
+        const existingBill = await Bill.findOne({ opdAppointmentId, billType: 'OPD_CHARGES' }).session(session)
+        if (existingBill) {
+            await session.abortTransaction()
+            session.endSession()
+            return existingBill
+        }
+
+        // 2. Fetch unbilled PatientCharges for OPD appointment
+        require('../clinical/ipd/ipd_charge_category.model')
+        const PatientCharge = require('../common/patient_charge.model')
+        const PatientChargeAddon = require('../common/patient_charge_addon.model')
+        const unbilledCharges = await PatientCharge.find({ opdAppointmentId: appointment._id, isBilled: false })
+            .populate('chargeCategoryId')
+            .session(session)
+
+        if (unbilledCharges.length === 0) {
+            const error = new Error('No unbilled charges found for this appointment')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        let totalChargesAmount = 0
+        for (const charge of unbilledCharges) {
+            const addons = await PatientChargeAddon.find({ patientChargeId: charge._id }).session(session)
+            const addonsTotal = addons.reduce((sum, a) => sum + (a.amount || 0), 0)
+            charge._addonsTotal = addonsTotal
+            totalChargesAmount += charge.amount + addonsTotal
+        }
+
+        // 3. Calculate amounts
+        const grossAmount = totalChargesAmount
+        const netAmount = Math.max(0, grossAmount - discountAmount)
+        const isFreeOrPaid = netAmount === 0
+        const initialStatus = isFreeOrPaid ? 'PAID' : 'DRAFT'
+        const initialBalance = isFreeOrPaid ? 0 : netAmount
+
+        // 4. Create Bill
+        const [bill] = await Bill.create([{
+            patientId: appointment.patientId,
+            opdAppointmentId: appointment._id,
+            billType: 'OPD_CHARGES',
+            grossAmount,
+            discountAmount,
+            netAmount,
+            paidAmount: 0,
+            balanceAmount: initialBalance,
+            status: initialStatus,
+            generatedBy: userId,
+            generatedAt: new Date()
+        }], { session })
+
+        // 5. Create BillItems for PatientCharges
+        for (const charge of unbilledCharges) {
+            const chargeTotal = charge.amount + (charge._addonsTotal || 0)
+            await BillItem.create([{
+                billId: bill._id,
+                itemType: charge.chargeCategoryId?.type === 'PROCEDURE' ? 'PROCEDURE' : 
+                           charge.chargeCategoryId?.type === 'INVESTIGATION' ? 'INVESTIGATION' : 'OTHER',
+                sourceModule: 'OTHER',
+                description: charge.description,
+                referenceId: charge._id,
+                quantity: charge.quantity,
+                rate: charge.rate,
+                amount: chargeTotal,
+                discountAmount: 0,
+                netAmount: chargeTotal
+            }], { session })
+
+            charge.isBilled = true
+            charge.billId = bill._id
+            await charge.save({ session })
+        }
 
         // 6. Create Discount record if discount is applied
         if (discountAmount > 0) {
@@ -1043,14 +1170,14 @@ exports.processBillPayment = async (billId, paymentData, userId) => {
         }
 
         // Sync OpdAppointment
-        if (txBill.billType === 'OPD' && txBill.opdAppointmentId) {
+        if ((txBill.billType === 'OPD' || txBill.billType === 'OPD_CONSULTATION' || txBill.billType === 'OPD_CHARGES') && txBill.opdAppointmentId) {
             const appointment = await OpdAppointment.findById(txBill.opdAppointmentId).session(session)
             if (appointment) {
-                appointment.paymentStatus = txBill.status === 'PAID' ? 'Paid' : 'Unpaid'
-                if (txBill.status === 'PAID') {
-                    appointment.status = 'Booked'
-                } else {
-                    appointment.status = 'Draft'
+                if (txBill.billType === 'OPD_CONSULTATION' || txBill.billType === 'OPD') {
+                    appointment.paymentStatus = txBill.status === 'PAID' ? 'Paid' : 'Unpaid'
+                    if (txBill.status === 'PAID' && appointment.status === 'Draft') {
+                        appointment.status = 'Booked'
+                    }
                 }
                 await appointment.save({ session })
             }
@@ -1129,12 +1256,11 @@ exports.cancelBill = async (billId) => {
             throw error
         }
 
-        // Validate that no active/successful payments have been made
+        // Cancel any active/successful payments
         const payments = await Payment.find({ billId, status: 'SUCCESS' }).session(session)
-        if (payments.length > 0) {
-            const error = new Error('Cannot cancel bill as active payments have already been processed')
-            error.status = STATUS_CODES.BAD_REQUEST
-            throw error
+        for (const payment of payments) {
+            payment.status = 'CANCELLED'
+            await payment.save({ session })
         }
 
         // Revert associated laboratory order status
@@ -1168,11 +1294,13 @@ exports.cancelBill = async (billId) => {
         }
 
         // Revert associated OPD appointment status
-        if (bill.billType === 'OPD' && bill.opdAppointmentId) {
+        if ((bill.billType === 'OPD' || bill.billType === 'OPD_CONSULTATION' || bill.billType === 'OPD_CHARGES') && bill.opdAppointmentId) {
             const appointment = await OpdAppointment.findById(bill.opdAppointmentId).session(session)
             if (appointment) {
-                appointment.paymentStatus = 'Unpaid'
-                appointment.status = 'Draft'
+                if (bill.billType === 'OPD_CONSULTATION' || bill.billType === 'OPD') {
+                    appointment.paymentStatus = 'Unpaid'
+                    appointment.status = 'Draft'
+                }
                 await appointment.save({ session })
             }
         }
@@ -1316,11 +1444,13 @@ exports.cancelPayment = async (paymentId, userId) => {
             }
 
             // Sync OpdAppointment
-            if (bill.billType === 'OPD' && bill.opdAppointmentId) {
+            if ((bill.billType === 'OPD' || bill.billType === 'OPD_CONSULTATION' || bill.billType === 'OPD_CHARGES') && bill.opdAppointmentId) {
                 const appointment = await OpdAppointment.findById(bill.opdAppointmentId).session(session)
                 if (appointment) {
-                    appointment.paymentStatus = bill.status === 'PAID' ? 'Paid' : 'Unpaid'
-                    appointment.status = bill.status === 'PAID' ? 'Booked' : 'Draft'
+                    if (bill.billType === 'OPD_CONSULTATION' || bill.billType === 'OPD') {
+                        appointment.paymentStatus = bill.status === 'PAID' ? 'Paid' : 'Unpaid'
+                        appointment.status = bill.status === 'PAID' ? 'Booked' : 'Draft'
+                    }
                     await appointment.save({ session })
                 }
             }

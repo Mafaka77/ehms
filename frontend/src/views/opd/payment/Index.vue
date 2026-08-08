@@ -28,6 +28,7 @@ const currentPage = ref(1)
 const limit = ref(10)
 const totalPages = ref(1)
 const totalItems = ref(0)
+const isFetchingList = ref(false)
 
 // Payment Modal State
 const showPaymentModal = ref(false)
@@ -40,8 +41,11 @@ const paymentForm = ref({
   remarks: ''
 })
 
-const fetchAppointments = async () => {
+const fetchAppointments = async (isSilent = false) => {
   try {
+    if (isSilent !== true) {
+      isFetchingList.value = true
+    }
     const filters = {
       page: currentPage.value,
       limit: limit.value,
@@ -67,6 +71,10 @@ const fetchAppointments = async () => {
       message: opdStore.error || 'Failed to fetch appointments',
       type: 'error'
     })
+  } finally {
+    if (isSilent !== true) {
+      isFetchingList.value = false
+    }
   }
 }
 
@@ -89,8 +97,8 @@ const handleSelectAppointment = async (appt) => {
 }
 
 const handleBillGenerated = async (bill) => {
-  // Re-fetch list to update statuses, and reload current selected appointment details
-  await fetchAppointments()
+  // Re-fetch list to update statuses silently, and reload current selected appointment details
+  await fetchAppointments(true)
   if (selectedAppointment.value) {
     await fetchAppointmentDetails(selectedAppointment.value._id)
   }
@@ -134,8 +142,8 @@ const submitPayment = async () => {
     })
     showPaymentModal.value = false
     
-    // Refresh
-    await fetchAppointments()
+    // Refresh silently
+    await fetchAppointments(true)
     if (selectedAppointment.value) {
       await fetchAppointmentDetails(selectedAppointment.value._id)
     }
@@ -391,7 +399,7 @@ const handleExportPdf = async () => {
     printWin.document.write(printContent)
     printWin.document.close()
 
-    fetchAppointments()
+    fetchAppointments(true)
   } catch (err) {
     console.error(err)
     snackbarStore.show({ message: 'Failed to export OPD payments PDF report', type: 'error' })
@@ -529,12 +537,35 @@ const formatCurrency = (val) => {
         <!-- Appointments Table/List -->
         <div class="flex-grow overflow-y-auto">
           <!-- Loading state -->
-          <div v-if="opdStore.loading && opdStore.appointments.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400 py-12">
-            <svg class="animate-spin h-10 w-10 text-indigo-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span class="text-sm font-medium">Loading appointments...</span>
+          <div v-if="isFetchingList" class="w-full">
+            <table class="w-full text-left text-xs whitespace-nowrap">
+              <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
+                <tr>
+                  <th class="px-6 py-4">Appointment ID</th>
+                  <th class="px-6 py-4">Date</th>
+                  <th class="px-6 py-4">Patient</th>
+                  <th class="px-6 py-4">Doctor</th>
+                  <th class="px-6 py-4 text-right">Fee</th>
+                  <th class="px-6 py-4 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="i in 5" :key="i" class="animate-pulse">
+                  <td class="px-6 py-4"><div class="h-4 bg-slate-200 rounded w-24"></div></td>
+                  <td class="px-6 py-4"><div class="h-4 bg-slate-200 rounded w-20"></div></td>
+                  <td class="px-6 py-4">
+                    <div class="h-4 bg-slate-200 rounded w-32 mb-1"></div>
+                    <div class="h-3 bg-slate-200 rounded w-20"></div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <div class="h-4 bg-slate-200 rounded w-32 mb-1"></div>
+                    <div class="h-3 bg-slate-200 rounded w-24"></div>
+                  </td>
+                  <td class="px-6 py-4 flex justify-end"><div class="h-4 bg-slate-200 rounded w-16"></div></td>
+                  <td class="px-6 py-4"><div class="h-5 mx-auto bg-slate-200 rounded w-16"></div></td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <!-- Empty state -->
@@ -619,8 +650,10 @@ const formatCurrency = (val) => {
       <!-- Right Column: Detail View -->
       <div class="lg:col-span-5 h-[700px]">
         <OpdPaymentView 
-          v-if="selectedAppointment && selectedDetailedAppointment" 
-          :appointment="selectedDetailedAppointment" 
+          v-if="selectedAppointment" 
+          :appointment="selectedDetailedAppointment || selectedAppointment" 
+          @close="selectedAppointment = null"
+          @refresh="() => fetchAppointments(true)"
           @bill-generated="handleBillGenerated"
           @pay-clicked="handlePayClicked"
         />
@@ -700,7 +733,8 @@ const formatCurrency = (val) => {
                 step="0.01"
                 min="0.01"
                 :max="activeBill.balanceAmount"
-                class="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 transition-all shadow-sm"
+                disabled
+                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:outline-none text-slate-500 shadow-sm cursor-not-allowed"
               />
             </div>
 

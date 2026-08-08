@@ -158,6 +158,19 @@ export const useDentalStore = defineStore('dental', {
                 this.loading = false;
             }
         },
+        async syncAppointmentDates() {
+            this.loading = true;
+            try {
+                const response = await api.post(`/dental/appointments/sync-dates`);
+                return { success: true, message: response.data.message };
+            } catch (error) {
+                console.error('Error syncing appointment dates:', error);
+                this.error = error.response?.data?.message || 'Failed to sync appointment dates';
+                return { success: false, message: this.error };
+            } finally {
+                this.loading = false;
+            }
+        },
         async updateAppointment(id, data) {
             this.loading = true;
             try {

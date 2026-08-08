@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const softDeletePlugin = require('./softDelete.plugin')
+require('../clinical/ipd/ipd_charge_category.model')
 
 const patientChargeSchema = new mongoose.Schema({
 
@@ -18,6 +19,12 @@ const patientChargeSchema = new mongoose.Schema({
   dentalAppointmentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DentalAppointment',
+    default: null
+  },
+
+  opdAppointmentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'OpdAppointment',
     default: null
   },
 

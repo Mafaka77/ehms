@@ -1601,3 +1601,22 @@ exports.saveDischargeSummary = async (admissionId, data, userId) => {
         throw error
     }
 }
+
+exports.syncAdmissionDates = async () => {
+    try {
+        const Admission = require('./admission.model')
+        const admissions = await Admission.find({})
+        let updatedCount = 0
+
+        for (const admission of admissions) {
+            if (admission.createdAt && (!admission.admissionDate || admission.admissionDate.getTime() !== admission.createdAt.getTime())) {
+                admission.admissionDate = admission.createdAt
+                await admission.save({ validateBeforeSave: false }) // Skip validation for sync
+                updatedCount++
+            }
+        }
+        return { updatedCount }
+    } catch (error) {
+        throw error
+    }
+}

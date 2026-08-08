@@ -1,5 +1,6 @@
 const mongoose = require('mongoose')
 const softDeletePlugin = require('./softDelete.plugin')
+require('../clinical/ipd/ipd_charge_category.model')
 
 const patientChargeAddonSchema = new mongoose.Schema({
   patientChargeId: {
