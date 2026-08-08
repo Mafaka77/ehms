@@ -187,12 +187,13 @@ const fetchAdmissionDetails = async () => {
 // Format Date helpers
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-IN', {
+  return new Date(dateString).toLocaleString('en-IN', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    hour12: true
   })
 }
 
@@ -241,7 +242,7 @@ const printPatientInfo = () => {
 
   const allergiesText = Array.isArray(p.allergies) ? p.allergies.join(', ') : (p.allergies || 'None Known')
   const dobFormatted = p.dateOfBirth ? new Date(p.dateOfBirth).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-  const admitDateFormatted = adm.admissionDate ? new Date(adm.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'
+  const admitDateFormatted = adm.admissionDate ? new Date(adm.admissionDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'
   const printTime = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
 
   const content = `
