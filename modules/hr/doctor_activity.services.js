@@ -21,6 +21,16 @@ try {
     EmergencyVisit = require('../emergency/emergency.model');
 } catch (e) {}
 
+let DentalAppointment;
+try {
+    DentalAppointment = require('../dental/dental_appointment.model');
+} catch (e) {}
+
+let RadiologyOrder;
+try {
+    RadiologyOrder = require('../radiology/radiology_order.model');
+} catch (e) {}
+
 const todayRange = () => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -293,22 +303,46 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
 
         let items = [];
 
-        // 1. Fetch OPD Appointments with their corresponding Bill Invoice & Discount cross-reference
-        if ((filterType === 'ALL' || filterType === 'OPD') && OpdAppointment) {
+        // 1. Fetch Consultation Bills (OPD, Emergency, Dental, Radiology)
+        if ((filterType === 'ALL' || filterType === 'OPD' || filterType === 'EMERGENCY' || filterType === 'BILL') && Bill) {
             try {
-                const appointments = await OpdAppointment.find({
-                    doctorId: { $in: targetDoctorIds },
-                    $or: [
-                        { appointmentDate: { $gte: start, $lte: end } },
-                        { createdAt: { $gte: start, $lte: end } }
-                    ]
-                })
-                .populate('patientId', 'patientCode fullName mobileNo')
-                .lean();
+                let opdIds = [];
+                if (OpdAppointment) {
+                    const docOpds = await OpdAppointment.find({ doctorId: { $in: targetDoctorIds } }).select('_id').lean();
+                    opdIds = docOpds.map(o => o._id);
+                }
 
-                const appointmentIds = appointments.map(a => a._id);
-                const bills = await Bill.find({ opdAppointmentId: { $in: appointmentIds } })
-                    .select('_id billNo billType status grossAmount discountAmount netAmount opdAppointmentId createdAt generatedAt')
+                let emergencyIds = [];
+                if (EmergencyVisit) {
+                    const docEmergencies = await EmergencyVisit.find({ doctorId: { $in: targetDoctorIds } }).select('_id').lean();
+                    emergencyIds = docEmergencies.map(e => e._id);
+                }
+
+                let dentalIds = [];
+                if (DentalAppointment) {
+                    const docDentals = await DentalAppointment.find({ doctorId: { $in: targetDoctorIds } }).select('_id').lean();
+                    dentalIds = docDentals.map(d => d._id);
+                }
+
+                let radiologyIds = [];
+                if (RadiologyOrder) {
+                    const docRadios = await RadiologyOrder.find({ performedById: { $in: targetDoctorIds } }).select('_id').lean();
+                    radiologyIds = docRadios.map(r => r._id);
+                }
+
+                const billQuery = {
+                    createdAt: { $gte: start, $lte: end },
+                    billType: { $in: ['OPD_CONSULTATION', 'RADIOLOGY', 'DENTAL_CONSULTATION', 'EMERGENCY_CONSULTATION'] },
+                    $or: [
+                        { opdAppointmentId: { $in: opdIds } },
+                        { emergencyVisitId: { $in: emergencyIds } },
+                        { dentalAppointmentId: { $in: dentalIds } },
+                        { radiologyOrderId: { $in: radiologyIds } }
+                    ]
+                };
+
+                const bills = await Bill.find(billQuery)
+                    .populate('patientId', 'patientCode fullName mobileNo')
                     .lean();
 
                 const billIds = bills.map(b => b._id);
@@ -317,116 +351,60 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
                     .populate('doctorId', 'fullName doctorCode')
                     .lean();
 
-                appointments.forEach(app => {
-                    const bill = bills.find(b => b.opdAppointmentId && b.opdAppointmentId.toString() === app._id.toString());
-                    const billNo = bill ? bill.billNo : (app.appointmentId || 'OPD-BILL');
-                    const discountRecord = bill ? discounts.find(d => d.billId && d.billId.toString() === bill._id.toString()) : null;
-
-                    const grossAmount = bill ? bill.grossAmount : (app.consultationFee || 0);
-                    const discountAmount = discountRecord ? discountRecord.discountAmount : (bill ? bill.discountAmount : 0);
-                    const netAmount = bill ? bill.netAmount : (app.consultationFee || 0);
+                bills.forEach(bill => {
+                    const discountRecord = discounts.find(d => d.billId && d.billId.toString() === bill._id.toString());
+                    const billNo = bill.billNo;
+                    const discountAmount = discountRecord ? discountRecord.discountAmount : (bill.discountAmount || 0);
+                    
+                    let actType = 'Bill Invoice';
+                    let desc = `Bill Invoice (${billNo})`;
+                    
+                    if (bill.billType === 'OPD_CONSULTATION') {
+                        actType = 'OPD Bill Invoice';
+                        desc = discountAmount > 0 ? `OPD Consultation ${billNo} (${discountRecord?.discountType || 'Discount'}: -₹${discountAmount})` : `OPD Consultation (${billNo})`;
+                    } else if (bill.billType === 'EMERGENCY_CONSULTATION') {
+                        actType = 'Emergency Consultation';
+                        desc = discountAmount > 0 ? `Emergency Consultation ${billNo} (${discountRecord?.discountType || 'Discount'}: -₹${discountAmount})` : `Emergency Consultation (${billNo})`;
+                    } else if (bill.billType === 'DENTAL_CONSULTATION') {
+                        actType = 'Dental Consultation';
+                        desc = discountAmount > 0 ? `Dental Consultation ${billNo} (${discountRecord?.discountType || 'Discount'}: -₹${discountAmount})` : `Dental Consultation (${billNo})`;
+                    } else if (bill.billType === 'RADIOLOGY') {
+                        actType = 'Radiology Invoice';
+                        desc = discountAmount > 0 ? `Radiology Invoice ${billNo} (${discountRecord?.discountType || 'Discount'}: -₹${discountAmount})` : `Radiology Invoice (${billNo})`;
+                    }
 
                     items.push({
-                        id: `OPD_BILL_${app._id}`,
-                        activityType: 'OPD Bill Invoice',
-                        source: 'OPD',
+                        id: `CONS_BILL_${bill._id}`,
+                        activityType: actType,
+                        source: bill.billType === 'OPD_CONSULTATION' ? 'OPD' : (bill.billType === 'EMERGENCY_CONSULTATION' ? 'EMERGENCY' : bill.billType),
                         code: billNo,
                         billNo: billNo,
-                        billId: bill ? bill._id : null,
-                        appointmentId: app.appointmentId,
-                        date: (bill && (bill.createdAt || bill.generatedAt)) ? (bill.createdAt || bill.generatedAt) : (app.createdAt || app.appointmentDate),
-                        patientCode: app.patientId?.patientCode || '—',
-                        patientName: app.patientId?.fullName || '—',
-                        patientMobile: app.patientId?.mobileNo || '—',
-                        description: discountAmount > 0
-                            ? `OPD Bill ${billNo} (${discountRecord?.discountType || 'Discount'}: -₹${discountAmount})`
-                            : `OPD Bill Invoice (${billNo})`,
-                        grossAmount,
-                        discountAmount,
-                        netAmount,
-                        amount: netAmount,
-                        status: bill ? bill.status : app.status,
+                        billId: bill._id,
+                        appointmentId: bill.opdAppointmentId || bill.emergencyVisitId || bill.dentalAppointmentId || bill.radiologyOrderId,
+                        date: bill.createdAt || bill.generatedAt,
+                        patientCode: bill.patientId?.patientCode || '—',
+                        patientName: bill.patientId?.fullName || '—',
+                        patientMobile: bill.patientId?.mobileNo || '—',
+                        description: desc,
+                        grossAmount: bill.grossAmount || 0,
+                        discountAmount: discountAmount,
+                        netAmount: bill.netAmount || 0,
+                        amount: bill.netAmount || 0,
+                        status: bill.status || 'Active',
                         discountRecord: discountRecord || null
                     });
                 });
             } catch (e) {}
         }
 
-        // 1.5 Fetch Emergency Visits with Consultation Fees & Bill/Discount cross-references
-        if ((filterType === 'ALL' || filterType === 'EMERGENCY' || filterType === 'OPD') && EmergencyVisit) {
-            try {
-                const emergencyVisits = await EmergencyVisit.find({
-                    doctorId: { $in: targetDoctorIds },
-                    $or: [
-                        { arrivalDateTime: { $gte: start, $lte: end } },
-                        { createdAt: { $gte: start, $lte: end } }
-                    ]
-                })
-                .populate('patientId', 'patientCode fullName mobileNo')
-                .lean();
-
-                const evIds = emergencyVisits.map(v => v._id);
-                const evBills = await Bill.find({ emergencyVisitId: { $in: evIds } })
-                    .select('_id billNo billType status grossAmount discountAmount netAmount emergencyVisitId createdAt generatedAt')
-                    .lean();
-
-                const evBillIds = evBills.map(b => b._id);
-                const evDiscounts = await Discount.find({ billId: { $in: evBillIds } })
-                    .populate('appliedBy', 'fullName')
-                    .populate('doctorId', 'fullName doctorCode')
-                    .lean();
-
-                emergencyVisits.forEach(ev => {
-                    const bill = evBills.find(b => b.emergencyVisitId && b.emergencyVisitId.toString() === ev._id.toString());
-                    const billNo = bill ? bill.billNo : (ev.visitNo || 'EMG-BILL');
-                    const discountRecord = bill ? evDiscounts.find(d => d.billId && d.billId.toString() === bill._id.toString()) : null;
-
-                    const grossAmount = bill ? bill.grossAmount : (ev.consultationFee || 0);
-                    const discountAmount = discountRecord ? discountRecord.discountAmount : (bill ? bill.discountAmount : 0);
-                    const netAmount = bill ? bill.netAmount : (ev.consultationFee || 0);
-
-                    items.push({
-                        id: `EMG_BILL_${ev._id}`,
-                        activityType: 'Emergency Consultation',
-                        source: 'EMERGENCY',
-                        code: billNo,
-                        billNo: billNo,
-                        billId: bill ? bill._id : null,
-                        visitNo: ev.visitNo,
-                        date: (bill && (bill.createdAt || bill.generatedAt)) ? (bill.createdAt || bill.generatedAt) : (ev.arrivalDateTime || ev.createdAt),
-                        patientCode: ev.patientId?.patientCode || '—',
-                        patientName: ev.patientId?.fullName || '—',
-                        patientMobile: ev.patientId?.mobileNo || '—',
-                        description: discountAmount > 0
-                            ? `Emergency Consultation ${billNo} (${discountRecord?.discountType || 'Discount'}: -₹${discountAmount})`
-                            : `Emergency Consultation Fee (${billNo})`,
-                        grossAmount,
-                        discountAmount,
-                        netAmount,
-                        amount: netAmount,
-                        status: bill ? bill.status : (ev.paymentStatus || 'Unpaid'),
-                        discountRecord: discountRecord || null
-                    });
-                });
-            } catch (e) {}
-        }
+        // Step 1.5 Removed
 
         // 2. Fetch Patient Charges
         if ((filterType === 'ALL' || filterType === 'IPD_CHARGE') && PatientCharge) {
             try {
-                let docAdmissionIds = [];
-                try {
-                    const docAdms = await Admission.find({ consultantDoctorId: { $in: targetDoctorIds } }).select('_id').lean();
-                    docAdmissionIds = docAdms.map(a => a._id);
-                } catch (e) {}
-
                 const chargeFilter = {
                     createdAt: { $gte: start, $lte: end },
-                    sourceType: { $ne: 'OPD' },
-                    $or: [
-                        { doctorId: { $in: targetDoctorIds } },
-                        { admissionId: { $in: docAdmissionIds } }
-                    ]
+                    doctorId: { $in: targetDoctorIds }
                 };
 
                 const charges = await PatientCharge.find(chargeFilter)
@@ -501,81 +479,11 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
             } catch (e) {}
         }
 
-        // 4. Fetch General Bills with Discount records
-        if ((filterType === 'ALL' || filterType === 'BILL') && Bill) {
-            try {
-                let opdIds = [];
-                if (OpdAppointment) {
-                    const docOpds = await OpdAppointment.find({ doctorId: { $in: targetDoctorIds } }).select('_id').lean();
-                    opdIds = docOpds.map(o => o._id);
-                }
-
-                let admissionIds = [];
-                try {
-                    const docAdms = await Admission.find({ consultantDoctorId: { $in: targetDoctorIds } }).select('_id').lean();
-                    admissionIds = docAdms.map(a => a._id);
-                } catch (e) {}
-
-                let chargeIds = [];
-                if (PatientCharge) {
-                    const docCharges = await PatientCharge.find({ doctorId: { $in: targetDoctorIds } }).select('_id').lean();
-                    chargeIds = docCharges.map(c => c._id);
-                }
-
-                let billIdsFromItems = [];
-                if (BillItem && chargeIds.length) {
-                    const itemsWithCharge = await BillItem.find({ patientChargeId: { $in: chargeIds } }).select('billId').lean();
-                    billIdsFromItems = itemsWithCharge.map(b => b.billId);
-                }
-
-                const billQuery = {
-                    createdAt: { $gte: start, $lte: end },
-                    billType: { $ne: 'OPD' },
-                    $or: [
-                        { opdAppointmentId: { $in: opdIds } },
-                        { admissionId: { $in: admissionIds } },
-                        { _id: { $in: billIdsFromItems } }
-                    ]
-                };
-
-                const bills = await Bill.find(billQuery)
-                    .populate('patientId', 'patientCode fullName mobileNo')
-                    .lean();
-
-                const generalBillIds = bills.map(b => b._id);
-                const generalDiscounts = await Discount.find({ billId: { $in: generalBillIds } })
-                    .populate('appliedBy', 'fullName')
-                    .populate('doctorId', 'fullName doctorCode')
-                    .lean();
-
-                bills.forEach(b => {
-                    const discountRecord = generalDiscounts.find(d => d.billId && d.billId.toString() === b._id.toString());
-                    items.push({
-                        id: `BILL_${b._id}`,
-                        activityType: 'Bill Invoice Involved',
-                        source: b.billType || 'BILL',
-                        code: b.billNo || 'BILL',
-                        billNo: b.billNo || 'BILL',
-                        billId: b._id,
-                        date: b.createdAt,
-                        patientCode: b.patientId?.patientCode || '—',
-                        patientName: b.patientId?.fullName || '—',
-                        patientMobile: b.patientId?.mobileNo || '—',
-                        description: `Bill Invoice ${b.billNo} (${b.billType || 'General'})`,
-                        grossAmount: b.grossAmount || b.netAmount || 0,
-                        discountAmount: discountRecord ? discountRecord.discountAmount : (b.discountAmount || 0),
-                        netAmount: b.netAmount || 0,
-                        amount: b.netAmount || 0,
-                        status: b.status || 'DRAFT',
-                        discountRecord: discountRecord || null
-                    });
-                });
-            } catch (e) {}
-        }
+        // Step 4 Removed
 
         // Filter out Pharmacy, Test/Diagnostic, Room/Bed/Ward, and Dental charges (Include only doctor activity OPD, IPD, EMERGENCY charges)
-        const allowedSources = ['OPD', 'IPD', 'EMERGENCY'];
-        const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'RADIOLOGY', 'ENDOSCOPY', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION', 'DENTAL'];
+        const allowedSources = ['OPD', 'IPD', 'EMERGENCY', 'RADIOLOGY', 'DENTAL_CONSULTATION', 'ENDOSCOPY'];
+        const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION'];
 
         items = items.filter(item => {
             const src = (item.source || '').toUpperCase().trim();

@@ -222,7 +222,17 @@ const handleExportPdf = async () => {
       return
     }
 
+    for (const appt of exportAppointments) {
+      try {
+        const chargesRes = await opdStore.fetchPatientCharges(appt._id)
+        appt.patientCharges = chargesRes.data || []
+      } catch (error) {
+        appt.patientCharges = []
+      }
+    }
+
     let totalRevenue = 0
+    let totalChargesRevenue = 0
     let totalPaid = 0
     let totalBalance = 0
     const statusBreakdown = { Paid: 0, Unpaid: 0 }
@@ -230,10 +240,20 @@ const handleExportPdf = async () => {
     exportAppointments.forEach(a => {
       const fee = a.consultationFee || 0
       const bill = a.bill || {}
+      
+      let chargesSum = 0
+      if (a.patientCharges && a.patientCharges.length > 0) {
+        chargesSum = a.patientCharges.reduce((sum, c) => {
+          const cTotal = (c.amount || 0) + (c.addons || []).reduce((s, add) => s + (add.amount || 0), 0)
+          return sum + cTotal
+        }, 0)
+      }
+      
       const paid = bill.paidAmount || (a.paymentStatus === 'Paid' ? fee : 0)
       const balance = bill.balanceAmount ?? (a.paymentStatus === 'Paid' ? 0 : fee)
       
       totalRevenue += fee
+      totalChargesRevenue += chargesSum
       totalPaid += paid
       totalBalance += balance
 
@@ -359,6 +379,61 @@ const handleExportPdf = async () => {
                 const pCode = a.patientId?.patientCode || '-'
                 const docName = a.doctorId?.fullName ? a.doctorId.fullName : '-'
 
+                let chargesHtml = ''
+                if (a.patientCharges && a.patientCharges.length > 0) {
+                  chargesHtml = `
+                    <tr style="background-color: #f8fafc;">
+                      <td></td>
+                      <td colspan="6" style="padding: 4px 8px; border-left: 2px solid #e2e8f0;">
+                        <div style="font-size: 10px; font-weight: bold; color: #64748b; margin-bottom: 4px; text-transform: uppercase;">Treatment Charges:</div>
+                        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                          <thead>
+                            <tr style="background-color: #f1f5f9; color: #475569;">
+                              <th style="padding: 4px; text-align: left; border-bottom: 1px solid #e2e8f0; width: 50%;">Charge Detail</th>
+                              <th style="padding: 4px; text-align: center; border-bottom: 1px solid #e2e8f0; width: 10%;">Qty</th>
+                              <th style="padding: 4px; text-align: right; border-bottom: 1px solid #e2e8f0; width: 20%;">Rate (₹)</th>
+                              <th style="padding: 4px; text-align: right; border-bottom: 1px solid #e2e8f0; width: 20%;">Total (₹)</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${a.patientCharges.map(c => {
+                              const cName = c.description || 'Treatment Charge'
+                              const catStr = c.chargeCategoryId?.name || 'General'
+                              const docStr = c.doctorId ? (c.doctorId.fullName || c.doctorId.name) : ''
+                              
+                              let addonsHtml = ''
+                              let addonsSum = 0
+                              if (c.addons && c.addons.length > 0) {
+                                addonsSum = c.addons.reduce((s, add) => s + (add.amount || 0), 0)
+                                addonsHtml = c.addons.map(add => {
+                                  const addDoc = add.doctorId ? (add.doctorId.fullName || add.doctorId.name || add.doctorId) : ''
+                                  const docText = addDoc ? ` (By: ${addDoc})` : ''
+                                  return `<div style="font-size: 8px; color: #0d9488; margin-top: 2px;">+ ${add.itemName}${docText} (₹${(add.amount || 0).toFixed(2)})</div>`
+                                }).join('')
+                              }
+                              
+                              const cTotal = (c.amount || 0) + addonsSum
+
+                              return `
+                                <tr>
+                                  <td style="padding: 4px; border-bottom: 1px solid #f1f5f9; color: #475569;">
+                                    <strong>${cName}</strong><br>
+                                    <span style="font-size: 8px; color: #94a3b8;">${catStr} ${docStr ? ` • By: ${docStr}` : ''}</span>
+                                    ${addonsHtml}
+                                  </td>
+                                  <td style="padding: 4px; border-bottom: 1px solid #f1f5f9; text-align: center; color: #475569;">${c.quantity || 1}</td>
+                                  <td style="padding: 4px; border-bottom: 1px solid #f1f5f9; text-align: right; color: #475569;">${(c.rate || 0).toFixed(2)}</td>
+                                  <td style="padding: 4px; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: bold; color: #475569;">${cTotal.toFixed(2)}</td>
+                                </tr>
+                              `
+                            }).join('')}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  `
+                }
+
                 return `
                   <tr>
                     <td>${idx + 1}</td>
@@ -369,6 +444,7 @@ const handleExportPdf = async () => {
                     <td class="text-center"><span class="status-badge ${stClass}">${st}</span></td>
                     <td class="amount-col">₹${(a.consultationFee || 0).toFixed(2)}</td>
                   </tr>
+                  ${chargesHtml}
                 `
               }).join('')}
             </tbody>
@@ -376,8 +452,16 @@ const handleExportPdf = async () => {
 
           <table class="summary-table">
             <tr>
-              <td class="label">Grand Total OPD Consultation Fees (${exportAppointments.length} Records):</td>
+              <td class="label">Total OPD Consultation Fees (${exportAppointments.length} Records):</td>
               <td class="value">₹${totalRevenue.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td class="label">Total Treatment Charges:</td>
+              <td class="value">₹${totalChargesRevenue.toFixed(2)}</td>
+            </tr>
+            <tr style="border-top: 2px solid #e2e8f0;">
+              <td class="label" style="font-size: 14px; padding-top: 8px;">Grand Total Revenue:</td>
+              <td class="value" style="font-size: 14px; padding-top: 8px;">₹${(totalRevenue + totalChargesRevenue).toFixed(2)}</td>
             </tr>
           </table>
 

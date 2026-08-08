@@ -36,9 +36,15 @@ const otCustomAddonAmount = ref(0)
 const otCustomAddonDoctorId = ref('')
 const hasPredefinedPackageItems = ref(false)
 
-const getLocalDateString = () => {
+const getLocalDateTimeString = () => {
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const utc = d.getTime() + (d.getTimezoneOffset() * 60000)
+  const istDate = new Date(utc + (3600000 * 5.5))
+  return istDate.getFullYear() + '-' +
+    String(istDate.getMonth() + 1).padStart(2, '0') + '-' +
+    String(istDate.getDate()).padStart(2, '0') + 'T' +
+    String(istDate.getHours()).padStart(2, '0') + ':' +
+    String(istDate.getMinutes()).padStart(2, '0')
 }
 
 const chargeForm = ref({
@@ -48,7 +54,7 @@ const chargeForm = ref({
   description: '',
   rate: 0,
   quantity: 1,
-  chargeDate: getLocalDateString()
+  chargeDate: getLocalDateTimeString()
 })
 
 const fetchCharges = async () => {
@@ -363,7 +369,7 @@ const openAddModal = () => {
     description: '',
     rate: 0,
     quantity: 1,
-    chargeDate: getLocalDateString()
+    chargeDate: getLocalDateTimeString()
   }
   otPackageItems.value = []
   selectedAddons.value = []
@@ -385,7 +391,16 @@ const editCharge = async (charge) => {
     description: charge.description,
     rate: charge.rate,
     quantity: charge.quantity,
-    chargeDate: new Date(charge.createdAt).toISOString().slice(0, 10)
+    chargeDate: (() => {
+      const d = new Date(charge.createdAt || new Date())
+      const utc = d.getTime() + (d.getTimezoneOffset() * 60000)
+      const istDate = new Date(utc + (3600000 * 5.5))
+      return istDate.getFullYear() + '-' +
+        String(istDate.getMonth() + 1).padStart(2, '0') + '-' +
+        String(istDate.getDate()).padStart(2, '0') + 'T' +
+        String(istDate.getHours()).padStart(2, '0') + ':' +
+        String(istDate.getMinutes()).padStart(2, '0')
+    })()
   }
   
   otPackageItems.value = []
@@ -467,7 +482,7 @@ const submitCharge = async () => {
     description: chargeForm.value.description,
     rate: Number(chargeForm.value.rate || 0),
     quantity: Number(chargeForm.value.quantity || 1),
-    chargeDate: chargeForm.value.chargeDate === getLocalDateString() ? new Date().toISOString() : new Date(`${chargeForm.value.chargeDate}T12:00:00`).toISOString(),
+    chargeDate: new Date(chargeForm.value.chargeDate + "+05:30").toISOString(),
     addons: addonsPayload
   }
 
@@ -981,9 +996,9 @@ onBeforeUnmount(() => {
           <div class="space-y-1">
             <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Charge Date</label>
             <input 
-              type="date" 
+              type="datetime-local" 
               v-model="chargeForm.chargeDate"
-              :max="getLocalDateString()"
+              :max="getLocalDateTimeString()"
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
             />
           </div>

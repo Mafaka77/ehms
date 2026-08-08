@@ -57,8 +57,8 @@ const onCustomDateChange = () => {
 const logsData = computed(() => doctorActivityStore.activityLogs)
 const summary = computed(() => logsData.value?.summary)
 
-const allowedSources = ['OPD', 'IPD', 'EMERGENCY']
-const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'RADIOLOGY', 'ENDOSCOPY', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION', 'DENTAL']
+const allowedSources = ['OPD', 'IPD', 'EMERGENCY', 'RADIOLOGY', 'DENTAL_CONSULTATION','ENDOSCOPY']
+const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION']
 
 const items = computed(() => {
   const list = logsData.value?.items || []

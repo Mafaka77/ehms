@@ -146,11 +146,7 @@ const submitAppointment = async () => {
 
   if (res.success) {
     snackbarStore.show({ message: 'Appointment Booked Successfully!', type: 'success' })
-    createdAppointment.value = res.data
-    pdfPreviewUrl.value = null
-    showCardModal.value = true
-    
-    await generateCardPDF()
+    router.push({ name: 'opd-appointment' })
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
   }

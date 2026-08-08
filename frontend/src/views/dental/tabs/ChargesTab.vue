@@ -38,9 +38,20 @@ const otCustomAddonAmount = ref(0)
 const otCustomAddonDoctorId = ref('')
 const hasPredefinedPackageItems = ref(false)
 
-const getLocalDateString = () => {
+const getLocalDatetimeString = () => {
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+  const formatter = new Intl.DateTimeFormat('en-CA', options)
+  const parts = formatter.formatToParts(d)
+  
+  const year = parts.find(p => p.type === 'year').value
+  const month = parts.find(p => p.type === 'month').value
+  const day = parts.find(p => p.type === 'day').value
+  let hour = parts.find(p => p.type === 'hour').value
+  if (hour === '24') hour = '00'
+  const minute = parts.find(p => p.type === 'minute').value
+  
+  return `${year}-${month}-${day}T${hour}:${minute}`
 }
 
 const chargeForm = ref({
@@ -50,7 +61,7 @@ const chargeForm = ref({
   description: '',
   rate: 0,
   quantity: 1,
-  chargeDate: getLocalDateString()
+  chargeDate: getLocalDatetimeString()
 })
 
 const charges = computed(() => props.processedCharges)
@@ -398,7 +409,7 @@ const openAddModal = async () => {
     description: '',
     rate: 0,
     quantity: 1,
-    chargeDate: getLocalDateString()
+    chargeDate: getLocalDatetimeString()
   }
   closeAllDropdowns()
   showAddModal.value = true
@@ -431,7 +442,7 @@ const submitCharge = async () => {
     snackbarStore.show({ message: 'Quantity must be at least 1.', type: 'warning' })
     return
   }
-  if (chargeForm.value.chargeDate > getLocalDateString()) {
+  if (chargeForm.value.chargeDate > getLocalDatetimeString()) {
     snackbarStore.show({ message: 'Future dates (postdating) are not allowed.', type: 'warning' })
     return
   }
@@ -1099,9 +1110,9 @@ onBeforeUnmount(() => {
           <div class="space-y-1">
             <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Charge Date</label>
             <input 
-              type="date" 
+              type="datetime-local" 
               v-model="chargeForm.chargeDate"
-              :max="getLocalDateString()"
+              :max="getLocalDatetimeString()"
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
             />
           </div>
