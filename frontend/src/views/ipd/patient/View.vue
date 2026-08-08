@@ -551,7 +551,7 @@ onMounted(async () => {
           <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Admission Context</h4>
           <div class="space-y-1.5 text-xs text-slate-600">
             <p><span class="font-semibold text-slate-500">IPD No:</span> <strong class="font-mono text-indigo-600 font-bold">{{ admission.admissionNo }}</strong></p>
-            <p><span class="font-semibold text-slate-500">Admit Date:</span> {{ formatDate(admission.admissionDate) }}</p>
+            <p><span class="font-semibold text-slate-500">Admit Date:</span> {{ formatDate(admission.createdAt) }}</p>
             <p>
               <span class="font-semibold text-slate-500">Type:</span> 
               <span class="px-2 py-0.5 rounded text-[10px] font-bold border ml-1" :class="getAdmissionTypeColor(admission.admissionType)">
