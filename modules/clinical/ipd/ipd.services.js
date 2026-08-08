@@ -1575,6 +1575,8 @@ exports.saveDischargeSummary = async (admissionId, data, userId) => {
             historyOfPresentIllness: data.historyOfPresentIllness || null,
             pastHistory: data.pastHistory || null,
             clinicalFindings: data.clinicalFindings || null,
+            clinicalCourse: data.clinicalCourse || null,
+            medications: data.medications || null,
             investigationSummary: data.investigationSummary || null,
             conditionAtDischarge: data.conditionAtDischarge || null,
             dischargeAdvice: data.dischargeAdvice || null,

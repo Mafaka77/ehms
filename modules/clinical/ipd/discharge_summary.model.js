@@ -91,6 +91,10 @@ new mongoose.Schema({
     type:String,
     default:null
   },
+  medications:{
+    type:String,
+    default:null
+  },
   dischargeAdvice: {
     type: String,
     default: null

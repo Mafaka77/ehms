@@ -23,14 +23,18 @@ const admissionStore = useIpdAdmissionStore()
 const loading = ref(false)
 const saving = ref(false)
 
-const getNowDateTimeString = () => {
-  const now = new Date()
+const getNowDateTimeString = (dateInput = null) => {
+  const now = dateInput ? new Date(dateInput) : new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
   const day = String(now.getDate()).padStart(2, '0')
   const hours = String(now.getHours()).padStart(2, '0')
   const minutes = String(now.getMinutes()).padStart(2, '0')
   return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const setDischargeDateToNow = () => {
+  form.value.dischargeDate = getNowDateTimeString()
 }
 
 const form = ref({
@@ -50,6 +54,7 @@ const form = ref({
   },
   clinicalFindings: '',
   clinicalCourse: '',
+  medications: '',
   conditionAtDischarge: '',
   dischargeAdvice: '',
   followUpAdvice: '',
@@ -75,6 +80,7 @@ const loadSummary = async () => {
       }
       form.value.clinicalFindings = d.clinicalFindings || ''
       form.value.clinicalCourse = d.clinicalCourse || ''
+      form.value.medications = d.medications || ''
       form.value.conditionAtDischarge = d.conditionAtDischarge || ''
       form.value.dischargeAdvice = d.dischargeAdvice || ''
       form.value.followUpAdvice = d.followUpAdvice || ''
@@ -82,7 +88,9 @@ const loadSummary = async () => {
       form.value.status = d.status || 'DRAFT'
 
       if (d.dischargeDate) {
-        form.value.dischargeDate = new Date(d.dischargeDate).toISOString().slice(0, 16)
+        form.value.dischargeDate = getNowDateTimeString(d.dischargeDate)
+      } else {
+        form.value.dischargeDate = getNowDateTimeString()
       }
     }
   } catch (error) {
@@ -536,6 +544,12 @@ const printSummary = () => {
                   <div class="section-content">${f.clinicalCourse || '—'}</div>
                 </div>
 
+                <!-- Medications -->
+                <div class="section" v-if="f.medications">
+                  <div class="section-title">Medications</div>
+                  <div class="section-content">${f.medications || '—'}</div>
+                </div>
+
                 <!-- Condition at Discharge -->
                 <div class="section" v-if="f.conditionAtDischarge">
                   <div class="section-title">Condition at Discharge</div>
@@ -686,7 +700,17 @@ const printSummary = () => {
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
           <!-- Discharge Date -->
           <div class="space-y-1">
-            <label class="font-bold text-slate-700">Discharge Date &amp; Time <span class="text-rose-500">*</span></label>
+            <div class="flex items-center justify-between">
+              <label class="font-bold text-slate-700">Discharge Date &amp; Time <span class="text-rose-500">*</span></label>
+              <button 
+                type="button"
+                @click="setDischargeDateToNow"
+                class="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                title="Set to current date and time"
+              >
+                Set to Now
+              </button>
+            </div>
             <input 
               type="datetime-local" 
               v-model="form.dischargeDate"
@@ -852,7 +876,16 @@ const printSummary = () => {
               class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
             ></textarea>
           </div>
-
+            <!-- Medications -->
+          <div class="space-y-1">
+            <label class="font-bold text-slate-700">Medications</label>
+            <textarea 
+              v-model="form.medications"
+              rows="3"
+              placeholder="..."
+              class="w-full p-3 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium text-slate-800 bg-slate-50/50"
+            ></textarea>
+          </div>
           <!-- Condition at Discharge -->
           <div class="space-y-1">
             <label class="font-bold text-slate-700">Condition of Patient at Discharge</label>
@@ -1038,6 +1071,12 @@ const printSummary = () => {
                 <div v-if="form.clinicalCourse" class="pdf-section">
                   <div class="pdf-section-title">Clinical Course</div>
                   <div class="pdf-section-content">{{ form.clinicalCourse }}</div>
+                </div>
+
+                <!-- Medications -->
+                <div v-if="form.medications" class="pdf-section">
+                  <div class="pdf-section-title">Medications</div>
+                  <div class="pdf-section-content">{{ form.medications }}</div>
                 </div>
 
                 <!-- Condition at Discharge -->

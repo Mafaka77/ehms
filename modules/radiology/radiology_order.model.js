@@ -42,7 +42,11 @@ new mongoose.Schema({
     ref: 'Doctor',
     default: null
   },
-
+  performedById:{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Doctor',
+    default: null
+  },
   referral: {
     type: String,
     enum: [

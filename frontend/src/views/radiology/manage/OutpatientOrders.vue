@@ -1,11 +1,19 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRadiologyStore } from '../../../stores/radiologyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useDoctorStore } from '../../../stores/doctorStore'
 
 const emit = defineEmits(['saved'])
 const radiologyStore = useRadiologyStore()
 const snackbarStore = useSnackbarStore()
+const doctorStore = useDoctorStore()
+
+const selectedPerformedById = ref('')
+
+const doctorOptions = computed(() => {
+  return doctorStore.doctors || []
+})
 
 const currentPage = ref(1)
 const limit = ref(9) // 9 per page fits nicely in a 3-column grid
@@ -47,11 +55,19 @@ const updateOrderStatus = async (orderId, newStatus) => {
 
 const viewDetails = async (order) => {
   selectedOrder.value = order
+  selectedPerformedById.value = order.performedById?._id || order.performedById || ''
   showDetailModal.value = true
   loadingDetails.value = true
+  if (doctorStore.doctors.length === 0) {
+    doctorStore.fetchDoctors(1, 500)
+  }
   try {
     const res = await radiologyStore.getOrderById(order._id)
     selectedOrderItems.value = res.items || []
+    if (res.order) {
+      selectedOrder.value = res.order
+      selectedPerformedById.value = res.order.performedById?._id || res.order.performedById || ''
+    }
   } catch (error) {
     console.error('Error loading order details:', error)
     snackbarStore.show({ message: 'Failed to load order details', type: 'error' })
@@ -60,10 +76,32 @@ const viewDetails = async (order) => {
   }
 }
 
+const updatePerformedDoctor = async () => {
+  if (!selectedOrder.value) return
+  try {
+    const res = await radiologyStore.updateOrder(selectedOrder.value._id, {
+      performedById: selectedPerformedById.value || null
+    })
+    if (res.success) {
+      snackbarStore.show({ message: 'Performing doctor updated successfully!', type: 'success' })
+      if (res.data) {
+        selectedOrder.value.performedById = res.data.performedById
+      }
+      await fetchOrders()
+    } else {
+      snackbarStore.show({ message: res.message || 'Failed to update performing doctor', type: 'error' })
+    }
+  } catch (error) {
+    console.error('Error updating performing doctor:', error)
+    snackbarStore.show({ message: 'An error occurred while updating performing doctor', type: 'error' })
+  }
+}
+
 const closeDetailModal = () => {
   showDetailModal.value = false
   selectedOrder.value = null
   selectedOrderItems.value = []
+  selectedPerformedById.value = ''
 }
 
 const getStatusColor = (status) => {
@@ -204,6 +242,12 @@ onMounted(async () => {
                 {{ order.referral === 'Self' ? 'Self-Referred' : (order.doctorId?.fullName || 'N/A') }}
               </span>
             </div>
+            <div v-if="order.performedById" class="flex items-center justify-between">
+              <span class="text-slate-400 text-xs">Performed By</span>
+              <span class="text-indigo-600 font-semibold text-right truncate max-w-[180px]">
+                {{ order.performedById?.fullName }}
+              </span>
+            </div>
           </div>
           
           <!-- Price and Status -->
@@ -341,6 +385,19 @@ onMounted(async () => {
               <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Priority & Date</div>
               <div class="font-semibold text-slate-800 mt-1 uppercase text-xs">{{ selectedOrder.priority }}</div>
               <div class="text-xs text-slate-500 mt-0.5">{{ formatDate(selectedOrder.orderDate || selectedOrder.createdAt) }}</div>
+            </div>
+            <div class="sm:col-span-2 pt-3 border-t border-slate-200/60">
+              <label class="text-[10px] text-indigo-600 uppercase tracking-wider font-extrabold block mb-1">Performed By (Radiologist/Doctor)</label>
+              <select 
+                v-model="selectedPerformedById" 
+                @change="updatePerformedDoctor"
+                class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all cursor-pointer shadow-xs"
+              >
+                <option value="">-- Select Performing Doctor --</option>
+                <option v-for="doc in doctorOptions" :key="doc._id" :value="doc._id">
+                  {{ doc.fullName }}
+                </option>
+              </select>
             </div>
           </div>
 

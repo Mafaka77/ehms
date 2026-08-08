@@ -215,7 +215,7 @@ exports.createRadiologyOrder = async (data, userId) => {
         const { tests = [], ...orderData } = data || {}
 
         // Sanitize optional ObjectId fields
-        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId']
+        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId', 'performedById']
         for (const field of fields) {
             if (orderData[field] === '' || orderData[field] === undefined) {
                 orderData[field] = null
@@ -368,6 +368,7 @@ exports.getAllRadiologyOrders = async (query = {}) => {
         let queryExec = RadiologyOrder.find(filter)
             .populate('patientId', 'fullName patientCode mobileNo')
             .populate('doctorId', 'fullName doctorCode')
+            .populate('performedById', 'fullName doctorCode')
             .sort({ createdAt: -1 })
 
         if (limit > 0) {
@@ -376,8 +377,26 @@ exports.getAllRadiologyOrders = async (query = {}) => {
 
         const orders = await queryExec
 
+        const orderIds = orders.map(o => o._id)
+        const allItems = await RadiologyOrderItem.find({ orderId: { $in: orderIds } }).populate('radiologyTestId', 'name code rate')
+
+        const itemsByOrderId = {}
+        allItems.forEach(item => {
+            const oid = item.orderId ? item.orderId.toString() : ''
+            if (oid) {
+                if (!itemsByOrderId[oid]) itemsByOrderId[oid] = []
+                itemsByOrderId[oid].push(item)
+            }
+        })
+
+        const ordersWithItems = orders.map(o => {
+            const obj = o.toObject()
+            obj.items = itemsByOrderId[o._id.toString()] || []
+            return obj
+        })
+
         return {
-            orders,
+            orders: ordersWithItems,
             pagination: {
                 total,
                 page,
@@ -395,6 +414,7 @@ exports.getRadiologyOrderById = async (id) => {
         const order = await RadiologyOrder.findById(id)
             .populate('patientId')
             .populate('doctorId', 'fullName doctorCode')
+            .populate('performedById', 'fullName doctorCode')
             .populate('createdBy', 'email')
 
         if (!order) {
@@ -441,7 +461,7 @@ exports.updateRadiologyOrder = async (id, data) => {
         delete updateData.tests
 
         // Only sanitize empty string fields if explicitly passed in updateData
-        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId']
+        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId', 'performedById']
         for (const field of fields) {
             if (updateData[field] === '') {
                 updateData[field] = null
@@ -457,6 +477,7 @@ exports.updateRadiologyOrder = async (id, data) => {
         const order = await RadiologyOrder.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
             .populate('patientId', 'fullName patientCode mobileNo')
             .populate('doctorId', 'fullName doctorCode')
+            .populate('performedById', 'fullName doctorCode')
 
         if (!order) {
             const error = new Error('Radiology order not found')

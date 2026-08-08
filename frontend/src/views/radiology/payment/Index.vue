@@ -246,23 +246,23 @@ const handleExportPdf = async () => {
         <head>
           <title>Radiology Revenue & Payment Report - ${new Date().toLocaleDateString('en-IN')}</title>
           <style>
-            @page { size: A4 portrait; margin: 12mm; }
-            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 18px; line-height: 1.5; font-size: 11px; }
-            .header { text-align: center; border-bottom: 2px solid #7c3aed; padding-bottom: 10px; margin-bottom: 18px; }
+            @page { size: A4 landscape; margin: 10mm; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #1e293b; margin: 0; padding: 14px; line-height: 1.5; font-size: 11px; }
+            .header { text-align: center; border-bottom: 2px solid #7c3aed; padding-bottom: 8px; margin-bottom: 14px; }
             .header h1 { margin: 0; font-size: 20px; color: #6d28d9; text-transform: uppercase; letter-spacing: 0.8px; }
             .header p { margin: 4px 0 0 0; font-size: 11px; color: #64748b; }
             
-            .meta-bar { display: flex; justify-content: space-between; background: #f5f3ff; border: 1px solid #ddd6fe; padding: 10px 14px; border-radius: 8px; font-size: 11px; margin-bottom: 16px; }
+            .meta-bar { display: flex; justify-content: space-between; background: #f5f3ff; border: 1px solid #ddd6fe; padding: 8px 14px; border-radius: 8px; font-size: 11px; margin-bottom: 14px; }
             .meta-item { display: flex; flex-direction: column; }
             .meta-label { font-weight: 700; color: #6d28d9; text-transform: uppercase; font-size: 9.5px; }
             .meta-val { font-weight: 600; color: #1e293b; margin-top: 2px; }
 
-            .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+            .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
             .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 8px; text-align: center; }
             .stat-title { font-size: 9px; font-weight: 700; color: #64748b; text-transform: uppercase; }
             .stat-value { font-size: 14px; font-weight: 800; color: #6d28d9; margin-top: 3px; }
 
-            table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-bottom: 14px; }
             th { background: #6d28d9; color: #ffffff; text-align: left; padding: 7px 9px; font-weight: 700; text-transform: uppercase; font-size: 9.5px; }
             td { border-bottom: 1px solid #e2e8f0; padding: 7px 9px; color: #334155; }
             tr:nth-child(even) { background-color: #f8fafc; }
@@ -279,9 +279,9 @@ const handleExportPdf = async () => {
             .summary-table .label { font-weight: 700; background: #f1f5f9; text-align: right; width: 75%; }
             .summary-table .value { font-weight: 800; color: #6d28d9; text-align: right; font-size: 13px; font-family: monospace; }
 
-            .footer { margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px; color: #64748b; page-break-inside: avoid; }
+            .footer { margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px; color: #64748b; page-break-inside: avoid; }
             .sig-box { text-align: center; width: 170px; }
-            .sig-line { border-top: 1px solid #475569; margin-top: 45px; padding-top: 5px; font-weight: 700; color: #1e293b; }
+            .sig-line { border-top: 1px solid #475569; margin-top: 40px; padding-top: 5px; font-weight: 700; color: #1e293b; }
           </style>
         </head>
         <body>
@@ -332,11 +332,13 @@ const handleExportPdf = async () => {
             <thead>
               <tr>
                 <th style="width: 4%;">#</th>
-                <th style="width: 14%;">Order No</th>
-                <th style="width: 15%;">Order Date</th>
-                <th style="width: 32%;">Patient Details</th>
-                <th style="width: 15%; text-align: center;">Status</th>
-                <th style="width: 20%; text-align: right;">Amount (₹)</th>
+                <th style="width: 12%;">Order No</th>
+                <th style="width: 12%;">Order Date</th>
+                <th style="width: 20%;">Patient Details</th>
+                <th style="width: 22%;">Test / Scan Name(s)</th>
+                <th style="width: 16%;">Performed By</th>
+                <th style="width: 6%; text-align: center;">Status</th>
+                <th style="width: 8%; text-align: right;">Amount (₹)</th>
               </tr>
             </thead>
             <tbody>
@@ -346,6 +348,10 @@ const handleExportPdf = async () => {
                 const stClass = st === 'PAID' ? 'status-paid' : (st === 'PARTIAL' ? 'status-partial' : (st === 'IPD' ? 'status-ipd' : 'status-unpaid'))
                 const pName = o.patientId?.fullName || 'Walk-in Patient'
                 const pCode = o.patientId?.patientCode || '-'
+                const testNames = (o.items && o.items.length > 0)
+                  ? o.items.map(item => item.radiologyTestId?.name || item.name || 'Scan').join(', ')
+                  : '-'
+                const performedBy = o.performedById?.fullName || '-'
 
                 return `
                   <tr>
@@ -353,6 +359,8 @@ const handleExportPdf = async () => {
                     <td style="font-family: monospace; font-weight: bold;">${o.orderNo || '-'}</td>
                     <td>${dt}</td>
                     <td><strong>${pName}</strong><br><span style="color:#64748b; font-size:9.5px;">Code: ${pCode}</span></td>
+                    <td><strong style="color: #4338ca;">${testNames}</strong></td>
+                    <td>${performedBy}</td>
                     <td class="text-center"><span class="status-badge ${stClass}">${st}</span></td>
                     <td class="amount-col">₹${(o.totalAmount || 0).toFixed(2)}</td>
                   </tr>
