@@ -125,8 +125,9 @@ labOrderSchema.pre('validate', async function() {
   if (!this.orderNo) {
     const d = new Date();
     const day = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
     const year = String(d.getFullYear()).slice(-2); // YY
-    const prefix = `EH-LAB-${day}${year}`;
+    const prefix = `EH-LAB-${day}${mm}${year}`;
 
     const counter = await Counter.findByIdAndUpdate(
       { _id: prefix },

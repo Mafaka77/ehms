@@ -455,7 +455,7 @@ const submitCharge = async () => {
     description: chargeForm.value.description,
     rate: chargeForm.value.rate,
     quantity: chargeForm.value.quantity,
-    chargeDate: chargeForm.value.chargeDate,
+    chargeDate: chargeForm.value.chargeDate + '+05:30',
     doctorId: chargeForm.value.doctorId || null,
     addons: otPackageItems.value
       .filter(item => selectedAddons.value.includes(item._id))

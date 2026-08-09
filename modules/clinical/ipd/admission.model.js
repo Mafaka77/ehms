@@ -76,8 +76,9 @@ admissionSchema.pre('validate', async function() {
   if (!this.admissionNo) {
     const d = new Date()
     const dd = String(d.getDate()).padStart(2, '0')
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
     const yy = String(d.getFullYear()).slice(-2)
-    const prefix = `EH-IPD-${dd}${yy}`
+    const prefix = `EH-IPD-${dd}${mm}${yy}`
 
     const counter = await Counter.findByIdAndUpdate(
       { _id: prefix },

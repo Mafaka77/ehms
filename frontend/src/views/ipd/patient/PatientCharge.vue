@@ -107,7 +107,10 @@ const closeAddonDoctorDropdown = (itemId) => {
 }
 const filteredAddonDoctors = (itemId) => {
   const q = (addonDoctorSearch.value[itemId] || '').toLowerCase()
-  return doctorStore.doctors.filter(d => d.fullName?.toLowerCase().includes(q))
+  return doctorStore.doctors.filter(d => 
+    d.fullName?.toLowerCase().includes(q) || 
+    d.specializationId?.name?.toLowerCase().includes(q)
+  )
 }
 const selectAddonDoctor = (item, docId, docName) => {
   item.doctorId = docId
@@ -117,7 +120,7 @@ const selectAddonDoctor = (item, docId, docName) => {
 const getAddonDoctorLabel = (item) => {
   if (!item.doctorId) return ''
   const doc = doctorStore.doctors.find(d => d._id === item.doctorId)
-  return doc ? `${doc.fullName}` : ''
+  return doc ? `${doc.fullName} (${doc.specializationId?.name || 'General'})` : ''
 }
 
 // Custom addon doctor search
@@ -125,7 +128,10 @@ const customAddonDoctorSearch = ref('')
 const showCustomAddonDoctorDropdown = ref(false)
 const filteredCustomAddonDoctors = computed(() => {
   const q = customAddonDoctorSearch.value.toLowerCase()
-  return doctorStore.doctors.filter(d => d.fullName?.toLowerCase().includes(q))
+  return doctorStore.doctors.filter(d => 
+    d.fullName?.toLowerCase().includes(q) || 
+    d.specializationId?.name?.toLowerCase().includes(q)
+  )
 })
 const selectCustomAddonDoctor = (docId, docName) => {
   otCustomAddonDoctorId.value = docId
@@ -538,7 +544,7 @@ const submitCharge = async () => {
     ot_description: isOtCategory.value ? (chargeForm.value.ot_description?.trim() || null) : null,
     rate: chargeForm.value.rate,
     quantity: chargeForm.value.quantity,
-    chargeDate: chargeForm.value.chargeDate,
+    chargeDate: chargeForm.value.chargeDate + '+05:30',
     doctorId: isOtCharge.value ? null : (chargeForm.value.doctorId || null),
     addons: otPackageItems.value
       .filter(item => selectedAddons.value.includes(item._id))
@@ -1071,10 +1077,10 @@ onBeforeUnmount(() => {
                           v-for="doc in filteredAddonDoctors(item._id)"
                           :key="doc._id"
                           type="button"
-                          @click="selectAddonDoctor(item, doc._id, doc.fullName)"
+                          @click="selectAddonDoctor(item, doc._id, `${doc.fullName} (${doc.specializationId?.name || 'General'})`)"
                           class="w-full text-left px-3 py-1.5 text-[10px] text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-all"
                           :class="{ 'bg-indigo-50 font-bold text-indigo-700': item.doctorId === doc._id }"
-                        > {{ doc.fullName }}</button>
+                        > {{ doc.fullName }} <span class="text-slate-400 font-normal">({{ doc.specializationId?.name || 'General' }})</span></button>
                         <div v-if="filteredAddonDoctors(item._id).length === 0" class="px-3 py-2 text-[10px] text-slate-400 text-center">No doctor found</div>
                       </div>
                     </div>
@@ -1151,16 +1157,16 @@ onBeforeUnmount(() => {
                     <button
                       type="button"
                       @click="selectCustomAddonDoctor('', '')"
-                      class="w-full text-left px-3 py-2 text-xs text-slate-500 hover:bg-slate-50 cursor-pointer"
-                    >-- No Doctor --</button>
+                      class="w-full text-left px-3 py-2 text-[11px] text-slate-500 hover:bg-slate-50 cursor-pointer border-b border-slate-100"
+                    >-- Clear Selection --</button>
                     <button
                       v-for="doc in filteredCustomAddonDoctors"
                       :key="doc._id"
                       type="button"
-                      @click="selectCustomAddonDoctor(doc._id, doc.fullName)"
-                      class="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-all"
+                      @click="selectCustomAddonDoctor(doc._id, `${doc.fullName} (${doc.specializationId?.name || 'General'})`)"
+                      class="w-full text-left px-3 py-2 text-[11px] text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-all"
                       :class="{ 'bg-indigo-50 font-bold text-indigo-700': otCustomAddonDoctorId === doc._id }"
-                    >{{ doc.fullName }}</button>
+                    > {{ doc.fullName }} <span class="text-slate-400 font-normal">({{ doc.specializationId?.name || 'General' }})</span></button>
                     <div v-if="filteredCustomAddonDoctors.length === 0" class="px-3 py-2 text-xs text-slate-400 text-center">No doctor found</div>
                   </div>
                 </div>

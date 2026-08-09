@@ -218,6 +218,10 @@ const submitAdmission = async () => {
     snackbarStore.show({ message: 'Doctor and Bed allocation are required', type: 'warning' })
     return
   }
+  if (admissionForm.value.admissionDate > getLocalDatetimeString()) {
+    snackbarStore.show({ message: 'Future dates (postdating) are not allowed.', type: 'warning' })
+    return
+  }
 
   isSubmittingAdmission.value = true
   const payload = {
@@ -225,7 +229,7 @@ const submitAdmission = async () => {
     consultantDoctorId: admissionForm.value.consultantDoctorId,
     bedId: admissionForm.value.bedId,
     admissionType: admissionForm.value.admissionType,
-    admissionDate: admissionForm.value.admissionDate,
+    admissionDate: admissionForm.value.admissionDate + '+05:30',
     diagnosis: admissionForm.value.diagnosis,
     remarks: admissionForm.value.remarks
   }
@@ -785,6 +789,7 @@ const doctorOptions = computed(() => {
                   type="datetime-local"
                   id="admissionDate"
                   label="Admission Date & Time"
+                  :max="getLocalDatetimeString()"
                   required
                 />
               </div>

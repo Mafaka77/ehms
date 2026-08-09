@@ -29,6 +29,10 @@ const props = defineProps({
   error: {
     type: String,
     default: ''
+  },
+  max: {
+    type: String,
+    default: undefined
   }
 })
 
@@ -54,6 +58,7 @@ const model = defineModel({ type: String, default: '' })
         :placeholder="placeholder"
         :required="required"
         :disabled="disabled"
+        :max="max"
         class="w-full px-4 py-3 rounded-xl border bg-white placeholder-slate-400 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
         :class="error ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-100' : 'border-slate-200 focus:border-indigo-500'"
       />

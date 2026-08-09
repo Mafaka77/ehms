@@ -166,10 +166,15 @@ watch(() => visitForm.value.doctorId, async (newDoctorId) => {
 
 const submitVisit = async () => {
   if (!selectedPatient.value) return
+  if (visitForm.value.arrivalDateTime > getLocalDatetimeString()) {
+    snackbarStore.show({ message: 'Future dates (postdating) are not allowed.', type: 'warning' })
+    return
+  }
   
   isRegistering.value = true
   const payload = {
     ...visitForm.value,
+    arrivalDateTime: visitForm.value.arrivalDateTime + '+05:30',
     patientId: selectedPatient.value._id
   }
 
@@ -335,6 +340,7 @@ const submitVisit = async () => {
               type="datetime-local"
               id="arrivalDateTime"
               label="Arrival Date/Time"
+              :max="getLocalDatetimeString()"
               required
             />
           </div>
