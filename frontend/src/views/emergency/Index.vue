@@ -452,7 +452,7 @@ const handleUpdate = async () => {
                 <p class="text-xs text-slate-500">{{ v.doctorId?.specializationId?.name || 'Emergency Services' }}</p>
               </td>
               <td class="px-6 py-4">
-                <span class="font-semibold text-slate-700">{{ formatDate(v.arrivalDateTime) }}</span>
+                <span class="font-semibold text-slate-700">{{ formatDate(v.createdAt) }}</span>
               </td>
               <td class="px-6 py-4">
                 <span 
