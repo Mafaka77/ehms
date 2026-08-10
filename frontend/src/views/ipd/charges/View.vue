@@ -396,6 +396,12 @@ onMounted(async () => {
                       >
                         Package
                       </span>
+                      <span 
+                        v-if="master.mask" 
+                        class="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-purple-50 text-purple-700 border-purple-100 uppercase"
+                      >
+                        Masked
+                      </span>
                     </div>
                   </td>
                   <td class="px-4 py-3.5 text-center">

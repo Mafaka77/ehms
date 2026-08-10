@@ -427,7 +427,7 @@ onMounted(async () => {
                 >
                   <div>
                     <p class="font-bold text-slate-800">{{ med.medicineName }}</p>
-                    <p class="text-[10px] text-slate-400 mt-0.5">Code: {{ med.medicineCode }} • {{ med.dosageForm || 'TAB' }} - {{ med.strength || '' }} (Stock: {{ med.currentStock || 0 }})</p>
+                    <p class="text-[10px] text-slate-400 mt-0.5">Code: {{ med.medicineCode }} • {{ med.dosageForm || 'TAB' }} - {{ med.strength || '' }}</p>
                   </div>
                   <button type="button" class="text-indigo-600 bg-indigo-50 px-2.5 py-1.5 rounded-lg font-bold">Select</button>
                 </div>

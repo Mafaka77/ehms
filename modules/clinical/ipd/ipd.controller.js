@@ -722,6 +722,22 @@ exports.createChargeCategory = async (req, res) => {
     }
 }
 
+exports.updateChargeCategory = async (req, res) => {
+    try {
+        const category = await ipdService.updateChargeCategory(req.params.id, req.body)
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Charge category updated successfully',
+            data: category,
+            status: STATUS_CODES.OK
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 exports.deleteChargeCategory = async (req, res) => {
     try {
         const category = await ipdService.deleteChargeCategory(req.params.id)

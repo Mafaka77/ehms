@@ -16,7 +16,8 @@ const submitting = ref(false)
 const form = ref({
   code: '',
   name: '',
-  description: ''
+  description: '',
+  mask: false
 })
 
 const fetchCategories = async () => {
@@ -48,7 +49,8 @@ const openAddModal = () => {
   form.value = {
     code: '',
     name: '',
-    description: ''
+    description: '',
+    mask: false
   }
   showAddModal.value = true
 }
@@ -77,6 +79,18 @@ const submitCategory = async () => {
 
 const isProtectedCategory = (code) => {
   return ['ROOM', 'LAB', 'PHARMACY', 'DOCTOR', 'ENDOSCOPY', 'RADIOLOGY'].includes(code?.toUpperCase())
+}
+
+const toggleCategoryMask = async (cat) => {
+  // cat.mask is already updated by v-model, so we send its current value
+  const res = await admissionStore.updateChargeCategory(cat._id, { mask: cat.mask })
+  if (res.success) {
+    snackbarStore.show({ message: 'Mask status updated', type: 'success' })
+  } else {
+    // revert on failure
+    cat.mask = !cat.mask
+    snackbarStore.show({ message: res.message || 'Failed to update mask status', type: 'error' })
+  }
 }
 
 const deleteCategory = async (cat) => {
@@ -165,13 +179,25 @@ onMounted(async () => {
           </p>
 
           <div class="flex items-center justify-between pt-2 border-t border-slate-50">
-            <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Status</span>
-            <span 
-              class="px-2 py-0.5 rounded text-[10px] font-bold border"
-              :class="cat.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'"
-            >
-              {{ cat.isActive ? 'Active' : 'Inactive' }}
-            </span>
+            <!-- Status -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Status</span>
+              <span 
+                class="px-2 py-0.5 rounded text-[10px] font-bold border"
+                :class="cat.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100'"
+              >
+                {{ cat.isActive ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+            
+            <!-- Mask Toggle -->
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Mask</span>
+              <label class="relative inline-flex items-center cursor-pointer" title="Toggle Mask for Non-Admins">
+                <input type="checkbox" v-model="cat.mask" @change="toggleCategoryMask(cat)" class="sr-only peer" />
+                <div class="w-7 h-4 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600"></div>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -265,6 +291,18 @@ onMounted(async () => {
               placeholder="Describe what charges will be billed under this category..."
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all resize-none"
             ></textarea>
+          </div>
+          
+          <!-- Mask Toggle -->
+          <div class="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50/50">
+            <div>
+              <span class="text-xs font-bold text-slate-700 block">Mask Amounts</span>
+              <span class="text-[10px] text-slate-500">Hide prices for this category from non-admins.</span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" v-model="form.mask" class="sr-only peer" />
+              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+            </label>
           </div>
         </div>
 

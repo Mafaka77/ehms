@@ -376,6 +376,17 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async updateChargeCategory(id, data) {
+      this.loading = true
+      try {
+        const res = await api.put(`/ipd/charge-categories/${id}`, data)
+        return { success: true, data: res.data.data, message: res.data.message }
+      } catch (err) {
+        return { success: false, message: err.response?.data?.message || err.message }
+      } finally {
+        this.loading = false
+      }
+    },
     async deleteChargeCategory(id) {
       this.loading = true
       this.error = null

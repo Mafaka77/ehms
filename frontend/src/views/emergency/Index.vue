@@ -4,6 +4,7 @@ import { useEmergencyStore } from '../../stores/emergencyStore'
 import { usePatientStore } from '../../stores/patientStore'
 import { useDoctorStore } from '../../stores/doctorStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
+import { useAuthStore } from '../../stores/authStore'
 import BaseInput from '../../components/BaseInput.vue'
 import BaseSelect from '../../components/BaseSelect.vue'
 import BaseTextarea from '../../components/BaseTextarea.vue'
@@ -18,6 +19,7 @@ const emergencyStore = useEmergencyStore()
 const patientStore = usePatientStore()
 const doctorStore = useDoctorStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 
@@ -486,6 +488,7 @@ const handleUpdate = async () => {
 
                   <!-- Print Button -->
                   <button 
+                    v-if="authStore.hasPermission('emergency.print')"
                     @click.stop="openPrintModal(v)"
                     class="p-2 text-slate-400 hover:text-indigo-650 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
                     title="Print Emergency Card"
@@ -495,6 +498,7 @@ const handleUpdate = async () => {
 
                   <!-- Edit Button -->
                   <button 
+                    v-if="authStore.hasPermission('emergency.update')"
                     @click.stop="openEditModal(v)"
                     class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                     title="Edit Emergency Visit"
@@ -504,6 +508,7 @@ const handleUpdate = async () => {
                   
                   <!-- Delete Button -->
                   <button 
+                    v-if="['SuperAdmin', 'Super Admin'].includes(authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role)"
                     @click.stop="handleDelete(v._id)"
                     class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                     title="Delete Visit Record"

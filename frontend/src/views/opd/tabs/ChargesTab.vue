@@ -233,6 +233,19 @@ const selectDoctor = (doc) => {
   onDoctorChange()
 }
 
+const isDoctorCategory = computed(() => {
+  const selectedCat = chargeCategories.value.find(c => c._id === chargeForm.value.chargeCategoryId)
+  if (!selectedCat) return false
+  const code = (selectedCat.code || '').toUpperCase()
+  const name = (selectedCat.name || '').toLowerCase()
+  return code === 'DOCTOR' || code === 'DOCTOR_CHARGES' || code === 'DOCTOR_VISIT' || name.includes('doctor')
+})
+
+const isOtCategory = computed(() => {
+  const selectedCat = chargeCategories.value.find(c => c._id === chargeForm.value.chargeCategoryId)
+  return selectedCat?.code === 'OT'
+})
+
 const onCategoryChange = async () => {
   chargeMasters.value = []
   chargeForm.value.chargeMasterId = ''
@@ -980,6 +993,69 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
+
+          <!-- Consulting Doctor Selection (Enabled only for Doctor Charges categories) -->
+          <div v-if="!isOtCategory" class="space-y-1 relative">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Consulting Doctor <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
+            <div class="relative">
+              <button 
+                type="button"
+                :disabled="!isDoctorCategory"
+                @click.stop="toggleDoctorDropdown"
+                class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all text-left cursor-pointer disabled:opacity-60 disabled:bg-slate-50 disabled:cursor-not-allowed"
+              >
+                <span class="truncate">{{ isDoctorCategory ? selectedDoctorName : '-- Not Applicable --' }}</span>
+                <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0" :class="{ 'rotate-180': showDoctorDropdown }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <div 
+                v-if="showDoctorDropdown"
+                @click.stop
+                class="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg flex flex-col max-h-52 overflow-hidden animate-in fade-in duration-100"
+              >
+                <div class="p-2 border-b border-slate-100 bg-slate-50/50">
+                  <input 
+                    type="text"
+                    v-model="doctorSearch"
+                    placeholder="Search doctor..."
+                    ref="doctorSearchInput"
+                    class="w-full px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:border-indigo-500 text-xs text-slate-700"
+                  />
+                </div>
+                <div class="overflow-y-auto flex-1 py-1">
+                  <button
+                    type="button"
+                    @click="selectDoctor(null)"
+                    class="w-full px-3.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-between"
+                    :class="{ 'bg-indigo-50/40 text-indigo-600 font-bold': !chargeForm.doctorId }"
+                  >
+                    <span>-- Select Doctor --</span>
+                    <svg v-if="!chargeForm.doctorId" class="w-4 h-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button
+                    v-for="doc in filteredDoctors"
+                    :key="doc._id"
+                    type="button"
+                    @click="selectDoctor(doc)"
+                    class="w-full px-3.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-between"
+                    :class="{ 'bg-indigo-50/40 text-indigo-600 font-bold': chargeForm.doctorId === doc._id }"
+                  >
+                    <span class="truncate">{{ doc.fullName }} ({{ doc.specializationId?.name || 'General' }})</span>
+                    <svg v-if="chargeForm.doctorId === doc._id" class="w-4 h-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <div v-if="filteredDoctors.length === 0" class="px-3.5 py-3 text-center text-xs text-slate-400">
+                    No doctors found
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Description -->
           <div class="space-y-1">

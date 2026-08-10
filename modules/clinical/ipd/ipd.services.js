@@ -1210,7 +1210,9 @@ exports.createChargeMaster = async (categoryId, data, userId) => {
             packageDurationType: data.packageDurationType || null,
             applicableTo: data.applicableTo || ['IPD'],
             remarks: data.remarks || null,
-            createdBy: userId
+            isActive: true,
+            createdBy: userId,
+            mask: data.mask !== undefined ? !!data.mask : false
         })
 
         return chargeMaster
@@ -1251,6 +1253,8 @@ exports.updateChargeMaster = async (id, data) => {
         if (data.packageDurationType !== undefined) chargeMaster.packageDurationType = data.packageDurationType || null
         if (data.applicableTo !== undefined) chargeMaster.applicableTo = data.applicableTo || ['IPD']
         if (data.remarks !== undefined) chargeMaster.remarks = data.remarks || null
+        if (data.isActive !== undefined) chargeMaster.isActive = !!data.isActive
+        if (data.mask !== undefined) chargeMaster.mask = !!data.mask
 
         await chargeMaster.save()
         return chargeMaster
@@ -1383,9 +1387,32 @@ exports.createChargeCategory = async (data) => {
             code: data.code.toUpperCase().trim(),
             name: data.name.trim(),
             description: data.description ? data.description.trim() : null,
-            isActive: data.isActive !== undefined ? !!data.isActive : true
+            isActive: data.isActive !== undefined ? !!data.isActive : true,
+            mask: data.mask !== undefined ? !!data.mask : false
         })
 
+        return category
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.updateChargeCategory = async (id, data) => {
+    try {
+        const ChargeCategory = require('./ipd_charge_category.model')
+        const category = await ChargeCategory.findById(id)
+        if (!category) {
+            const error = new Error('Charge Category not found')
+            error.status = 404
+            throw error
+        }
+        
+        if (data.mask !== undefined) {
+            category.mask = !!data.mask
+        }
+        // Could also update name/description if provided
+        
+        await category.save()
         return category
     } catch (error) {
         throw error

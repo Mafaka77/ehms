@@ -3,6 +3,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useDentalStore } from '../../stores/dentalStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
+import { useAuthStore } from '../../stores/authStore'
 import OpdCard from '../../components/OpdCard.vue'
 import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
@@ -11,6 +12,7 @@ import SearchableSelect from '../../components/SearchableSelect.vue'
 const router = useRouter()
 const dentalStore = useDentalStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 
@@ -541,6 +543,7 @@ watch(() => editForm.value.doctorId, (newDocId) => {
                   
                   <!-- Delete Button -->
                   <button 
+                    v-if="['SuperAdmin', 'Super Admin'].includes(authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role)"
                     @click.stop="handleDelete(app._id)"
                     class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     title="Delete Appointment"

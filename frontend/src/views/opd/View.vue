@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useOpdStore } from '../../stores/opdStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
+import { useAuthStore } from '../../stores/authStore'
 
 import ChargesTab from './tabs/ChargesTab.vue'
 
@@ -10,6 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const opdStore = useOpdStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
 
 const loading = ref(true)
 const appointment = ref(null)
@@ -135,6 +137,7 @@ const getStatusColor = (status) => {
           Overview & Info
         </button>
         <button 
+          v-if="authStore.hasPermission('opd.treatmentcharges')"
           @click="activeTab = 'charges'" 
           class="flex-1 py-2.5 px-4 text-xs font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
           :class="activeTab === 'charges' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-900/5 font-extrabold' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'"
@@ -231,7 +234,7 @@ const getStatusColor = (status) => {
         </div>
 
         <!-- Treatment Charges Tab -->
-        <div v-else-if="activeTab === 'charges'">
+        <div v-else-if="activeTab === 'charges' && authStore.hasPermission('opd.treatmentcharges')">
           <ChargesTab 
             :appointment="appointment" 
             @refresh="fetchDetails" 

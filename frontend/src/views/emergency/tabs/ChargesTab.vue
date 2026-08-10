@@ -4,6 +4,7 @@ import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useEmergencyStore } from '../../../stores/emergencyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useDoctorStore } from '../../../stores/doctorStore'
+import { useAuthStore } from '../../../stores/authStore'
 
 const props = defineProps({
   visit: {
@@ -18,6 +19,29 @@ const emergencyStore = useEmergencyStore()
 const admissionStore = useIpdAdmissionStore()
 const snackbarStore = useSnackbarStore()
 const doctorStore = useDoctorStore()
+const authStore = useAuthStore()
+
+const isSuperAdmin = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role;
+  return roleName === "SuperAdmin" || roleName === "Super Admin";
+})
+
+const isCategoryMasked = (categoryId) => {
+  if (!categoryId) return false;
+  if (typeof categoryId === "object" && categoryId !== null) return !!categoryId.mask;
+  const cat = chargeCategories.value.find(c => c._id === categoryId);
+  return cat ? !!cat.mask : false;
+}
+
+const formatAmount = (amount, shouldMask = false) => {
+  if (isSuperAdmin.value) {
+    return "₹" + Number(amount || 0).toLocaleString();
+  }
+  if (shouldMask) {
+    return "₹XXXX";
+  }
+  return "₹" + Number(amount || 0).toLocaleString();
+}
 
 const loading = ref(false)
 const initialLoading = ref(true)
@@ -211,7 +235,7 @@ const filteredMasters = computed(() => {
 
 const selectedMasterName = computed(() => {
   const selected = chargeMasters.value.find(m => m._id === chargeForm.value.chargeMasterId)
-  return selected ? `${selected.name} (₹${selected.standardRate})` : '-- Custom / Other --'
+  return selected ? `${selected.name} (${formatAmount(selected.standardRate, isCategoryMasked(chargeForm.value.chargeCategoryId))})` : '-- Custom / Other --'
 })
 
 const selectMaster = (master) => {
@@ -245,7 +269,10 @@ const selectDoctor = (doc) => {
 
 const isDoctorCategory = computed(() => {
   const selectedCat = chargeCategories.value.find(c => c._id === chargeForm.value.chargeCategoryId)
-  return selectedCat?.code === 'DOCTOR' || selectedCat?.code === 'OT'
+  if (!selectedCat) return false
+  const code = (selectedCat.code || '').toUpperCase()
+  const name = (selectedCat.name || '').toLowerCase()
+  return code === 'DOCTOR' || code === 'DOCTOR_CHARGES' || code === 'DOCTOR_VISIT' || name.includes('doctor')
 })
 
 const isOtCategory = computed(() => {
@@ -370,6 +397,26 @@ const getChargeTotal = (charge) => {
   const addonsTotal = (charge.addons || []).reduce((sum, a) => sum + (a.amount || 0), 0)
   return base + addonsTotal
 }
+
+const selectedActiveAddons = computed(() => {
+  return otPackageItems.value.filter(item => selectedAddons.value.includes(item._id))
+})
+
+const baseChargeSubtotal = computed(() => {
+  return (chargeForm.value.rate || 0) * (chargeForm.value.quantity || 1)
+})
+
+const addonsSubtotal = computed(() => {
+  return selectedActiveAddons.value.reduce((sum, item) => sum + (item.defaultAmount || 0), 0)
+})
+
+const totalCalculatedCharge = computed(() => {
+  return baseChargeSubtotal.value + addonsSubtotal.value
+})
+
+const isAnyUnbilledChargeMasked = computed(() => {
+  return charges.value.some(c => !c.isBilled && isCategoryMasked(c.chargeCategoryId))
+})
 
 const totalUnbilledAmount = computed(() => {
   return charges.value
@@ -626,7 +673,7 @@ onBeforeUnmount(() => {
       <div class="flex items-center gap-3 w-full sm:w-auto">
         <div class="bg-indigo-50 border border-indigo-100 text-indigo-700 px-4 py-2 rounded-xl text-right shrink-0">
           <span class="text-[10px] uppercase font-bold tracking-wider block leading-none text-slate-400">Total Unbilled Balance</span>
-          <span class="text-lg font-bold">₹{{ totalUnbilledAmount.toLocaleString() }}</span>
+          <span class="text-lg font-bold">{{ formatAmount(totalUnbilledAmount, isAnyUnbilledChargeMasked) }}</span>
         </div>
         <button 
           @click="openAddModal"
@@ -693,7 +740,7 @@ onBeforeUnmount(() => {
           </div>
           <div class="flex items-center gap-2">
             <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400">Day Total:</span>
-            <span class="font-extrabold text-slate-800 text-sm">₹{{ group.totalAmount.toLocaleString() }}</span>
+            <span class="font-extrabold text-slate-800 text-sm">{{ formatAmount(group.totalAmount, group.charges.some(c => isCategoryMasked(c.chargeCategoryId))) }}</span>
           </div>
         </div>
 
@@ -737,7 +784,7 @@ onBeforeUnmount(() => {
                       <span v-if="addon.doctorId" class="px-1 py-0.2 text-[8px] font-bold bg-indigo-50 border border-indigo-100 text-indigo-650 rounded">
                         {{ addon.doctorId.fullName || addon.doctorId }}
                       </span>
-                      <span class="text-slate-500 font-extrabold">(₹{{ addon.amount.toLocaleString() }})</span>
+                      <span class="text-slate-500 font-extrabold">({{ formatAmount(addon.amount, isCategoryMasked(charge.chargeCategoryId)) }})</span>
                     </span>
                   </div>
 
@@ -751,13 +798,22 @@ onBeforeUnmount(() => {
                 <td class="px-5 py-3 text-right">
                   <div v-if="editingChargeId === charge._id" class="flex justify-end">
                     <input 
+                      v-if="isSuperAdmin"
                       type="number" 
                       v-model.number="editingForm.rate" 
                       min="0"
                       class="w-20 px-2 py-1 border border-slate-200 rounded text-right focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-xs font-semibold"
                     />
+                    <input
+                      v-else
+                      type="text"
+                      value="XXXX"
+                      readonly
+                      disabled
+                      class="w-20 px-2 py-1 border border-slate-200 rounded text-right text-slate-400 bg-slate-50 text-xs font-semibold cursor-not-allowed"
+                    />
                   </div>
-                  <template v-else>₹{{ charge.rate?.toLocaleString() }}</template>
+                  <template v-else>{{ formatAmount(charge.rate, isCategoryMasked(charge.chargeCategoryId)) }}</template>
                 </td>
                 <td class="px-5 py-3 text-center">
                   <div v-if="editingChargeId === charge._id" class="flex justify-center">
@@ -771,8 +827,8 @@ onBeforeUnmount(() => {
                   <span v-else class="font-bold text-slate-600">{{ charge.quantity }}</span>
                 </td>
                 <td class="px-5 py-3 text-right font-bold text-slate-900">
-                  <span v-if="editingChargeId === charge._id">₹{{ (editingForm.rate * editingForm.quantity).toLocaleString() }}</span>
-                  <span v-else>₹{{ getChargeTotal(charge).toLocaleString() }}</span>
+                  <span v-if="editingChargeId === charge._id">{{ formatAmount(editingForm.rate * editingForm.quantity, isCategoryMasked(charge.chargeCategoryId)) }}</span>
+                  <span v-else>{{ formatAmount(getChargeTotal(charge), isCategoryMasked(charge.chargeCategoryId)) }}</span>
                 </td>
                 <td class="px-5 py-3 text-center">
                   <span 
@@ -805,6 +861,7 @@ onBeforeUnmount(() => {
                   </div>
                   <div v-else-if="!charge.isBilled" class="flex items-center justify-end gap-1.5">
                     <button 
+                      v-if="isSuperAdmin"
                       @click.stop="startEdit(charge)"
                       class="p-1 rounded-lg border border-transparent hover:border-slate-200 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 cursor-pointer transition-all"
                       title="Edit charge"
@@ -837,7 +894,7 @@ onBeforeUnmount(() => {
       v-if="showAddModal" 
       class="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity overflow-y-auto"
     >
-      <div class="bg-white w-full max-w-md rounded-2xl shadow-xl flex flex-col my-8 animate-in zoom-in-95 duration-200 overflow-visible">
+      <div class="bg-white w-full max-w-xl rounded-2xl shadow-xl flex flex-col my-8 animate-in zoom-in-95 duration-200 overflow-visible">
         <!-- Header -->
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between rounded-t-2xl">
           <div>
@@ -956,7 +1013,7 @@ onBeforeUnmount(() => {
                     class="w-full px-3.5 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-all flex items-center justify-between"
                     :class="{ 'bg-indigo-50/40 text-indigo-600 font-bold': chargeForm.chargeMasterId === master._id }"
                   >
-                    <span class="truncate">{{ master.name }} (₹{{ master.standardRate }})</span>
+                    <span class="truncate">{{ master.name }} ({{ formatAmount(master.standardRate, isCategoryMasked(chargeForm.chargeCategoryId)) }})</span>
                     <svg v-if="chargeForm.chargeMasterId === master._id" class="w-4 h-4 text-indigo-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
                     </svg>
@@ -1044,7 +1101,7 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
                 <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-extrabold text-slate-800">₹{{ item.defaultAmount.toLocaleString() }}</span>
+                  <span class="text-xs font-extrabold text-slate-800">{{ formatAmount(item.defaultAmount, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
                   <button 
                     v-if="item.isCustom"
                     type="button"
@@ -1127,17 +1184,17 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Consulting Doctor Selection -->
-          <div class="space-y-1 relative" v-if="isDoctorCategory">
-            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Consulting Doctor</label>
+          <!-- Consulting Doctor Selection (Enabled only for Doctor Charges categories) -->
+          <div v-if="!isOtCategory" class="space-y-1 relative">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Consulting Doctor <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
             <div class="relative">
               <button 
                 type="button"
-                :disabled="isOtCategory"
+                :disabled="!isDoctorCategory"
                 @click.stop="toggleDoctorDropdown"
                 class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all text-left cursor-pointer disabled:opacity-60 disabled:bg-slate-50 disabled:cursor-not-allowed"
               >
-                <span class="truncate">{{ selectedDoctorName }}</span>
+                <span class="truncate">{{ isDoctorCategory ? selectedDoctorName : '-- Not Applicable --' }}</span>
                 <svg class="w-4 h-4 text-slate-400 transition-transform duration-200 shrink-0" :class="{ 'rotate-180': showDoctorDropdown }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -1217,10 +1274,19 @@ onBeforeUnmount(() => {
             <div class="space-y-1">
               <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Unit Rate (₹)</label>
               <input 
+                v-if="isSuperAdmin"
                 type="number" 
                 v-model.number="chargeForm.rate"
                 min="0"
                 class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all text-right"
+              />
+              <input 
+                v-else
+                type="text" 
+                value="XXXX"
+                readonly
+                disabled
+                class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-400 bg-slate-50 font-medium text-xs text-right cursor-not-allowed"
               />
             </div>
             <div class="space-y-1">
@@ -1235,9 +1301,38 @@ onBeforeUnmount(() => {
           </div>
 
           <!-- Summary calculated amount block -->
-          <div class="bg-indigo-50/50 p-3 rounded-xl border border-indigo-100 flex justify-between items-center text-xs">
-            <span class="font-bold text-slate-500">Calculated Charge Amount:</span>
-            <span class="font-extrabold text-indigo-700 text-sm">₹{{ (chargeForm.rate * chargeForm.quantity).toLocaleString() }}</span>
+          <!-- Charge Amount Breakdown Card (IPD Style) -->
+          <div class="bg-gradient-to-br from-indigo-50/70 to-slate-50 border border-indigo-100/80 rounded-2xl p-4 space-y-3 text-xs">
+            <div class="flex justify-between items-center pb-2 border-b border-indigo-100/60">
+              <span class="font-bold text-slate-700 uppercase tracking-wider text-[10px]">Charge Amount Breakdown</span>
+              <span class="font-black text-indigo-700 text-base">{{ formatAmount(totalCalculatedCharge, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
+            </div>
+
+            <div class="space-y-1.5 text-slate-600">
+              <div class="flex justify-between items-center">
+                <span>Base Charge Rate ({{ formatAmount(chargeForm.rate, isCategoryMasked(chargeForm.chargeCategoryId)) }} × {{ chargeForm.quantity }} qty):</span>
+                <span class="font-bold text-slate-800">{{ formatAmount(baseChargeSubtotal, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
+              </div>
+
+              <template v-if="selectedActiveAddons.length > 0">
+                <div class="flex justify-between items-center pt-1 border-t border-slate-200/40 text-indigo-900 font-semibold">
+                  <span>Included Addons / Package Components ({{ selectedActiveAddons.length }})</span>
+                </div>
+                <div 
+                  v-for="addon in selectedActiveAddons" 
+                  :key="addon._id" 
+                  class="flex justify-between items-center pl-2 text-[11px] text-slate-600"
+                >
+                  <span class="truncate max-w-[220px]">• {{ addon.itemName }}</span>
+                  <span class="font-medium text-slate-700">{{ formatAmount(addon.defaultAmount || addon.amount, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
+                </div>
+              </template>
+
+              <div class="flex justify-between items-center pt-2 border-t border-indigo-100/80 font-extrabold text-slate-800">
+                <span>Total Calculated Amount:</span>
+                <span class="font-extrabold text-indigo-700 text-sm">{{ formatAmount(totalCalculatedCharge, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
+              </div>
+            </div>
           </div>
         </div>
 

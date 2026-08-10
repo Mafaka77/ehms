@@ -25,6 +25,11 @@ new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+
+  mask: {
+    type: Boolean,
+    default: false
   }
 
 },{

@@ -3,6 +3,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOpdStore } from '../../stores/opdStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
+import { useAuthStore } from '../../stores/authStore'
 import OpdCard from '../../components/OpdCard.vue'
 import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
@@ -11,6 +12,7 @@ import SearchableSelect from '../../components/SearchableSelect.vue'
 const router = useRouter()
 const opdStore = useOpdStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 
@@ -509,7 +511,7 @@ watch(() => editForm.value.doctorId, (newDocId) => {
 
                   <!-- Print Button -->
                   <button 
-                    v-if="app.status === 'Booked'"
+                    v-if="app.status === 'Booked' && authStore.hasPermission('opd.print')"
                     @click.stop="openPrintModal(app)"
                     class="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
                     title="Print OPD Card"
@@ -519,6 +521,7 @@ watch(() => editForm.value.doctorId, (newDocId) => {
                   
                   <!-- Edit Button -->
                   <button 
+                    v-if="authStore.hasPermission('opd.update')"
                     @click.stop="openEditModal(app)"
                     class="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
                     title="Edit Appointment"
@@ -528,6 +531,7 @@ watch(() => editForm.value.doctorId, (newDocId) => {
                   
                   <!-- Delete Button -->
                   <button 
+                    v-if="['SuperAdmin', 'Super Admin'].includes(authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role)"
                     @click.stop="handleDelete(app._id)"
                     class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
                     title="Delete Appointment"

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../../stores/authStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
@@ -9,6 +9,13 @@ const snackbarStore = useSnackbarStore()
 const router = useRouter()
 
 const roles = ref([])
+const searchQuery = ref("")
+
+const filteredRoles = computed(() => {
+  if (!searchQuery.value.trim()) return roles.value
+  const q = searchQuery.value.toLowerCase().trim()
+  return roles.value.filter(role => role.name?.toLowerCase().includes(q))
+})
 const loading = ref(false)
 
 const loadRoles = async () => {
@@ -105,8 +112,21 @@ onMounted(() => {
 
     <!-- Data Card -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-      <div class="p-6 border-b border-slate-100 bg-slate-50/30">
+      <div class="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 class="text-lg font-semibold text-slate-800">All Roles</h2>
+        
+        <!-- Search Input -->
+        <div class="relative w-full sm:w-72">
+          <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search roles..."
+            class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+          />
+        </div>
       </div>
 
       <div v-if="loading" class="flex flex-col items-center justify-center py-24 text-slate-400">
@@ -117,7 +137,7 @@ onMounted(() => {
         <span class="text-sm font-medium">Loading roles...</span>
       </div>
 
-      <div v-else-if="roles.length === 0" class="p-6 text-center text-slate-500 py-24">
+      <div v-else-if="filteredRoles.length === 0" class="p-6 text-center text-slate-500 py-24">
         <p class="text-slate-700 font-semibold text-lg">No roles found</p>
       </div>
 
@@ -133,7 +153,7 @@ onMounted(() => {
           </thead>
           <tbody class="divide-y divide-slate-100">
             <tr 
-              v-for="role in roles" 
+              v-for="role in filteredRoles" 
               :key="role._id"
               class="hover:bg-slate-50/50 transition-colors group"
             >

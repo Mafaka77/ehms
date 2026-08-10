@@ -2,11 +2,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePatientStore } from '../../../stores/patientStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useAuthStore } from '../../../stores/authStore'
 import CreatePatientModal from './Create.vue'
 import EditPatientModal from './Edit.vue'
 
 const patientStore = usePatientStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
@@ -95,6 +97,7 @@ onMounted(() => {
       </div>
 
       <button
+        v-if="authStore.hasPermission('patient.create')"
         @click="showCreateModal = true"
         class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-md shadow-indigo-200 transition-all flex items-center justify-center gap-2 cursor-pointer"
       >
@@ -189,7 +192,7 @@ onMounted(() => {
               <th class="py-3 px-4">Mobile / Alt Contact</th>
               <th class="py-3 px-4">Address</th>
               <th class="py-3 px-4">Status</th>
-              <th class="py-3 px-4 text-right">Actions</th>
+              <th v-if="authStore.hasPermission('patient.update') || authStore.hasPermission('patient.delete')" class="py-3 px-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
@@ -244,8 +247,9 @@ onMounted(() => {
               </td>
 
               <!-- Actions -->
-              <td class="py-3 px-4 text-right space-x-1">
+              <td v-if="authStore.hasPermission('patient.update') || authStore.hasPermission('patient.delete')" class="py-3 px-4 text-right space-x-1">
                 <button
+                  v-if="authStore.hasPermission('patient.update')"
                   @click="openEditModal(patient)"
                   class="p-1.5 text-slate-500 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-all cursor-pointer"
                   title="Edit Patient"
@@ -255,6 +259,7 @@ onMounted(() => {
                   </svg>
                 </button>
                 <button
+                  v-if="authStore.hasPermission('patient.delete')"
                   @click="confirmDelete(patient)"
                   class="p-1.5 text-slate-500 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition-all cursor-pointer"
                   title="Delete Patient"
