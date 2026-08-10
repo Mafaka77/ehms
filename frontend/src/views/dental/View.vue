@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useDentalStore } from '../../stores/dentalStore'
 import { useIpdAdmissionStore } from '../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../stores/snackbarStore'
+import { useAuthStore } from '../../stores/authStore'
 
 // Import Tab Components
 import OverviewTab from './tabs/OverviewTab.vue'
@@ -15,6 +16,7 @@ const router = useRouter()
 const dentalStore = useDentalStore()
 const ipdAdmissionStore = useIpdAdmissionStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
 
 const loading = ref(true)
 const appointment = ref(null)
@@ -173,6 +175,7 @@ const totalChargesAmount = computed(() => {
           Overview
         </button>
         <button 
+          v-if="authStore.hasPermission('dental.treatmentcharges')"
           @click="activeTab = 'charges'" 
           class="flex-1 py-3 px-4 text-sm font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
           :class="activeTab === 'charges' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'"
@@ -181,6 +184,7 @@ const totalChargesAmount = computed(() => {
           Treatment Charges
         </button>
         <button 
+          v-if="authStore.hasPermission('dental.treatment.payment')"
           @click="activeTab = 'installments'" 
           class="flex-1 py-3 px-4 text-sm font-bold rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
           :class="activeTab === 'installments' ? 'bg-white text-indigo-600 shadow-sm ring-1 ring-slate-900/5' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'"
@@ -197,14 +201,14 @@ const totalChargesAmount = computed(() => {
         />
         
         <ChargesTab 
-          v-if="activeTab === 'charges'" 
+          v-if="activeTab === 'charges' && authStore.hasPermission('dental.treatmentcharges')" 
           :appointment="appointment" 
           :processedCharges="processedCharges"
           @refresh="fetchDetails" 
         />
 
         <InstallmentsTab 
-          v-if="activeTab === 'installments'"
+          v-if="activeTab === 'installments' && authStore.hasPermission('dental.treatment.payment')"
           :appointment="appointment"
           :installments="installments"
           :processedCharges="processedCharges"
