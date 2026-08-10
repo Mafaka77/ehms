@@ -20,6 +20,11 @@ const ipdWardStore = useIpdWardStore()
 const snackbarStore = useSnackbarStore()
 const authStore = useAuthStore()
 
+const isSuperAdmin = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return roleName === 'SuperAdmin' || roleName === 'Super Admin'
+})
+
 const loading = ref(false)
 const listAdmissions = ref([])
 
@@ -515,6 +520,7 @@ const doctorOptions = computed(() => {
               <td class="px-6 py-4 text-center">
                 <div class="flex items-center justify-center gap-2">
                   <button 
+                    v-if="isSuperAdmin"
                     @click="router.push({ name: 'ipd-patient-view', params: { id: adm._id } })"
                     class="bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 p-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center border border-blue-100 shadow-sm cursor-pointer"
                     title="View Patient Details"
