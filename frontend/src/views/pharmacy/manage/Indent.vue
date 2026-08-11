@@ -330,8 +330,13 @@ const openEditModal = async (indent) => {
   showCreateModal.value = true
 }
 
+const isSuperAdmin = computed(() => {
+  const role = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return ['SuperAdmin', 'Super Admin'].includes(role)
+})
+
 const handleDeleteIndent = async (indent) => {
-  if (['COMPLETED', 'ISSUED'].includes(indent.status)) {
+  if (!isSuperAdmin.value && ['COMPLETED', 'ISSUED'].includes(indent.status)) {
     snackbarStore.show({ message: 'Completed or issued indents cannot be deleted.', type: 'warning' })
     return
   }
@@ -374,18 +379,20 @@ const submitNewIndent = async () => {
 }
 
 // Returns true if the current user is allowed to edit a given indent.
-// Pharmacist role can edit any indent; others can only edit their own (if they have the permission).
+// SuperAdmin and Pharmacist roles can edit any indent; others can only edit their own (if they have the permission).
 const canEditIndent = computed(() => (indent) => {
-  if (authStore.user?.roleName === 'Pharmacist') return true
+  const role = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  if (['SuperAdmin', 'Super Admin', 'Pharmacist'].includes(role)) return true
   if (!authStore.hasPermission('pharmacy.indent.update')) return false
   const requestedById = indent.requestedBy?._id || indent.requestedBy
   return requestedById?.toString() === authStore.user?._id?.toString()
 })
 
 // Returns true if the current user is allowed to delete a given indent.
-// Pharmacist role can delete any indent; others can only delete their own (if they have the permission).
+// SuperAdmin and Pharmacist roles can delete any indent; others can only delete their own (if they have the permission).
 const canDeleteIndent = computed(() => (indent) => {
-  if (authStore.user?.roleName === 'Pharmacist') return true
+  const role = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  if (['SuperAdmin', 'Super Admin', 'Pharmacist'].includes(role)) return true
   if (!authStore.hasPermission('pharmacy.indent.delete')) return false
   const requestedById = indent.requestedBy?._id || indent.requestedBy
   return requestedById?.toString() === authStore.user?._id?.toString()
@@ -516,7 +523,7 @@ const canDeleteIndent = computed(() => (indent) => {
                 <button 
                   v-if="canDeleteIndent(indent)"
                   @click.stop="handleDeleteIndent(indent)"
-                  :disabled="['COMPLETED', 'ISSUED'].includes(indent.status)"
+                  :disabled="!isSuperAdmin && ['COMPLETED', 'ISSUED'].includes(indent.status)"
                   class="p-2 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
                   title="Delete Indent"
                 >
