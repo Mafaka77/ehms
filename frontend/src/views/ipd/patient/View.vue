@@ -708,16 +708,6 @@ onMounted(async () => {
               </svg>
               Add Advance
             </button>
-            <button 
-              v-if="isSuperAdmin && admission.status === 'ADMITTED'"
-              @click="openDischargeModal"
-              class="flex-1 py-1.5 border border-rose-100 hover:border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-              Discharge
-            </button>
           </div>
         </div>
 
