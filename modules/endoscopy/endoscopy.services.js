@@ -408,6 +408,7 @@ exports.getAllEndoscopyOrders = async (query = {}) => {
         let queryExec = EndoscopyOrder.find(filter)
             .populate('patientId', 'fullName patientCode mobileNo')
             .populate('doctorId', 'fullName doctorCode')
+            .populate('performedDoctorId', 'fullName doctorCode')
             .sort({ createdAt: -1 })
 
         if (limit > 0) {
@@ -435,6 +436,7 @@ exports.getEndoscopyOrderById = async (id) => {
         const order = await EndoscopyOrder.findById(id)
             .populate('patientId')
             .populate('doctorId', 'fullName doctorCode')
+            .populate('performedDoctorId', 'fullName doctorCode')
             .populate('createdBy', 'email')
 
         if (!order) {
@@ -480,7 +482,7 @@ exports.updateEndoscopyOrder = async (id, data) => {
         const tests = updateData.tests
         delete updateData.tests
 
-        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId']
+        const fields = ['opdAppointmentId', 'admissionId', 'emergencyVisitId', 'doctorId', 'performedDoctorId']
         for (const field of fields) {
             if (updateData[field] === '') {
                 updateData[field] = null
@@ -496,6 +498,7 @@ exports.updateEndoscopyOrder = async (id, data) => {
         const order = await EndoscopyOrder.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
             .populate('patientId', 'fullName patientCode mobileNo')
             .populate('doctorId', 'fullName doctorCode')
+            .populate('performedDoctorId', 'fullName doctorCode')
 
         if (!order) {
             const error = new Error('Endoscopy order not found')

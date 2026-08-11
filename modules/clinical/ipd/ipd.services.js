@@ -289,6 +289,7 @@ exports.createAdmission = async (data) => {
             patientId: data.patientId,
             admissionDate: data.admissionDate || new Date(),
             admissionType: data.admissionType || 'NORMAL',
+            payerType: data.payerType || 'NORMAL',
             consultantDoctorId: data.consultantDoctorId,
             bedId: data.bedId,
             diagnosis: data.diagnosis || null,

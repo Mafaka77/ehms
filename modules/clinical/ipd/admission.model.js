@@ -66,7 +66,18 @@ const admissionSchema = new mongoose.Schema({
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
-  }
+  },
+  payerType: {
+  type: String,
+  enum: [
+    'MUHCS',
+    'MR_STATE',
+    'MR_CENTRAL',
+    'HEALTH_INSURANCE',
+    'NORMAL'
+  ],
+  default: 'NORMAL'
+}
 
 },{
   timestamps:true

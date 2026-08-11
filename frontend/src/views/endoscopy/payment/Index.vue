@@ -15,6 +15,7 @@ const isSuperAdmin = computed(() => {
 })
 
 // State
+const loading = ref(true)
 const selectedOrder = ref(null)
 const selectedDetailedOrder = ref(null)
 
@@ -41,6 +42,7 @@ const paymentForm = ref({
 })
 
 const fetchOrders = async () => {
+  loading.value = true
   try {
     const additionalParams = {}
     if (filterStartDate.value) additionalParams.startDate = filterStartDate.value
@@ -68,6 +70,8 @@ const fetchOrders = async () => {
       message: endoscopyStore.error || 'Failed to fetch endoscopy orders',
       type: 'error'
     })
+  } finally {
+    loading.value = false
   }
 }
 
@@ -528,14 +532,30 @@ const formatCurrency = (val) => {
 
         <!-- Orders Table/List -->
         <div class="flex-grow overflow-y-auto">
-          <!-- Loading state -->
-          <div v-if="endoscopyStore.loading && endoscopyStore.orders.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400 py-12">
-            <svg class="animate-spin h-10 w-10 text-teal-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <span class="text-sm font-medium">Loading orders...</span>
-          </div>
+          <!-- Skeleton Loading -->
+          <table v-if="loading" class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-50 text-slate-400 uppercase font-bold border-b border-slate-100 sticky top-0 z-10 text-[11px]">
+              <tr>
+                <th class="px-6 py-4">Order No</th>
+                <th class="px-6 py-4">Date</th>
+                <th class="px-6 py-4">Patient</th>
+                <th class="px-6 py-4 text-right">Amount</th>
+                <th class="px-6 py-4 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <tr v-for="i in 7" :key="i" class="animate-pulse">
+                <td class="px-6 py-4"><div class="h-4 bg-slate-200 rounded w-20"></div></td>
+                <td class="px-6 py-4"><div class="h-4 bg-slate-200 rounded w-22"></div></td>
+                <td class="px-6 py-4">
+                  <div class="h-4 bg-slate-200 rounded w-28 mb-1"></div>
+                  <div class="h-3 bg-slate-200 rounded w-16"></div>
+                </td>
+                <td class="px-6 py-4 text-right"><div class="h-4 bg-slate-200 rounded w-16 ml-auto"></div></td>
+                <td class="px-6 py-4 text-center"><div class="h-5 bg-slate-200 rounded w-14 mx-auto"></div></td>
+              </tr>
+            </tbody>
+          </table>
 
           <!-- Empty state -->
           <div v-else-if="endoscopyStore.orders.length === 0" class="flex flex-col items-center justify-center h-full text-slate-400 p-8 py-16">

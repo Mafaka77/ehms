@@ -26,7 +26,6 @@ const isSuperAdmin = computed(() => {
 })
 
 const loading = ref(false)
-const listAdmissions = ref([])
 
 // Wizard Modal State for New Admission
 const showAdmitModal = ref(false)
@@ -69,10 +68,19 @@ const admissionForm = ref({
   wardId: '',
   bedId: '',
   admissionType: 'NORMAL',
+  payerType: 'NORMAL',
   admissionDate: getLocalDatetimeString(),
   diagnosis: '',
   remarks: ''
 })
+
+const payerTypeOptions = [
+  { value: 'NORMAL', label: 'NORMAL' },
+  { value: 'MUHCS', label: 'MUHCS' },
+  { value: 'MR_STATE', label: 'MR (STATE)' },
+  { value: 'MR_CENTRAL', label: 'MR (CENTRAL)' },
+  { value: 'HEALTH_INSURANCE', label: 'HEALTH INSURANCE' }
+]
 const availableBeds = ref([])
 const loadingBeds = ref(false)
 const isSubmittingAdmission = ref(false)
@@ -201,6 +209,7 @@ const openAdmitModal = () => {
     wardId: '',
     bedId: '',
     admissionType: 'NORMAL',
+    payerType: 'NORMAL',
     admissionDate: getLocalDatetimeString(),
     diagnosis: '',
     remarks: ''
@@ -231,12 +240,7 @@ const submitAdmission = async () => {
   isSubmittingAdmission.value = true
   const payload = {
     patientId: selectedPatient.value._id,
-    consultantDoctorId: admissionForm.value.consultantDoctorId,
-    bedId: admissionForm.value.bedId,
-    admissionType: admissionForm.value.admissionType,
-    admissionDate: admissionForm.value.admissionDate + '+05:30',
-    diagnosis: admissionForm.value.diagnosis,
-    remarks: admissionForm.value.remarks
+    ...admissionForm.value
   }
 
   const res = await admissionStore.createAdmission(payload)
@@ -244,7 +248,7 @@ const submitAdmission = async () => {
 
   if (res.success) {
     snackbarStore.show({ message: 'Patient admitted successfully!', type: 'success' })
-    closeAdmitModal()
+    showAdmitModal.value = false
     fetchAdmissions()
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
@@ -318,18 +322,18 @@ const handleDeleteAdmission = async (admission) => {
 // Helpers
 const getStatusColor = (status) => {
   switch (status) {
-    case 'ADMITTED': return 'bg-sky-50 border-sky-100 text-sky-700'
-    case 'DISCHARGED': return 'bg-emerald-50 border-emerald-100 text-emerald-700'
-    case 'CANCELLED': return 'bg-rose-50 border-rose-100 text-rose-700'
-    default: return 'bg-slate-50 border-slate-100 text-slate-700'
+    case 'ADMITTED': return 'bg-emerald-50 border-emerald-200 text-emerald-700'
+    case 'DISCHARGED': return 'bg-slate-100 border-slate-200 text-slate-700'
+    case 'CANCELLED': return 'bg-rose-50 border-rose-200 text-rose-700'
+    default: return 'bg-slate-50 border-slate-200 text-slate-700'
   }
 }
 
 const getAdmissionTypeColor = (type) => {
   switch (type) {
-    case 'EMERGENCY': return 'bg-rose-100/60 text-rose-700 border-rose-200'
-    case 'TRANSFER': return 'bg-amber-100/60 text-amber-700 border-amber-200'
-    default: return 'bg-slate-100/60 text-slate-700 border-slate-200'
+    case 'EMERGENCY': return 'bg-rose-100/70 text-rose-800 border-rose-200 font-bold'
+    case 'TRANSFER': return 'bg-amber-100/70 text-amber-800 border-amber-200 font-bold'
+    default: return 'bg-slate-100/70 text-slate-700 border-slate-200'
   }
 }
 
@@ -355,49 +359,59 @@ const doctorOptions = computed(() => {
     label: `${doc.fullName} - ${doc.specializationId?.name || 'General'}`
   }))
 })
-
-
 </script>
 
 <template>
-  <div class="space-y-6 max-w-7xl mx-auto">
-    <!-- Header -->
+  <div class="space-y-8 max-w-7xl mx-auto">
+    <!-- Header Banner & Action -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div>
-        <h1 class="text-2xl font-bold text-slate-900">IPD Admissions</h1>
-        <p class="text-slate-500 mt-1 text-sm">Manage patient admissions, bed allocations, and discharge records.</p>
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 shadow-xs">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">IPD Inpatient Admissions</h1>
+          <p class="text-xs font-semibold text-slate-500 mt-0.5">Manage patient bed allocations, ward transfers, consultant assignments, and discharges.</p>
+        </div>
       </div>
-      <div class="flex items-center gap-3 w-full sm:w-auto">
 
+      <div class="flex items-center gap-3 w-full sm:w-auto">
         <button 
           v-if="authStore.hasPermission('ipd.admit')"
           @click="openAdmitModal"
-          class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 w-full sm:w-auto justify-center cursor-pointer transform active:scale-95"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-indigo-100 transition-all flex items-center gap-2 w-full sm:w-auto justify-center cursor-pointer transform active:scale-95"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" /></svg>
-          Admit Patient
+          Admit New Patient
         </button>
       </div>
     </div>
 
-    <!-- Table Card -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <!-- Main Table Container -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
       
-      <!-- Filters Header -->
-      <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row justify-between items-center gap-4">
-        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+      <!-- Filters Header Bar -->
+      <div class="p-4 border-b border-slate-100 bg-slate-50/40 flex flex-col lg:flex-row justify-between items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
           <!-- Text Search -->
-          <input 
-            v-model="filters.search"
-            type="text" 
-            placeholder="Search name, code, IPD no..." 
-            class="px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[200px]"
-          />
+          <div class="relative min-w-[220px]">
+            <input 
+              v-model="filters.search"
+              type="text" 
+              placeholder="Search name, code, IPD no..." 
+              class="w-full pl-9 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-800 shadow-2xs"
+            />
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
 
           <!-- Status Filter -->
           <select 
             v-model="filters.status" 
-            class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[140px]"
+            class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[130px]"
           >
             <option value="">All Statuses</option>
             <option value="ADMITTED">Admitted</option>
@@ -408,7 +422,7 @@ const doctorOptions = computed(() => {
           <!-- Doctor Filter -->
           <select 
             v-model="filters.consultantDoctorId" 
-            class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[180px]"
+            class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[170px]"
           >
             <option value="">All Doctors</option>
             <option v-for="doc in doctorStore.doctors" :key="doc._id" :value="doc._id">
@@ -420,96 +434,94 @@ const doctorOptions = computed(() => {
           <input 
             type="date" 
             v-model="filters.date" 
-            class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700"
+            class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700"
           />
 
           <!-- Clear Filters -->
           <button 
             v-if="filters.status || filters.consultantDoctorId || filters.date || filters.search"
             @click="clearFilters"
-            class="text-sm font-semibold text-rose-600 hover:text-rose-700 hover:underline px-2 cursor-pointer"
+            class="text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-lg border border-rose-100 cursor-pointer transition-all"
           >
             Clear Filters
           </button>
         </div>
 
-        <div class="text-sm font-semibold text-slate-600 whitespace-nowrap">
-          Total admissions: {{ admissionStore.pagination.total }}
+        <div class="text-xs font-bold text-slate-500 whitespace-nowrap self-end lg:self-center">
+          Total Admissions: <span class="text-slate-800 font-mono text-sm font-black">{{ admissionStore.pagination.total }}</span>
         </div>
       </div>
 
       <!-- Table View -->
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-slate-50/80 text-slate-500 font-semibold uppercase tracking-wider text-xs border-b border-slate-100">
+        <table class="w-full text-left text-xs whitespace-nowrap">
+          <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
             <tr>
-              <th class="px-6 py-4">IPD No / Date</th>
-              <th class="px-6 py-4">Patient</th>
-              <th class="px-6 py-4">Bed / Ward Location</th>
-              <th class="px-6 py-4">Consultant Doctor</th>
-              <th class="px-6 py-4">Admission Type</th>
-              <th class="px-6 py-4">Status</th>
-              <th class="px-6 py-4 text-center">Action</th>
+              <th class="px-5 py-3.5">IPD No / Date</th>
+              <th class="px-5 py-3.5">Patient Details</th>
+              <th class="px-5 py-3.5">Bed / Ward Location</th>
+              <th class="px-5 py-3.5">Consultant Doctor</th>
+              <th class="px-5 py-3.5">Status</th>
+              <th class="px-5 py-3.5 text-center">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 text-slate-700">
             <tr v-if="loading">
-              <td colspan="7" class="px-6 py-12 text-center text-slate-400">
-                <svg class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Loading admissions list...
+              <td colspan="6" class="px-6 py-16 text-center text-slate-400">
+                <svg class="animate-spin h-8 w-8 mx-auto text-indigo-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <span class="text-xs font-semibold">Loading IPD admissions list...</span>
               </td>
             </tr>
             <tr v-else-if="admissionStore.admissions.length === 0">
-              <td colspan="7" class="px-6 py-12 text-center text-slate-500">
-                <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16" /></svg>
-                <p class="font-medium text-slate-600">No IPD admissions found.</p>
-                <p class="text-xs text-slate-400 mt-1">Try adjusting filters or record a new patient admission.</p>
+              <td colspan="6" class="px-6 py-16 text-center text-slate-500">
+                <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16" /></svg>
+                </div>
+                <p class="font-bold text-slate-700 text-sm">No IPD Admissions Found</p>
+                <p class="text-xs text-slate-400 mt-0.5">Try modifying filters or admit a new patient.</p>
               </td>
             </tr>
             <tr 
               v-else
               v-for="adm in admissionStore.admissions" 
               :key="adm._id"
-              class="hover:bg-slate-50/50 transition-colors"
+              class="hover:bg-slate-50/60 transition-colors"
             >
               <!-- IPD No & Date -->
-              <td class="px-6 py-4">
-                <span class="font-mono text-indigo-600 font-bold block">{{ adm.admissionNo }}</span>
-                <span class="text-slate-400 text-xs mt-0.5 block">{{ formatDate(adm.admissionDate || adm.admissionDate) }}</span>
+              <td class="px-5 py-3.5">
+                <span class="font-mono text-indigo-700 font-bold block text-xs">{{ adm.admissionNo }}</span>
+                <span class="text-slate-400 text-[11px] mt-0.5 block">{{ formatDate(adm.admissionDate) }}</span>
               </td>
               
               <!-- Patient Details -->
-              <td class="px-6 py-4">
-                <p class="font-bold text-slate-800">{{ adm.patientId?.fullName || 'N/A' }}</p>
-                <p class="text-xs text-slate-500">{{ adm.patientId?.patientCode || '-' }} • {{ adm.patientId?.gender }}, {{ adm.patientId?.age || '?' }}y</p>
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-extrabold flex items-center justify-center text-xs shrink-0 border border-slate-200">
+                    {{ (adm.patientId?.fullName || 'P')[0] }}
+                  </div>
+                  <div>
+                    <p class="font-bold text-slate-800 leading-snug">{{ adm.patientId?.fullName || 'N/A' }}</p>
+                    <p class="text-[11px] text-slate-400 font-mono mt-0.5">{{ adm.patientId?.patientCode || '-' }} • {{ adm.patientId?.gender || '-' }}, {{ adm.patientId?.age || '?' }}y</p>
+                  </div>
+                </div>
               </td>
               
               <!-- Location Ward & Bed -->
-              <td class="px-6 py-4">
-                <p class="font-semibold text-slate-800">Bed {{ adm.bedId?.bedNo || 'N/A' }}</p>
-                <p class="text-xs text-slate-500">{{ adm.bedId?.wardId?.name || 'Unknown Ward' }} ({{ adm.bedId?.bedType || 'General' }})</p>
+              <td class="px-5 py-3.5">
+                <p class="font-bold text-slate-800">Bed {{ adm.bedId?.bedNo || 'N/A' }}</p>
+                <p class="text-[11px] text-slate-500 font-medium">{{ adm.bedId?.wardId?.name || 'Unknown Ward' }} <span v-if="adm.bedId?.bedType" class="text-slate-400">({{ adm.bedId.bedType }})</span></p>
               </td>
               
               <!-- Doctor -->
-              <td class="px-6 py-4">
+              <td class="px-5 py-3.5">
                 <p class="font-bold text-slate-800">{{ adm.consultantDoctorId?.fullName || 'N/A' }}</p>
-                <p class="text-xs text-slate-500">{{ adm.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
-              </td>
-              
-              <!-- Admission Type -->
-              <td class="px-6 py-4">
-                <span 
-                  class="px-2.5 py-0.5 rounded-full text-xs font-semibold border"
-                  :class="getAdmissionTypeColor(adm.admissionType)"
-                >
-                  {{ adm.admissionType }}
-                </span>
+                <p class="text-[11px] text-slate-400">{{ adm.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
               </td>
               
               <!-- Status -->
-              <td class="px-6 py-4">
+              <td class="px-5 py-3.5">
                 <span 
-                  class="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border"
+                  class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border"
                   :class="getStatusColor(adm.status)"
                 >
                   {{ adm.status }}
@@ -517,33 +529,36 @@ const doctorOptions = computed(() => {
               </td>
               
               <!-- Actions -->
-              <td class="px-6 py-4 text-center">
-                <div class="flex items-center justify-center gap-2">
+              <td class="px-5 py-3.5 text-center">
+                <div class="flex items-center justify-center gap-1.5">
                   <button 
                     v-if="isSuperAdmin"
                     @click="router.push({ name: 'ipd-patient-view', params: { id: adm._id } })"
-                    class="bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 p-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center border border-blue-100 shadow-sm cursor-pointer"
-                    title="View Patient Details"
+                    class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-all border border-blue-100 cursor-pointer"
+                    title="View Patient Medical Details"
                   >
-                    <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                       <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </button>
+
                   <button 
-                    v-if="adm.status === 'ADMITTED' && authStore.hasPermission('ipd.discharge')"
+                    v-if="isSuperAdmin && adm.status === 'ADMITTED'"
                     @click="openDischargeModal(adm)"
-                    class="bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 border border-indigo-100 shadow-sm cursor-pointer"
+                    class="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 rounded-lg font-bold text-[11px] transition-all border border-indigo-100 cursor-pointer"
                   >
                     Discharge / Cancel
                   </button>
+
                   <button 
                     v-if="authStore.user?.roleName === 'SuperAdmin' || authStore.user?.roleName === 'HospitalAdmin' || authStore.user?.role?.name === 'SuperAdmin' || authStore.user?.role?.name === 'HospitalAdmin'"
                     @click="handleDeleteAdmission(adm)"
                     :disabled="deletingId === adm._id"
-                    class="bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 px-3 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1 border border-rose-100 shadow-sm cursor-pointer disabled:opacity-50 disabled:pointer-events-none"
+                    class="px-2.5 py-1 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 rounded-lg font-bold text-[11px] transition-all border border-rose-100 cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    title="Delete Admission Record"
                   >
-                    <svg v-if="deletingId === adm._id" class="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <svg v-if="deletingId === adm._id" class="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                       <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -559,47 +574,48 @@ const doctorOptions = computed(() => {
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="admissionStore.pagination.pages > 1" class="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
-        <button 
-          @click="filters.page--" 
-          :disabled="filters.page === 1"
-          class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          Previous
-        </button>
-        <span class="text-sm font-semibold text-slate-600">
-          Page {{ filters.page }} of {{ admissionStore.pagination.pages }}
+      <!-- Pagination Footer -->
+      <div v-if="admissionStore.pagination.pages > 1" class="p-4 px-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 text-xs">
+        <span class="text-slate-500 font-semibold">
+          Page <strong class="text-slate-800">{{ filters.page }}</strong> of <strong class="text-slate-800">{{ admissionStore.pagination.pages }}</strong>
         </span>
-        <button 
-          @click="filters.page++" 
-          :disabled="filters.page === admissionStore.pagination.pages"
-          class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          Next
-        </button>
+        <div class="flex gap-1.5">
+          <button 
+            @click="filters.page--" 
+            :disabled="filters.page === 1"
+            class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+          >
+            Previous
+          </button>
+          <button 
+            @click="filters.page++" 
+            :disabled="filters.page === admissionStore.pagination.pages"
+            class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
     </div>
 
     <!-- Wizard Admission Modal Overlay -->
-    <div v-if="showAdmitModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="closeAdmitModal"></div>
+    <div v-if="showAdmitModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       
-      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 max-h-[90vh] border border-slate-100">
         <!-- Header -->
         <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h2 class="text-lg font-bold text-slate-900">New Patient Admission (IPD)</h2>
             <p class="text-xs text-slate-500 mt-0.5">Register or select a patient to allocate an available hospital bed.</p>
           </div>
-          <button @click="closeAdmitModal" class="text-slate-400 hover:text-slate-600 rounded-xl p-1.5 hover:bg-slate-100 transition-colors">
+          <button @click="closeAdmitModal" class="text-slate-400 hover:text-slate-600 rounded-xl p-1.5 hover:bg-slate-100 transition-colors cursor-pointer">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
         <!-- Stepper Indicators -->
-        <div class="px-6 py-4 bg-slate-50/30 border-b border-slate-100 flex items-center justify-center gap-8">
+        <div class="px-6 py-3.5 bg-slate-50/40 border-b border-slate-100 flex items-center justify-center gap-8 text-xs">
           <div class="flex items-center gap-2">
             <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" :class="currentStep === 1 ? 'bg-indigo-600 text-white' : 'bg-indigo-100 text-indigo-700'">1</span>
             <span class="text-xs font-bold" :class="currentStep === 1 ? 'text-indigo-600' : 'text-slate-500'">Select Patient</span>
@@ -618,7 +634,7 @@ const doctorOptions = computed(() => {
           <div v-if="currentStep === 1" class="space-y-6">
             <div v-if="!showNewPatientForm" class="space-y-5">
               <div class="max-w-md mx-auto text-center">
-                <label class="block text-sm font-semibold text-slate-700 mb-2">Find Existing Patient Record</label>
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Find Existing Patient Record</label>
                 <div class="relative">
                   <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                     <svg class="w-5 h-5" :class="isSearching ? 'text-indigo-500 animate-pulse' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -630,14 +646,14 @@ const doctorOptions = computed(() => {
                     @input="handlePatientSearch"
                     type="text" 
                     placeholder="Enter phone number or patient name..." 
-                    class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                    class="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
                   />
                 </div>
               </div>
 
               <!-- Dropdown Results -->
-              <div v-if="patientStore.searchResults.length > 0" class="border border-slate-200 rounded-xl overflow-hidden shadow-md bg-white max-h-60 overflow-y-auto">
-                <div class="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center text-xs font-bold text-slate-500">
+              <div v-if="patientStore.searchResults.length > 0" class="border border-slate-200 rounded-xl overflow-hidden shadow-md bg-white max-h-60 overflow-y-auto text-xs">
+                <div class="bg-slate-50 px-4 py-2 border-b border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase">
                   <span>SEARCH RESULTS</span>
                   <span>{{ patientStore.searchResults.length }} found</span>
                 </div>
@@ -652,7 +668,7 @@ const doctorOptions = computed(() => {
                       <p class="text-sm font-bold text-slate-800">{{ p.fullName }} <span class="text-xs font-semibold text-slate-400">({{ p.gender }}, {{ p.age || '?' }}y)</span></p>
                       <p class="text-xs text-slate-500 font-mono mt-0.5">{{ p.patientCode }} • {{ p.mobileNo }}</p>
                     </div>
-                    <button class="text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm">
+                    <button class="text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-2xs">
                       Select
                     </button>
                   </li>
@@ -660,36 +676,36 @@ const doctorOptions = computed(() => {
               </div>
 
               <!-- Empty Results -->
-              <div v-if="searchQuery.length >= 3 && !isSearching && patientStore.searchResults.length === 0" class="text-center py-6 text-slate-400 bg-slate-50 rounded-xl">
-                <p class="font-medium text-slate-700">No patient found matching "{{ searchQuery }}"</p>
-                <p class="text-xs mt-1">Check spelling or proceed to register them below.</p>
+              <div v-if="searchQuery.length >= 3 && !isSearching && patientStore.searchResults.length === 0" class="text-center py-6 text-slate-400 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+                <p class="font-bold text-slate-700">No patient found matching "{{ searchQuery }}"</p>
+                <p class="text-slate-400 mt-0.5">Check spelling or proceed to register profile below.</p>
               </div>
 
-              <div class="flex items-center justify-center py-2">
+              <div class="flex items-center justify-center py-1">
                 <div class="w-1/3 border-t border-slate-200"></div>
-                <span class="mx-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Or</span>
+                <span class="mx-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Or</span>
                 <div class="w-1/3 border-t border-slate-200"></div>
               </div>
 
               <div class="text-center">
                 <button 
                   @click="toggleNewPatient"
-                  class="bg-white border-2 border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer shadow-sm"
+                  class="bg-white border border-slate-200 hover:border-indigo-600 hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 px-5 py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 mx-auto cursor-pointer shadow-2xs"
                 >
-                  <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
                   Register New Patient Profile
                 </button>
               </div>
             </div>
 
             <!-- New Patient Registration Form -->
-            <div v-else class="border border-slate-200 rounded-xl p-5 bg-slate-50/50 relative">
-              <button @click="toggleNewPatient" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 shadow-sm border border-slate-200 cursor-pointer">
+            <div v-else class="border border-slate-200 rounded-2xl p-5 bg-slate-50/50 relative text-xs">
+              <button @click="toggleNewPatient" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 bg-white rounded-lg p-1.5 shadow-2xs border border-slate-200 cursor-pointer">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
               </button>
               
-              <h3 class="text-sm font-bold text-slate-800 mb-1">Quick Registration</h3>
-              <p class="text-xs text-slate-500 mb-5">Create a basic patient profile for IPD admission.</p>
+              <h3 class="text-sm font-bold text-slate-800 mb-0.5">Quick Registration</h3>
+              <p class="text-xs text-slate-500 mb-4">Create a basic patient profile for IPD admission.</p>
               
               <form @submit.prevent="saveNewPatient" class="space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -708,13 +724,13 @@ const doctorOptions = computed(() => {
                 </div>
                 <BaseInput v-model="newPatient.address" id="address" label="Address" placeholder="e.g. 123 Main St" />
                 
-                <div class="pt-4 flex justify-end">
+                <div class="pt-2 flex justify-end">
                   <button 
                     type="submit" 
                     :disabled="isCreatingPatient"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-70 cursor-pointer"
                   >
-                    <span v-if="isCreatingPatient" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                    <span v-if="isCreatingPatient" class="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
                     <span>Save & Select</span>
                   </button>
                 </div>
@@ -723,24 +739,24 @@ const doctorOptions = computed(() => {
           </div>
 
           <!-- STEP 2: Allocating Bed and Consultant -->
-          <div v-else class="space-y-6">
+          <div v-else class="space-y-5 text-xs">
             <!-- Selected Patient Card -->
-            <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
+            <div class="bg-indigo-50/80 border border-indigo-100 rounded-xl p-3.5 flex items-center justify-between">
               <div>
-                <p class="text-xs font-bold text-indigo-500 uppercase tracking-wider mb-0.5">Selected Patient</p>
-                <p class="text-base font-bold text-indigo-900">{{ selectedPatient?.fullName }}</p>
-                <p class="text-xs text-indigo-700 font-medium mt-0.5">{{ selectedPatient?.patientCode }} • {{ selectedPatient?.mobileNo }}</p>
+                <p class="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-0.5">Selected Patient</p>
+                <p class="text-sm font-bold text-indigo-950">{{ selectedPatient?.fullName }}</p>
+                <p class="text-xs text-indigo-700 font-mono mt-0.5">{{ selectedPatient?.patientCode }} • {{ selectedPatient?.mobileNo }}</p>
               </div>
               <button 
                 @click="goBackToPatient"
-                class="text-indigo-600 hover:text-indigo-800 text-xs font-bold uppercase tracking-wider bg-white shadow-sm border border-indigo-100 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                class="text-indigo-700 hover:text-indigo-900 text-xs font-bold bg-white shadow-2xs border border-indigo-100 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
               >
-                Change
+                Change Patient
               </button>
             </div>
 
             <!-- Admission Details Form -->
-            <form @submit.prevent="submitAdmission" class="space-y-5">
+            <form @submit.prevent="submitAdmission" class="space-y-4">
               <!-- Consultant Doctor Searchable select -->
               <div>
                 <SearchableSelect
@@ -781,7 +797,7 @@ const doctorOptions = computed(() => {
                 </BaseSelect>
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <BaseSelect
                   v-model="admissionForm.admissionType"
                   id="type-select"
@@ -789,6 +805,17 @@ const doctorOptions = computed(() => {
                   :options="['NORMAL', 'EMERGENCY', 'TRANSFER']"
                   required
                 />
+
+                <BaseSelect
+                  v-model="admissionForm.payerType"
+                  id="payer-type-select"
+                  label="Payer Type"
+                  required
+                >
+                  <option v-for="pt in payerTypeOptions" :key="pt.value" :value="pt.value">
+                    {{ pt.label }}
+                  </option>
+                </BaseSelect>
                 
                 <BaseInput 
                   v-model="admissionForm.admissionDate"
@@ -827,7 +854,7 @@ const doctorOptions = computed(() => {
         <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-between items-center">
           <button 
             @click="closeAdmitModal"
-            class="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+            class="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
           >
             Cancel
           </button>
@@ -836,9 +863,9 @@ const doctorOptions = computed(() => {
             v-if="currentStep === 2"
             @click="submitAdmission"
             :disabled="isSubmittingAdmission || !admissionForm.bedId || !admissionForm.consultantDoctorId"
-            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
-            <span v-if="isSubmittingAdmission" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+            <span v-if="isSubmittingAdmission" class="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
             <span>Confirm Admission</span>
           </button>
         </div>
@@ -846,23 +873,22 @@ const doctorOptions = computed(() => {
     </div>
 
     <!-- Discharge & Cancel Admission Modal Overlay -->
-    <div v-if="showDischargeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-      <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="showDischargeModal = false"></div>
+    <div v-if="showDischargeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       
-      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-200">
+      <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col border border-slate-100 animate-in zoom-in-95 duration-200">
         <!-- Header -->
-        <div class="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
           <div>
-            <h2 class="text-lg font-bold text-slate-900">Discharge / Cancel Admission</h2>
-            <p class="text-xs text-slate-500 mt-0.5">Configure status update for patient: <strong class="text-slate-700">{{ selectedAdmissionForAction?.patientId?.fullName }}</strong></p>
+            <h2 class="text-base font-bold text-slate-900">Discharge / Cancel Admission</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Patient: <strong class="text-slate-700">{{ selectedAdmissionForAction?.patientId?.fullName }}</strong></p>
           </div>
-          <button @click="showDischargeModal = false" class="text-slate-400 hover:text-slate-600 rounded-xl p-1.5 hover:bg-slate-100 transition-colors">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          <button @click="showDischargeModal = false" class="text-slate-400 hover:text-slate-600 rounded-xl p-1.5 hover:bg-slate-100 transition-colors cursor-pointer">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
         <!-- Form Body -->
-        <div class="p-6 space-y-4">
+        <div class="p-6 space-y-4 text-xs">
           <BaseSelect
             v-model="dischargeForm.status"
             id="action-status"
@@ -884,19 +910,19 @@ const doctorOptions = computed(() => {
         </div>
 
         <!-- Action Footer -->
-        <div class="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+        <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
           <button 
             @click="showDischargeModal = false"
-            class="px-4 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
+            class="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors cursor-pointer"
           >
-            Go Back
+            Cancel
           </button>
           <button 
             @click="handleDischarge"
             :disabled="isProcessingDischarge || !dischargeForm.remarks.trim()"
-            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
           >
-            <span v-if="isProcessingDischarge" class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+            <span v-if="isProcessingDischarge" class="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
             <span>Confirm Action</span>
           </button>
         </div>
@@ -905,10 +931,3 @@ const doctorOptions = computed(() => {
 
   </div>
 </template>
-
-<style scoped>
-.animate-in {
-  animation-duration: 0.2s;
-  animation-fill-mode: both;
-}
-</style>

@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useEndoscopyStore } from '../../../stores/endoscopyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useAuthStore } from '../../../stores/authStore'
 
 const props = defineProps({
   admissionId: {
@@ -16,6 +17,12 @@ const props = defineProps({
 
 const endoscopyStore = useEndoscopyStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
+
+const isSuperAdmin = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return roleName === 'SuperAdmin' || roleName === 'Super Admin'
+})
 
 // State
 const loading = ref(false)
@@ -289,6 +296,7 @@ onMounted(async () => {
                   View Details
                 </button>
                 <button
+                  v-if="isSuperAdmin"
                   @click="deleteEndoscopyOrder(order._id)"
                   class="px-2.5 py-1 border border-rose-100 hover:border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-600 text-[10px] font-bold rounded-lg transition-all cursor-pointer"
                 >

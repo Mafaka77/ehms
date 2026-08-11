@@ -38,7 +38,11 @@ const endoscopyOrderSchema = new mongoose.Schema({
     ref: 'Doctor',
     default: null
   },
-
+  performedDoctorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Doctor',
+    default: null
+  },
   referral: {
     type: String,
     enum: [

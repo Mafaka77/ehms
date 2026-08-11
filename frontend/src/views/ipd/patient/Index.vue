@@ -54,6 +54,11 @@ const clearFilters = () => {
   }
 }
 
+const isSuperAdmin = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return roleName === 'SuperAdmin' || roleName === 'Super Admin'
+})
+
 onMounted(async () => {
   loading.value = true
   try {
@@ -63,8 +68,10 @@ onMounted(async () => {
       filters.value.nursingStationId = myStation._id
     }
     
-    // 2. Fetch all nursing stations for the filter select dropdown
-    await nursingStore.fetchNursingStations(1, 100)
+    // 2. Fetch all nursing stations for SuperAdmin filter select dropdown
+    if (isSuperAdmin.value) {
+      await nursingStore.fetchNursingStations(1, 100)
+    }
     
     // 3. Fetch patient list based on the station
     await fetchMyPatients()
@@ -123,10 +130,10 @@ const getDaysAdmitted = (dateString) => {
 
 const getStatusColor = (status) => {
   switch (status) {
-    case 'ADMITTED': return 'bg-sky-50 border-sky-100 text-sky-700'
-    case 'DISCHARGED': return 'bg-emerald-50 border-emerald-100 text-emerald-700'
-    case 'CANCELLED': return 'bg-rose-50 border-rose-100 text-rose-700'
-    default: return 'bg-slate-50 border-slate-100 text-slate-700'
+    case 'ADMITTED': return 'bg-emerald-50 border-emerald-200 text-emerald-700'
+    case 'DISCHARGED': return 'bg-slate-100 border-slate-200 text-slate-700'
+    case 'CANCELLED': return 'bg-rose-50 border-rose-200 text-rose-700'
+    default: return 'bg-slate-50 border-slate-200 text-slate-700'
   }
 }
 </script>
@@ -134,110 +141,121 @@ const getStatusColor = (status) => {
 <template>
   <div class="space-y-8 max-w-7xl mx-auto">
     
-    <!-- Top Header -->
+    <!-- Top Header & Station Info -->
     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-      <div>
-        <h1 class="text-2xl font-bold text-slate-900">Ward Patient Monitoring</h1>
-        <p class="text-slate-500 mt-1 text-sm">Real-time status of admitted patients at your assigned nursing station.</p>
+      <div class="flex items-center gap-3">
+        <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 shadow-xs">
+          <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-2xl font-black text-slate-900 tracking-tight">Ward Patient Monitoring</h1>
+          <p class="text-xs font-semibold text-slate-500 mt-0.5">Real-time status of admitted inpatients at your assigned nursing station desk.</p>
+        </div>
       </div>
 
       <!-- Current Assigned Station Badge -->
-      <div v-if="nursingStore.myStation" class="bg-indigo-50 border border-indigo-100/80 rounded-2xl px-4 py-3 flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-indigo-100">
+      <div v-if="nursingStore.myStation" class="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl px-4 py-2.5 flex items-center gap-3 text-white shadow-md shadow-indigo-100">
+        <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center font-black text-xs shrink-0">
           NS
         </div>
         <div>
-          <span class="text-[10px] text-indigo-500 uppercase tracking-wider font-bold block leading-none">Your Assigned Station</span>
-          <span class="text-sm font-bold text-indigo-900 mt-0.5 inline-block">{{ nursingStore.myStation.name }} ({{ nursingStore.myStation.code }})</span>
+          <span class="text-[9px] uppercase tracking-wider font-bold block text-indigo-100 leading-tight">Assigned Station</span>
+          <span class="text-xs font-black tracking-wide">{{ nursingStore.myStation.name }} ({{ nursingStore.myStation.code }})</span>
         </div>
       </div>
     </div>
 
     <!-- Station KPI Dashboard -->
-    <div v-if="selectedStationDetails" class="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div v-if="selectedStationDetails" class="grid grid-cols-2 md:grid-cols-4 gap-4">
       
       <!-- Total Assigned Beds -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-        <div class="space-y-1">
-          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Assigned Beds</span>
-          <span class="text-3xl font-extrabold text-slate-800">{{ totalBedsCount }}</span>
-          <span class="text-[11px] text-slate-400 block mt-1">Total physical beds in ward</span>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Assigned Beds</span>
+          <span class="text-2xl font-black text-slate-900 font-mono">{{ totalBedsCount }}</span>
+          <span class="text-[10px] text-slate-400 block font-medium mt-0.5">Physical ward beds</span>
         </div>
-        <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
         </div>
       </div>
 
       <!-- Occupied Beds -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-        <div class="space-y-1">
-          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Occupied Beds</span>
-          <span class="text-3xl font-extrabold text-indigo-600">{{ occupiedBedsCount }}</span>
-          <span class="text-[11px] text-indigo-500 font-semibold block mt-1">Occupancy: {{ occupancyRate }}%</span>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Occupied Beds</span>
+          <span class="text-2xl font-black text-indigo-600 font-mono">{{ occupiedBedsCount }}</span>
+          <span class="text-[10px] text-indigo-600 font-bold block mt-0.5">Occupancy: {{ occupancyRate }}%</span>
         </div>
-        <div class="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        <div class="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
         </div>
       </div>
 
       <!-- Available Beds -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-        <div class="space-y-1">
-          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Available Beds</span>
-          <span class="text-3xl font-extrabold text-emerald-600">{{ availableBedsCount }}</span>
-          <span class="text-[11px] text-emerald-500 font-semibold block mt-1">Ready for admission</span>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Available Beds</span>
+          <span class="text-2xl font-black text-emerald-600 font-mono">{{ availableBedsCount }}</span>
+          <span class="text-[10px] text-emerald-600 font-bold block mt-0.5">Ready for admission</span>
         </div>
-        <div class="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         </div>
       </div>
 
       <!-- Emergency Cases -->
-      <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
-        <div class="space-y-1">
-          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Emergency Cases</span>
-          <span class="text-3xl font-extrabold text-rose-600">{{ emergencyCount }}</span>
-          <span class="text-[11px] text-rose-500 font-semibold block mt-1">Requires immediate attention</span>
+      <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
+        <div>
+          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Emergency Cases</span>
+          <span class="text-2xl font-black text-rose-600 font-mono">{{ emergencyCount }}</span>
+          <span class="text-[10px] text-rose-500 font-bold block mt-0.5">Urgent priority</span>
         </div>
-        <div class="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-600">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <div class="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         </div>
       </div>
 
     </div>
 
     <!-- Main Table Container -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
       
       <!-- Filters header -->
-      <div class="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col lg:flex-row justify-between items-center gap-4">
-        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+      <div class="p-4 border-b border-slate-100 bg-slate-50/40 flex flex-col lg:flex-row justify-between items-center gap-3">
+        <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
           
-          <!-- Nursing Station Selector -->
-          <div class="flex flex-col">
-            <select 
-              v-model="filters.nursingStationId"
-              class="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[200px]"
-            >
-              <option value="" disabled>Select Nursing Station...</option>
-              <option v-for="s in nursingStore.stations" :key="s._id" :value="s._id">
-                {{ s.name }} ({{ s.code }})
-              </option>
-            </select>
-          </div>
+          <!-- Nursing Station Selector (SuperAdmin only) -->
+          <select 
+            v-if="isSuperAdmin"
+            v-model="filters.nursingStationId"
+            class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[200px]"
+          >
+            <option value="">All Nursing Stations</option>
+            <option v-for="s in nursingStore.stations" :key="s._id" :value="s._id">
+              {{ s.name }} ({{ s.code }})
+            </option>
+          </select>
 
           <!-- Text Search -->
-          <input 
-            v-model="filters.search"
-            type="text" 
-            placeholder="Search patient name, code or IPD..." 
-            class="px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[220px]"
-          />
+          <div class="relative min-w-[220px]">
+            <input 
+              v-model="filters.search"
+              type="text" 
+              placeholder="Search patient name, code or IPD..." 
+              class="w-full pl-9 pr-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-800 shadow-2xs"
+            />
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
 
           <!-- Status Filter -->
           <select 
             v-model="filters.status" 
-            class="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[140px]"
+            class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[140px]"
           >
             <option value="">All Statuses</option>
             <option value="ADMITTED">Active Admitted</option>
@@ -249,92 +267,88 @@ const getStatusColor = (status) => {
           <button 
             v-if="filters.search || filters.date || filters.status !== 'ADMITTED'"
             @click="clearFilters"
-            class="text-sm font-semibold text-rose-600 hover:text-rose-700 hover:underline px-2 cursor-pointer"
+            class="text-xs font-bold text-rose-600 hover:text-rose-700 px-2 py-1 bg-rose-50 rounded-lg border border-rose-100 cursor-pointer transition-all"
           >
             Clear Filters
           </button>
         </div>
 
-        <div class="text-sm font-semibold text-slate-600 whitespace-nowrap">
-          Monitored Patients: {{ admissionStore.pagination.total }}
+        <div class="text-xs font-bold text-slate-500 whitespace-nowrap self-end lg:self-center">
+          Monitored Inpatients: <span class="text-slate-800 font-mono text-sm font-black">{{ admissionStore.pagination.total }}</span>
         </div>
       </div>
 
       <!-- Patients Table -->
       <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead class="bg-slate-50/80 text-slate-500 font-semibold uppercase tracking-wider text-xs border-b border-slate-100">
+        <table class="w-full text-left text-xs whitespace-nowrap">
+          <thead class="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
             <tr>
-              <th class="px-6 py-4">IPD No. / Date</th>
-              <th class="px-6 py-4">Patient Info</th>
-              <th class="px-6 py-4">Bed & Floor Location</th>
-              <th class="px-6 py-4">Days In Ward</th>
-              <th class="px-6 py-4">Consultant Doctor</th>
-              <th class="px-6 py-4">Diagnosis</th>
-              <th class="px-6 py-4">Status</th>
-              <th class="px-6 py-4 text-center">Action</th>
+              <th class="px-5 py-3.5">IPD No. / Date</th>
+              <th class="px-5 py-3.5">Patient Details</th>
+              <th class="px-5 py-3.5">Length of Stay</th>
+              <th class="px-5 py-3.5">Consultant Doctor</th>
+              <th class="px-5 py-3.5">Status</th>
+              <th class="px-5 py-3.5 text-center">Action</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 text-slate-700">
             <tr v-if="loading">
-              <td colspan="8" class="px-6 py-12 text-center text-slate-400">
-                <svg class="animate-spin h-8 w-8 mx-auto text-indigo-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Loading patients registry...
+              <td colspan="6" class="px-6 py-16 text-center text-slate-400">
+                <svg class="animate-spin h-8 w-8 mx-auto text-indigo-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <span class="text-xs font-semibold">Loading monitored patients registry...</span>
               </td>
             </tr>
             <tr v-else-if="admissionStore.admissions.length === 0">
-              <td colspan="8" class="px-6 py-12 text-center text-slate-500">
-                <svg class="w-12 h-12 mx-auto text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-                <p class="font-semibold text-slate-600">No active admissions for this station.</p>
-                <p class="text-xs text-slate-400 mt-1">Please select another nursing station or verify assignments.</p>
+              <td colspan="6" class="px-6 py-16 text-center text-slate-500">
+                <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
+                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                </div>
+                <p class="font-bold text-slate-700 text-sm">No active admissions for this station.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Select another nursing station or adjust your filter criteria.</p>
               </td>
             </tr>
             <tr 
               v-else
               v-for="adm in admissionStore.admissions" 
               :key="adm._id"
-              class="hover:bg-slate-50/50 transition-colors group"
+              class="hover:bg-slate-50/60 transition-colors group"
             >
               <!-- IPD No & Date -->
-              <td class="px-6 py-4">
-                <span class="font-mono text-indigo-600 font-bold block">{{ adm.admissionNo }}</span>
-                <span class="text-slate-400 text-xs mt-0.5 block">{{ formatDate(adm.admissionDate) }}</span>
+              <td class="px-5 py-3.5">
+                <span class="font-mono text-indigo-700 font-bold block text-xs">{{ adm.admissionNo }}</span>
+                <span class="text-slate-400 text-[11px] mt-0.5 block">{{ formatDate(adm.admissionDate) }}</span>
               </td>
               
               <!-- Patient Info -->
-              <td class="px-6 py-4">
-                <p class="font-bold text-slate-800">{{ adm.patientId?.fullName || 'N/A' }}</p>
-                <p class="text-xs text-slate-500">{{ adm.patientId?.patientCode || '-' }} • {{ adm.patientId?.gender }}, {{ adm.patientId?.age || '?' }}y</p>
-              </td>
-              
-              <!-- Location -->
-              <td class="px-6 py-4">
-                <p class="font-semibold text-slate-800">Bed {{ adm.bedId?.bedNo || 'N/A' }}</p>
-                <p class="text-xs text-slate-500">{{ adm.bedId?.wardId?.name || 'Unknown Ward' }} • Floor {{ adm.bedId?.floor || '-' }}</p>
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-extrabold flex items-center justify-center text-xs shrink-0 border border-slate-200">
+                    {{ (adm.patientId?.fullName || 'P')[0] }}
+                  </div>
+                  <div>
+                    <p class="font-bold text-slate-800 leading-snug">{{ adm.patientId?.fullName || 'N/A' }}</p>
+                    <p class="text-[11px] text-slate-400 font-mono mt-0.5">{{ adm.patientId?.patientCode || '-' }} • {{ adm.patientId?.gender || '-' }}, {{ adm.patientId?.age || '?' }}y</p>
+                  </div>
+                </div>
               </td>
               
               <!-- Days Admitted -->
-              <td class="px-6 py-4 text-slate-600 font-bold text-sm">
-                {{ getDaysAdmitted(adm.admissionDate) }} Days
+              <td class="px-5 py-3.5">
+                <span class="px-2.5 py-1 bg-slate-100 rounded-md font-mono font-bold text-slate-800 text-xs inline-block">
+                  {{ getDaysAdmitted(adm.admissionDate) }} Days
+                </span>
               </td>
               
               <!-- Doctor -->
-              <td class="px-6 py-4">
-                <p class="font-bold text-slate-800"> {{ adm.consultantDoctorId?.fullName || 'N/A' }}</p>
-                <p class="text-xs text-slate-500 font-medium">{{ adm.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
-              </td>
-              
-              <!-- Diagnosis -->
-              <td class="px-6 py-4">
-                <span class="text-xs px-2.5 py-1 bg-slate-100 rounded-md font-semibold text-slate-600 inline-block max-w-[150px] truncate" :title="adm.diagnosis">
-                  {{ adm.diagnosis || 'None Specified' }}
-                </span>
+              <td class="px-5 py-3.5">
+                <p class="font-bold text-slate-800">{{ adm.consultantDoctorId?.fullName || 'N/A' }}</p>
+                <p class="text-[11px] text-slate-400">{{ adm.consultantDoctorId?.specializationId?.name || 'General Consultant' }}</p>
               </td>
 
               <!-- Status -->
-              <td class="px-6 py-4">
+              <td class="px-5 py-3.5">
                 <span 
-                  class="px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider border"
+                  class="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border"
                   :class="getStatusColor(adm.status)"
                 >
                   {{ adm.status }}
@@ -342,14 +356,13 @@ const getStatusColor = (status) => {
               </td>
               
               <!-- Action -->
-              <td class="px-6 py-4 text-center">
+              <td class="px-5 py-3.5 text-center">
                 <button 
                   @click="router.push({ name: 'ipd-patient-view', params: { id: adm._id } })"
-                  class="bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-700 p-2 rounded-xl transition-all border border-slate-200 shadow-sm cursor-pointer inline-flex items-center justify-center"
-                  title="View Patient Dashboard"
+                  class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 transition-all border border-indigo-100 cursor-pointer inline-flex items-center justify-center shadow-2xs"
+                  title="Open Patient Clinical Chart & Dashboard"
                 >
-                  <!-- Eye Icon -->
-                  <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
@@ -360,25 +373,27 @@ const getStatusColor = (status) => {
         </table>
       </div>
 
-      <!-- Pagination -->
-      <div v-if="admissionStore.pagination.pages > 1" class="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
-        <button 
-          @click="filters.page--" 
-          :disabled="filters.page === 1"
-          class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          Previous
-        </button>
-        <span class="text-sm font-semibold text-slate-600">
-          Page {{ filters.page }} of {{ admissionStore.pagination.pages }}
+      <!-- Pagination Footer -->
+      <div v-if="admissionStore.pagination.pages > 1" class="p-4 px-6 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 text-xs">
+        <span class="text-slate-500 font-semibold">
+          Page <strong class="text-slate-800">{{ filters.page }}</strong> of <strong class="text-slate-800">{{ admissionStore.pagination.pages }}</strong>
         </span>
-        <button 
-          @click="filters.page++" 
-          :disabled="filters.page === admissionStore.pagination.pages"
-          class="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
-        >
-          Next
-        </button>
+        <div class="flex gap-1.5">
+          <button 
+            @click="filters.page--" 
+            :disabled="filters.page === 1"
+            class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+          >
+            Previous
+          </button>
+          <button 
+            @click="filters.page++" 
+            :disabled="filters.page === admissionStore.pagination.pages"
+            class="px-3 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
     </div>

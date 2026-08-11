@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
@@ -34,6 +34,25 @@ const authStore = useAuthStore()
 const canViewTransactions = computed(() => {
   const role = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
   return ['SuperAdmin', 'HospitalAdmin'].includes(role)
+})
+
+const isSuperAdmin = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return roleName === 'SuperAdmin' || roleName === 'Super Admin'
+})
+
+const wardOptions = computed(() => {
+  return (wardStore.wards || []).map(ward => ({
+    value: ward._id,
+    label: `${ward.name} (Floor: ${ward.floor || '-'})`
+  }))
+})
+
+const bedOptions = computed(() => {
+  return (availableBeds.value || []).map(bed => ({
+    value: bed._id,
+    label: `Bed ${bed.bedNo} (${bed.bedType} - ₹${bed.dailyRate}/day)`
+  }))
 })
 
 const loading = ref(true)
@@ -109,6 +128,10 @@ const onWardChange = async () => {
   const beds = await wardStore.fetchBeds(transferForm.value.wardId, 'AVAILABLE')
   availableBeds.value = beds
 }
+
+watch(() => transferForm.value.wardId, () => {
+  onWardChange()
+})
 
 const submitTransfer = async () => {
   if (!transferForm.value.bedId) {
@@ -218,7 +241,101 @@ const getAdmissionTypeColor = (type) => {
   }
 }
 
+const getPayerTypeLabel = (type) => {
+  switch (type) {
+    case 'MUHCS': return 'MUHCS'
+    case 'MR_STATE': return 'MR (STATE)'
+    case 'MR_CENTRAL': return 'MR (CENTRAL)'
+    case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
+    case 'NORMAL':
+    default: return 'NORMAL'
+  }
+}
 
+// Edit Admission Modal State & Handlers
+const showEditAdmissionModal = ref(false)
+const editAdmissionSubmitting = ref(false)
+const editAdmissionForm = ref({
+  admissionDate: '',
+  admissionType: 'NORMAL',
+  payerType: 'NORMAL',
+  diagnosis: '',
+  remarks: ''
+})
+
+const openEditAdmissionModal = () => {
+  if (!admission.value) return
+  let formattedDate = ''
+  if (admission.value.admissionDate) {
+    const d = new Date(admission.value.admissionDate)
+    const year = d.getFullYear()
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    const hours = String(d.getHours()).padStart(2, '0')
+    const minutes = String(d.getMinutes()).padStart(2, '0')
+    formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`
+  }
+
+  editAdmissionForm.value = {
+    admissionDate: formattedDate,
+    admissionType: admission.value.admissionType || 'NORMAL',
+    payerType: admission.value.payerType || 'NORMAL',
+    diagnosis: admission.value.diagnosis || '',
+    remarks: admission.value.remarks || ''
+  }
+  showEditAdmissionModal.value = true
+}
+
+const submitEditAdmission = async () => {
+  editAdmissionSubmitting.value = true
+  const res = await admissionStore.updateAdmission(admission.value._id, editAdmissionForm.value)
+  editAdmissionSubmitting.value = false
+
+  if (res.success) {
+    snackbarStore.show({ message: 'Admission details updated successfully', type: 'success' })
+    showEditAdmissionModal.value = false
+    await fetchAdmissionDetails()
+  } else {
+    snackbarStore.show({ message: res.message || 'Failed to update admission details', type: 'error' })
+  }
+}
+
+// Discharge Modal State & Handlers
+const showDischargeModal = ref(false)
+const isProcessingDischarge = ref(false)
+const dischargeForm = ref({
+  status: 'DISCHARGED',
+  remarks: ''
+})
+
+const openDischargeModal = () => {
+  dischargeForm.value = {
+    status: 'DISCHARGED',
+    remarks: admission.value?.remarks || ''
+  }
+  showDischargeModal.value = true
+}
+
+const handleDischarge = async () => {
+  if (!admission.value) return
+  isProcessingDischarge.value = true
+  const res = await admissionStore.updateAdmission(admission.value._id, {
+    status: dischargeForm.value.status,
+    remarks: dischargeForm.value.remarks
+  })
+  isProcessingDischarge.value = false
+
+  if (res.success) {
+    snackbarStore.show({ 
+      message: dischargeForm.value.status === 'DISCHARGED' ? 'Patient discharged successfully!' : 'Admission cancelled successfully!', 
+      type: 'success' 
+    })
+    showDischargeModal.value = false
+    await fetchAdmissionDetails()
+  } else {
+    snackbarStore.show({ message: res.message || 'Failed to discharge patient', type: 'error' })
+  }
+}
 
 // Update Patient Modal States
 const showUpdatePatientModal = ref(false)
@@ -479,13 +596,23 @@ onMounted(async () => {
           <p class="text-slate-500 mt-1 text-sm">Monitored patient inpatient files, pharmacy requests, and hospital charges.</p>
         </div>
       </div>
-      <div v-if="admission" class="flex items-center gap-2">
+      <div v-if="admission" class="flex items-center gap-3">
         <span 
-          class="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider border"
+          class="px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider border shadow-2xs"
           :class="getStatusColor(admission.status)"
         >
           {{ admission.status }}
         </span>
+        <button 
+          v-if="isSuperAdmin && admission.status === 'ADMITTED'"
+          @click="openDischargeModal"
+          class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-sm hover:shadow transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          Discharge Patient
+        </button>
       </div>
     </div>
 
@@ -558,16 +685,40 @@ onMounted(async () => {
                 {{ admission.admissionType }}
               </span>
             </p>
+            <p><span class="font-semibold text-slate-500">Payer Type:</span> <strong class="text-slate-800 font-bold ml-1">{{ getPayerTypeLabel(admission.payerType) }}</strong></p>
           </div>
-          <button 
-            @click="openAdvanceModal"
-            class="mt-3 w-full py-1.5 border border-emerald-100 hover:border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Advance
-          </button>
+          <div class="mt-3 flex items-center gap-2">
+            <button 
+              @click="openEditAdmissionModal"
+              class="flex-1 py-1.5 border border-indigo-100 hover:border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 text-indigo-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+              title="Edit admission details"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+              Edit
+            </button>
+            <button 
+              v-if="isSuperAdmin"
+              @click="openAdvanceModal"
+              class="flex-1 py-1.5 border border-emerald-100 hover:border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Advance
+            </button>
+            <button 
+              v-if="isSuperAdmin && admission.status === 'ADMITTED'"
+              @click="openDischargeModal"
+              class="flex-1 py-1.5 border border-rose-100 hover:border-rose-200 bg-rose-50/50 hover:bg-rose-50 text-rose-700 text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              Discharge
+            </button>
+          </div>
         </div>
 
         <!-- Column 3: Bed & Location -->
@@ -751,42 +902,29 @@ onMounted(async () => {
 
       <!-- Modal Body Form -->
       <div class="p-6 overflow-y-auto space-y-4 flex-1">
-        <!-- Select Ward -->
-        <div class="space-y-1">
-          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Target Ward</label>
-          <select 
+        <!-- Select Ward (Searchable) -->
+        <div>
+          <SearchableSelect
             v-model="transferForm.wardId"
-            @change="onWardChange"
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
-          >
-            <option value="">Select Ward...</option>
-            <option 
-              v-for="ward in wardStore.wards" 
-              :key="ward._id" 
-              :value="ward._id"
-            >
-              {{ ward.name }} (Floor: {{ ward.floor || '-' }})
-            </option>
-          </select>
+            id="target-ward-select"
+            label="Target Ward"
+            placeholder="Search & select target ward..."
+            :options="wardOptions"
+            :required="true"
+          />
         </div>
 
-        <!-- Select Bed -->
-        <div class="space-y-1">
-          <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Target Bed</label>
-          <select 
+        <!-- Select Bed (Searchable) -->
+        <div>
+          <SearchableSelect
             v-model="transferForm.bedId"
+            id="target-bed-select"
+            label="Target Bed"
+            placeholder="Search & select target bed..."
+            :options="bedOptions"
             :disabled="!transferForm.wardId"
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white disabled:bg-slate-50 font-medium text-xs transition-all"
-          >
-            <option value="">Select Bed...</option>
-            <option 
-              v-for="bed in availableBeds" 
-              :key="bed._id" 
-              :value="bed._id"
-            >
-              Bed {{ bed.bedNo }} ({{ bed.bedType }} - ₹{{ bed.dailyRate }}/day)
-            </option>
-          </select>
+            :required="true"
+          />
           <p v-if="transferForm.wardId && availableBeds.length === 0" class="text-[10px] text-rose-500 font-semibold mt-1">
             No available beds in the selected ward.
           </p>
@@ -971,6 +1109,181 @@ onMounted(async () => {
             <span>Save Changes</span>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Edit Admission Modal -->
+    <div 
+      v-if="showEditAdmissionModal" 
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
+    >
+      <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+        <!-- Modal Title Header -->
+        <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">Edit Admission Details</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Modify admission info in case of entry errors.</p>
+          </div>
+          <button 
+            @click="showEditAdmissionModal = false"
+            class="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+          >
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Modal Body Form -->
+        <form @submit.prevent="submitEditAdmission" class="p-6 overflow-y-auto space-y-4 flex-1">
+          <!-- Admission Date & Time -->
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Admission Date & Time</label>
+            <input 
+              v-model="editAdmissionForm.admissionDate"
+              type="datetime-local"
+              required
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium text-xs transition-all"
+            />
+          </div>
+
+          <!-- Admission Type & Payer Type Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Admission Type</label>
+              <select 
+                v-model="editAdmissionForm.admissionType"
+                required
+                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
+              >
+                <option value="NORMAL">NORMAL</option>
+                <option value="EMERGENCY">EMERGENCY</option>
+                <option value="TRANSFER">TRANSFER</option>
+              </select>
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Payer Type</label>
+              <select 
+                v-model="editAdmissionForm.payerType"
+                required
+                class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
+              >
+                <option value="NORMAL">NORMAL</option>
+                <option value="MUHCS">MUHCS</option>
+                <option value="MR_STATE">MR (STATE)</option>
+                <option value="MR_CENTRAL">MR (CENTRAL)</option>
+                <option value="HEALTH_INSURANCE">HEALTH INSURANCE</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Diagnosis -->
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Preliminary Diagnosis</label>
+            <input 
+              v-model="editAdmissionForm.diagnosis"
+              type="text"
+              placeholder="e.g. Acute Appendicitis"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium text-xs transition-all"
+            />
+          </div>
+
+          <!-- Remarks -->
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Admission Remarks / Notes</label>
+            <textarea 
+              v-model="editAdmissionForm.remarks"
+              rows="3"
+              placeholder="Any specific instructions or notes..."
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium text-xs transition-all"
+            ></textarea>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="pt-4 border-t border-slate-100 flex justify-end gap-3">
+            <button 
+              type="button"
+              @click="showEditAdmissionModal = false"
+              class="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit"
+              :disabled="editAdmissionSubmitting"
+              class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-md shadow-indigo-100 transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <svg v-if="editAdmissionSubmitting" class="animate-spin -ml-1 mr-1 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>Save Changes</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Discharge Admission Modal Overlay -->
+    <div v-if="showDischargeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
+      <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden flex flex-col">
+        <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h3 class="font-bold text-slate-800 text-base">Discharge Patient</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Discharge patient and release bed allocation.</p>
+          </div>
+          <button @click="showDischargeModal = false" class="text-slate-400 hover:text-slate-600 rounded-xl p-1.5 hover:bg-slate-100 transition-colors cursor-pointer">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form @submit.prevent="handleDischarge" class="p-6 space-y-4">
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Target Action / Status</label>
+            <select 
+              v-model="dischargeForm.status"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
+            >
+              <option value="DISCHARGED">DISCHARGE PATIENT (Frees bed allocation)</option>
+              <option value="CANCELLED">CANCEL ADMISSION</option>
+            </select>
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Discharge Remarks / Notes</label>
+            <textarea 
+              v-model="dischargeForm.remarks"
+              rows="3"
+              placeholder="e.g. Patient recovered well and discharged with medication instructions..."
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
+            ></textarea>
+          </div>
+
+          <div class="pt-3 border-t border-slate-100 flex justify-end gap-3">
+            <button 
+              type="button" 
+              @click="showDischargeModal = false" 
+              class="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit"
+              :disabled="isProcessingDischarge"
+              class="px-5 py-2 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-2 cursor-pointer"
+              :class="dischargeForm.status === 'DISCHARGED' ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-100' : 'bg-slate-700 hover:bg-slate-800'"
+            >
+              <svg v-if="isProcessingDischarge" class="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span>{{ dischargeForm.status === 'DISCHARGED' ? 'Discharge Patient' : 'Confirm Cancel' }}</span>
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
