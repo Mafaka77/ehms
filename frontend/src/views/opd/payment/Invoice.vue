@@ -122,6 +122,19 @@ const formatDateOnly = (dateString) => {
   })
 }
 
+
+const invoicePaymentMode = computed(() => {
+  if (props.billDetails?.payments && props.billDetails.payments.length > 0) {
+    const activePayments = props.billDetails.payments.filter(p => p.status === 'SUCCESS' || !p.status)
+    const list = activePayments.length > 0 ? activePayments : props.billDetails.payments
+    const modes = [...new Set(list.map(p => p.paymentMode || p.mode || 'CASH'))]
+    return modes.join(', ')
+  }
+  if (props.billDetails?.paymentMode) return props.billDetails.paymentMode
+  if (props.appointment?.paymentMode) return props.appointment.paymentMode
+  return 'CASH'
+})
+
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val || 0)
 }
@@ -170,12 +183,11 @@ const formatCurrency = (val) => {
                 <p><strong>Bill No:</strong> <span class="font-mono">{{ billDetails.billNo }}</span></p>
                 <p><strong>Date:</strong> {{ formatDate(billDetails.generatedAt || billDetails.createdAt) }}</p>
                 <p><strong>Status:</strong> <span class="uppercase font-bold">{{ billDetails.status }}</span></p>
-                <p v-if="billDetails.billType === 'OPD_CHARGES'"><strong>Payment Mode:</strong> <span class="uppercase font-bold">{{ billDetails.payments?.[0]?.paymentMode || 'CASH' }}</span></p>
-                <p v-else><strong>Appt No:</strong> <span class="font-mono">{{ appointment.appointmentId }}</span></p>
+                <p><strong>Payment Mode:</strong> <span class="uppercase font-bold font-mono">{{ invoicePaymentMode }}</span></p>
               </div>
               <div class="text-right">
                 <p class="patient-name truncate"><strong>Patient:</strong> {{ appointment.patientId?.fullName }}</p>
-                <p v-if="billDetails.billType === 'OPD_CHARGES'" class="truncate"><strong>Address:</strong> {{ appointment.patientId?.address || 'N/A' }}</p>
+                <p v-if="appointment.appointmentId" class="truncate"><strong>Appt No:</strong> <span class="font-mono">{{ appointment.appointmentId }}</span></p>
                 <p v-else><strong>Code:</strong> <span class="font-mono">{{ appointment.patientId?.patientCode }}</span></p>
                 <p><strong>Age/Gender:</strong> {{ patientAge }} / {{ appointment.patientId?.gender }}</p>
                 <p><strong>Contact:</strong> {{ appointment.patientId?.mobileNo }}</p>

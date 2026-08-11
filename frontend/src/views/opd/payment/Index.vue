@@ -201,6 +201,20 @@ const clearFilters = () => {
   fetchAppointments()
 }
 
+
+const getApptPaymentMode = (a) => {
+  if (a.bill && a.bill.payments && a.bill.payments.length > 0) {
+    const activePayments = a.bill.payments.filter(p => p.status === 'SUCCESS' || !p.status)
+    const list = activePayments.length > 0 ? activePayments : a.bill.payments
+    const modes = [...new Set(list.map(p => p.paymentMode || p.mode || 'CASH'))]
+    return modes.join(', ')
+  }
+  if (a.bill && a.bill.paymentMode) return a.bill.paymentMode
+  if (a.paymentMode) return a.paymentMode
+  if (a.paymentStatus === 'Paid') return 'CASH'
+  return '-'
+}
+
 const handleExportPdf = async () => {
   isExportingPdf.value = true
   try {
@@ -362,12 +376,13 @@ const handleExportPdf = async () => {
             <thead>
               <tr>
                 <th style="width: 4%;">#</th>
-                <th style="width: 14%;">Appt ID</th>
-                <th style="width: 15%;">Appt Date</th>
-                <th style="width: 27%;">Patient Details</th>
-                <th style="width: 20%;">Doctor</th>
-                <th style="width: 10%; text-align: center;">Status</th>
-                <th style="width: 10%; text-align: right;">Fee (₹)</th>
+                <th style="width: 13%;">Appt ID</th>
+                <th style="width: 13%;">Appt Date</th>
+                <th style="width: 23%;">Patient Details</th>
+                <th style="width: 17%;">Doctor</th>
+                <th style="width: 13%;">Payment Mode</th>
+                <th style="width: 9%; text-align: center;">Status</th>
+                <th style="width: 8%; text-align: right;">Fee (₹)</th>
               </tr>
             </thead>
             <tbody>
@@ -384,7 +399,7 @@ const handleExportPdf = async () => {
                   chargesHtml = `
                     <tr style="background-color: #f8fafc;">
                       <td></td>
-                      <td colspan="6" style="padding: 4px 8px; border-left: 2px solid #e2e8f0;">
+                      <td colspan="7" style="padding: 4px 8px; border-left: 2px solid #e2e8f0;">
                         <div style="font-size: 10px; font-weight: bold; color: #64748b; margin-bottom: 4px; text-transform: uppercase;">Treatment Charges:</div>
                         <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
                           <thead>
@@ -434,6 +449,7 @@ const handleExportPdf = async () => {
                   `
                 }
 
+                const payMode = getApptPaymentMode(a)
                 return `
                   <tr>
                     <td>${idx + 1}</td>
@@ -441,6 +457,7 @@ const handleExportPdf = async () => {
                     <td>${dt}</td>
                     <td><strong>${pName}</strong><br><span style="color:#64748b; font-size:9.5px;">Code: ${pCode}</span></td>
                     <td>${docName}</td>
+                    <td style="font-weight: 600; font-family: monospace; color: #4338ca; text-transform: uppercase;">${payMode}</td>
                     <td class="text-center"><span class="status-badge ${stClass}">${st}</span></td>
                     <td class="amount-col">₹${(a.consultationFee || 0).toFixed(2)}</td>
                   </tr>

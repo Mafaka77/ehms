@@ -118,14 +118,23 @@ exports.getAppointments = async (query) => {
 
         // Fetch corresponding Bill records for these appointments
         const Bill = mongoose.model('Bill');
+        const Payment = mongoose.model('Payment');
         const appointmentIds = appointments.map(a => a._id);
-        const bills = await Bill.find({ opdAppointmentId: { $in: appointmentIds } });
+        const bills = await Bill.find({ opdAppointmentId: { $in: appointmentIds } }).lean();
+        const billIds = bills.map(b => b._id);
+        const payments = await Payment.find({ billId: { $in: billIds } }).lean();
 
         const appointmentsObj = appointments.map(appt => {
             const apptObj = appt.toObject();
             const bill = bills.find(b => b.opdAppointmentId && b.opdAppointmentId.toString() === appt._id.toString());
-            apptObj.billId = bill ? bill._id : null;
-            apptObj.bill = bill || null;
+            if (bill) {
+                bill.payments = payments.filter(p => p.billId && p.billId.toString() === bill._id.toString());
+                apptObj.billId = bill._id;
+                apptObj.bill = bill;
+            } else {
+                apptObj.billId = null;
+                apptObj.bill = null;
+            }
             return apptObj;
         });
 

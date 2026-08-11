@@ -20,7 +20,10 @@
           </span>
         </h2>
       </div>
-      <div class="text-right">
+      <div class="text-right flex items-center gap-2">
+        <span v-if="appointment.paymentMode || getPaymentModeText(consultationBill || chargesBill)" class="px-2.5 py-1 text-xs font-bold font-mono uppercase tracking-wider rounded-md border bg-slate-100 text-slate-700 border-slate-200">
+          Mode: {{ appointment.paymentMode || getPaymentModeText(consultationBill || chargesBill) }}
+        </span>
         <span :class="['px-2.5 py-1 text-xs font-bold uppercase tracking-wider rounded-md border', getPaymentStatusColor(appointment.paymentStatus)]">
           {{ appointment.paymentStatus || 'Unpaid' }}
         </span>
@@ -174,15 +177,60 @@
             </div>
           </div>
 
-          <div v-if="consultationBill" class="bg-slate-50 rounded-lg p-4 flex justify-between items-center text-xs border border-slate-100">
-            <div>
-              <p class="text-slate-500 mb-1">Bill No: <span class="font-mono font-bold text-slate-800">{{ consultationBill.billNo }}</span></p>
+          <div v-if="consultationBill" class="bg-slate-50 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs border border-slate-100">
+            <div class="space-y-1">
+              <p class="text-slate-500">Bill No: <span class="font-mono font-bold text-slate-800">{{ consultationBill.billNo }}</span></p>
               <p class="text-slate-500">Generated: {{ formatDate(consultationBill.generatedAt) }}</p>
+              <p v-if="getPaymentModeText(consultationBill)" class="text-slate-600 flex items-center gap-1.5 pt-0.5">
+                <span>Payment Mode:</span>
+                <span class="font-bold text-indigo-700 font-mono uppercase bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md text-[11px]">
+                  {{ getPaymentModeText(consultationBill) }}
+                </span>
+              </p>
             </div>
-            <div class="text-right">
+            <div class="text-left sm:text-right">
               <p class="font-semibold text-slate-800">Net Amount: <span class="text-sm font-mono text-indigo-600 font-bold">{{ formatCurrency(consultationBill.netAmount) }}</span></p>
               <p class="text-slate-500 font-medium mt-0.5">Balance: {{ formatCurrency(consultationBill.balanceAmount) }}</p>
             </div>
+          </div>
+
+          <!-- Consultation Bill Payments Table -->
+          <div v-if="consultationBill && consultationBill.payments && consultationBill.payments.length > 0" class="border border-slate-200/80 rounded-xl overflow-hidden text-xs shadow-xs">
+            <div class="bg-slate-100/70 px-4 py-2 font-bold text-slate-700 border-b border-slate-200/60 flex items-center justify-between">
+              <span>Payment History</span>
+              <span class="text-[10px] text-slate-500 font-semibold">{{ consultationBill.payments.length }} Transaction(s)</span>
+            </div>
+            <table class="w-full text-left">
+              <thead class="bg-slate-50 text-slate-400 font-semibold uppercase text-[10px] border-b border-slate-100">
+                <tr>
+                  <th class="px-3 py-2">Receipt / Txn No</th>
+                  <th class="px-3 py-2">Date</th>
+                  <th class="px-3 py-2">Payment Mode</th>
+                  <th class="px-3 py-2 text-right">Amount</th>
+                  <th class="px-3 py-2 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="pay in consultationBill.payments" :key="pay._id" class="hover:bg-slate-50/50">
+                  <td class="px-3 py-2.5 font-mono font-semibold text-slate-800">
+                    {{ pay.paymentNo }}
+                    <span v-if="pay.transactionNo" class="text-[10px] text-slate-400 font-normal block">Ref: {{ pay.transactionNo }}</span>
+                  </td>
+                  <td class="px-3 py-2.5 text-slate-500">{{ formatDate(pay.createdAt) }}</td>
+                  <td class="px-3 py-2.5">
+                    <span class="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                      {{ pay.paymentMode }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right font-mono font-bold text-slate-800">{{ formatCurrency(pay.amount) }}</td>
+                  <td class="px-3 py-2.5 text-center">
+                    <span :class="['px-1.5 py-0.5 text-[9px] font-bold rounded uppercase border', pay.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100']">
+                      {{ pay.status || 'SUCCESS' }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <div class="flex gap-3 justify-end pt-2">
@@ -285,15 +333,60 @@
             </table>
           </div>
 
-          <div v-if="chargesBill" class="bg-slate-50 rounded-lg p-4 flex justify-between items-center text-xs border border-slate-100">
-            <div>
-              <p class="text-slate-500 mb-1">Bill No: <span class="font-mono font-bold text-slate-800">{{ chargesBill.billNo }}</span></p>
+          <div v-if="chargesBill" class="bg-slate-50 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs border border-slate-100">
+            <div class="space-y-1">
+              <p class="text-slate-500">Bill No: <span class="font-mono font-bold text-slate-800">{{ chargesBill.billNo }}</span></p>
               <p class="text-slate-500">Generated: {{ formatDate(chargesBill.generatedAt) }}</p>
+              <p v-if="getPaymentModeText(chargesBill)" class="text-slate-600 flex items-center gap-1.5 pt-0.5">
+                <span>Payment Mode:</span>
+                <span class="font-bold text-indigo-700 font-mono uppercase bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md text-[11px]">
+                  {{ getPaymentModeText(chargesBill) }}
+                </span>
+              </p>
             </div>
-            <div class="text-right">
+            <div class="text-left sm:text-right">
               <p class="font-semibold text-slate-800">Net Amount: <span class="text-sm font-mono text-indigo-600 font-bold">{{ formatCurrency(chargesBill.netAmount) }}</span></p>
               <p class="text-slate-500 font-medium mt-0.5">Balance: {{ formatCurrency(chargesBill.balanceAmount) }}</p>
             </div>
+          </div>
+
+          <!-- Treatment Charges Bill Payments Table -->
+          <div v-if="chargesBill && chargesBill.payments && chargesBill.payments.length > 0" class="border border-slate-200/80 rounded-xl overflow-hidden text-xs shadow-xs">
+            <div class="bg-slate-100/70 px-4 py-2 font-bold text-slate-700 border-b border-slate-200/60 flex items-center justify-between">
+              <span>Payment History</span>
+              <span class="text-[10px] text-slate-500 font-semibold">{{ chargesBill.payments.length }} Transaction(s)</span>
+            </div>
+            <table class="w-full text-left">
+              <thead class="bg-slate-50 text-slate-400 font-semibold uppercase text-[10px] border-b border-slate-100">
+                <tr>
+                  <th class="px-3 py-2">Receipt / Txn No</th>
+                  <th class="px-3 py-2">Date</th>
+                  <th class="px-3 py-2">Payment Mode</th>
+                  <th class="px-3 py-2 text-right">Amount</th>
+                  <th class="px-3 py-2 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr v-for="pay in chargesBill.payments" :key="pay._id" class="hover:bg-slate-50/50">
+                  <td class="px-3 py-2.5 font-mono font-semibold text-slate-800">
+                    {{ pay.paymentNo }}
+                    <span v-if="pay.transactionNo" class="text-[10px] text-slate-400 font-normal block">Ref: {{ pay.transactionNo }}</span>
+                  </td>
+                  <td class="px-3 py-2.5 text-slate-500">{{ formatDate(pay.createdAt) }}</td>
+                  <td class="px-3 py-2.5">
+                    <span class="px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                      {{ pay.paymentMode }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2.5 text-right font-mono font-bold text-slate-800">{{ formatCurrency(pay.amount) }}</td>
+                  <td class="px-3 py-2.5 text-center">
+                    <span :class="['px-1.5 py-0.5 text-[9px] font-bold rounded uppercase border', pay.status === 'SUCCESS' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-100']">
+                      {{ pay.status || 'SUCCESS' }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
           <div class="flex gap-3 justify-end pt-2">
@@ -570,6 +663,22 @@ const formatDate = (dateString) => {
   return new Date(dateString).toLocaleDateString('en-IN', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata'
   })
+}
+
+
+const getPaymentModeText = (bill) => {
+  if (!bill) return null
+  if (bill.payments && bill.payments.length > 0) {
+    const activePayments = bill.payments.filter(p => p.status === 'SUCCESS' || !p.status)
+    const list = activePayments.length > 0 ? activePayments : bill.payments
+    const modes = [...new Set(list.map(p => {
+      const mode = p.paymentMode || p.mode || 'CASH'
+      return p.transactionNo ? `${mode} (${p.transactionNo})` : mode
+    }))]
+    return modes.join(', ')
+  }
+  if (bill.paymentMode) return bill.paymentMode
+  return null
 }
 
 const formatCurrency = (val) => {
