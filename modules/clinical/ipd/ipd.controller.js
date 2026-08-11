@@ -845,3 +845,20 @@ exports.syncAdmissionDates = async (req, res) => {
     }
 }
 
+
+
+exports.deleteAdmissionBedHistory = async (req, res) => {
+    try {
+        const result = await ipdService.deleteAdmissionBedHistory(req.params.id)
+        return res.code(STATUS_CODES.OK).send({
+            message: 'Bed history deleted successfully',
+            data: result,
+            status: STATUS_CODES.OK
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            message: error.message,
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}

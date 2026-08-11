@@ -35,6 +35,7 @@ module.exports = async (fastify, options) => {
     fastify.get('/admission/files/:fileId/download', { onRequest: [auth] }, ipdController.downloadPatientFile)
     fastify.get('/admission/:id/bed-history', { onRequest: [auth] }, ipdController.getAdmissionBedHistory)
     fastify.put('/admission/bed-history/:id', { onRequest: [auth] }, ipdController.updateAdmissionBedHistory)
+    fastify.delete('/admission/bed-history/:id', { onRequest: [auth, authorizeRole(['SuperAdmin', 'Super Admin'])] }, ipdController.deleteAdmissionBedHistory)
     fastify.post('/admission/bed-history/:id/post-charge', { onRequest: [auth] }, ipdController.postAdmissionBedCharge)
     fastify.post('/admission/:id/post-all-bed-charges', { onRequest: [auth] }, ipdController.postAllAdmissionBedCharges)
 

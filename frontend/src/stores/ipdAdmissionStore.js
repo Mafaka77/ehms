@@ -119,6 +119,27 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    
+    async deleteAdmissionBedHistory(id) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.delete(`/ipd/admission/bed-history/${id}`)
+        return {
+          success: true,
+          message: response.data.message || 'Bed history deleted successfully'
+        }
+      } catch (error) {
+        console.error('Error deleting bed history:', error)
+        this.error = error.response?.data?.message || 'Failed to delete bed history'
+        return {
+          success: false,
+          message: this.error
+        }
+      } finally {
+        this.loading = false
+      }
+    },
     async updateAdmissionBedHistory(id, data) {
       this.loading = true
       this.error = null

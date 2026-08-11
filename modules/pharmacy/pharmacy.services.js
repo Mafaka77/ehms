@@ -795,10 +795,14 @@ exports.updateIpdOrderStatus = async (orderId, status, userId) => {
             error.status = STATUS_CODES.NOT_FOUND
             throw error
         }
-        order.status = status
-        await order.save()
 
         if (status === 'ISSUED') {
+            if (order.status === 'ISSUED') {
+                const error = new Error('This order has already been issued')
+                error.status = STATUS_CODES.BAD_REQUEST
+                throw error
+            }
+
             const items = await MedicineIpdOrderItem.find({ medicineIpdOrderId: orderId }).populate('medicineId')
             const PatientCharge = require('../common/patient_charge.model')
             const MedicineBatch = require('./medicine_batch.model')
@@ -811,17 +815,45 @@ exports.updateIpdOrderStatus = async (orderId, status, userId) => {
                 throw error
             }
 
+            // 1. Validate stock availability for all items first
             for (const item of items) {
-                // Get saleRate of the latest active batch of this medicine
+                const medId = item.medicineId?._id || item.medicineId
                 const batches = await MedicineBatch.find({ 
-                    medicineId: item.medicineId?._id || item.medicineId, 
-                    isActive: true 
-                }).sort({ createdAt: -1 })
-                const rate = batches.length > 0 ? batches[0].saleRate : 50
+                    medicineId: medId, 
+                    isActive: true,
+                    currentStock: { $gt: 0 }
+                })
+                const totalStock = batches.reduce((sum, b) => sum + (b.currentStock || 0), 0)
+                if (totalStock < item.quantity) {
+                    const error = new Error(`Insufficient stock for ${item.medicineId?.medicineName || 'medicine'}. Required: ${item.quantity}, Available: ${totalStock}`)
+                    error.status = STATUS_CODES.BAD_REQUEST
+                    throw error
+                }
+            }
+
+            // 2. Perform stock deduction and create patient charge
+            for (const item of items) {
+                const medId = item.medicineId?._id || item.medicineId
+                const batches = await MedicineBatch.find({ 
+                    medicineId: medId, 
+                    isActive: true,
+                    currentStock: { $gt: 0 }
+                }).sort({ expiryDate: 1 })
+
+                let remainingToDeduct = item.quantity
+                let effectiveRate = batches.length > 0 ? batches[0].saleRate : 50
+
+                for (const batch of batches) {
+                    if (remainingToDeduct <= 0) break
+                    const deduct = Math.min(batch.currentStock, remainingToDeduct)
+                    batch.currentStock -= deduct
+                    remainingToDeduct -= deduct
+                    await batch.save()
+                }
 
                 item.issuedQuantity = item.quantity
-                item.rate = rate
-                item.amount = item.quantity * rate
+                item.rate = effectiveRate
+                item.amount = item.quantity * effectiveRate
                 await item.save()
 
                 // Create patient charge for the issued medicine
@@ -833,14 +865,17 @@ exports.updateIpdOrderStatus = async (orderId, status, userId) => {
                     description: `Dispensed: ${item.quantity} units of ${item.medicineId?.medicineName || 'medicine'}`,
                     sourceId: item._id,
                     quantity: item.quantity,
-                    rate: rate,
-                    amount: item.quantity * rate,
+                    rate: effectiveRate,
+                    amount: item.quantity * effectiveRate,
                     isBilled: false,
                     createdBy: userId || null,
                     updatedBy: userId || null
                 })
             }
         }
+
+        order.status = status
+        await order.save()
 
         return order
     } catch (error) {
@@ -872,6 +907,24 @@ exports.returnIpdMedicineItem = async (itemId, returnQty, remarks) => {
         item.quantity = item.issuedQuantity - item.returnedQuantity
         item.amount = item.quantity * (item.rate || 0)
         await item.save()
+
+        // RESTORE STOCK TO MEDICINE BATCH
+        const MedicineBatch = require('./medicine_batch.model')
+        const medId = item.medicineId?._id || item.medicineId
+        
+        let targetBatch = await MedicineBatch.findOne({ 
+            medicineId: medId, 
+            isActive: true 
+        }).sort({ expiryDate: 1 })
+
+        if (!targetBatch) {
+            targetBatch = await MedicineBatch.findOne({ medicineId: medId }).sort({ createdAt: -1 })
+        }
+
+        if (targetBatch) {
+            targetBatch.currentStock = (targetBatch.currentStock || 0) + Number(returnQty)
+            await targetBatch.save()
+        }
 
         // Update original positive patient charge document inside PatientCharge
         const PatientCharge = require('../common/patient_charge.model')

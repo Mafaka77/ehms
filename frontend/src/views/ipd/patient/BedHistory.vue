@@ -1,7 +1,8 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useAuthStore } from '../../../stores/authStore'
 
 const props = defineProps({
   admissionId: {
@@ -16,11 +17,41 @@ const props = defineProps({
 
 const admissionStore = useIpdAdmissionStore()
 const snackbarStore = useSnackbarStore()
+const authStore = useAuthStore()
 
 const loading = ref(false)
 const history = ref([])
 const postingId = ref(null)
 const postingAll = ref(false)
+
+const isSuperAdmin = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return roleName === 'SuperAdmin' || roleName === 'Super Admin'
+})
+
+const deletingId = ref(null)
+
+const deleteHistoryItem = async (item) => {
+  if (item.isCurrent) {
+    snackbarStore.show({ message: 'Cannot delete active current bed allocation', type: 'warning' })
+    return
+  }
+  if (!confirm(`Are you sure you want to delete the bed history record for Bed ${item.bedId?.bedNo || ''}? This action cannot be undone.`)) {
+    return
+  }
+
+  deletingId.value = item._id
+  const res = await admissionStore.deleteAdmissionBedHistory(item._id)
+  deletingId.value = null
+
+  if (res.success) {
+    snackbarStore.show({ message: res.message || 'Bed history record deleted successfully', type: 'success' })
+    await fetchBedHistory()
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
+}
+
 
 const showEditModal = ref(false)
 const submitting = ref(false)
@@ -207,16 +238,34 @@ watch(() => props.admission?.bedId?._id || props.admission?.bedId, async () => {
           class="p-5 border rounded-2xl bg-white shadow-sm max-w-4xl space-y-4 relative group"
           :class="item.isCurrent ? 'border-emerald-200 shadow-emerald-50/30' : 'border-slate-100'"
         >
-          <!-- Edit Button (top-right of card) -->
-          <button 
-            @click="openEditModal(item)"
-            class="absolute top-4 right-4 p-1.5 rounded-lg border border-slate-100 hover:border-slate-200 bg-slate-50/40 text-slate-500 hover:text-indigo-600 transition-all cursor-pointer opacity-0 group-hover:opacity-100 focus:opacity-100"
-            title="Edit Bed Allocation details"
-          >
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          </button>
+          <!-- Action Buttons (top-right of card) -->
+          <div class="absolute top-4 right-4 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+            <button 
+              @click="openEditModal(item)"
+              class="p-1.5 rounded-lg border border-slate-100 hover:border-slate-200 bg-slate-50/40 text-slate-500 hover:text-indigo-600 transition-all cursor-pointer"
+              title="Edit Bed Allocation details"
+            >
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+
+            <button 
+              v-if="isSuperAdmin && !item.isCurrent"
+              @click="deleteHistoryItem(item)"
+              :disabled="deletingId === item._id"
+              class="p-1.5 rounded-lg border border-rose-100 hover:border-rose-200 bg-rose-50/40 text-rose-500 hover:text-rose-700 hover:bg-rose-100 transition-all cursor-pointer disabled:opacity-50"
+              title="Delete Bed History Record (SuperAdmin only)"
+            >
+              <svg v-if="deletingId === item._id" class="animate-spin h-4 w-4 text-rose-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <svg v-else class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
 
           <!-- Title & Badges -->
           <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pr-8">

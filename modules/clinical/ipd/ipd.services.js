@@ -1647,3 +1647,39 @@ exports.syncAdmissionDates = async () => {
         throw error
     }
 }
+
+
+exports.deleteAdmissionBedHistory = async (id) => {
+    try {
+        const AdmissionBedHistory = require('./admission_bed_history.model')
+        const PatientCharge = require('../../common/patient_charge.model')
+
+        const history = await AdmissionBedHistory.findById(id)
+        if (!history) {
+            const error = new Error('Bed history record not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        if (history.isCurrent) {
+            const error = new Error('Current active bed history allocation cannot be deleted')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        const charge = await PatientCharge.findOne({ sourceId: history._id })
+        if (charge) {
+            if (charge.isBilled) {
+                const error = new Error('This bed history record has an already-billed charge and cannot be deleted')
+                error.status = STATUS_CODES.BAD_REQUEST
+                throw error
+            }
+            await PatientCharge.deleteOne({ _id: charge._id })
+        }
+
+        await AdmissionBedHistory.deleteOne({ _id: id })
+        return { success: true }
+    } catch (error) {
+        throw error
+    }
+}
