@@ -556,8 +556,6 @@ onMounted(async () => {
               >
                 <option value="NORMAL">NORMAL</option>
                 <option value="URGENT">URGENT</option>
-                <option value="CRITICAL">CRITICAL</option>
-                <option value="STAT">STAT (Immediate)</option>
               </select>
             </div>
           </div>
