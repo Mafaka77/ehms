@@ -119,7 +119,7 @@ exports.getDoctorActivityList = async (query = {}) => {
             try {
                 activeIpdCount = await Admission.countDocuments({
                     consultantDoctorId: docId,
-                    status: 'Admitted'
+                    status: { $in: ['ADMITTED', 'Admitted'] }
                 });
             } catch (e) {}
 
@@ -189,7 +189,7 @@ exports.getDoctorActivityById = async (doctorId) => {
         try {
             activeAdmissions = await Admission.find({
                 consultantDoctorId: doctorId,
-                status: 'Admitted'
+                status: { $in: ['ADMITTED', 'Admitted'] }
             })
             .populate('patientId', 'patientCode fullName gender age mobileNo')
             .populate('wardId', 'name code')

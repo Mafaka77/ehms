@@ -58,9 +58,9 @@ exports.getAdminDashboardStats = async () => {
         safeCount(Appointment, { appointmentDate: { $gte: todayStart, $lte: todayEnd } }),
         safeCount(Appointment, { appointmentDate: { $gte: thisMonthStart, $lte: thisMonthEnd } }),
         safeCount(Appointment, { appointmentDate: { $gte: lastMonthStart, $lte: lastMonthEnd } }),
-        safeCount(Admission, { status: 'Admitted' }),
+        safeCount(Admission, { status: { $in: ['ADMITTED', 'Admitted'] } }),
         safeCount(Admission, { admissionDate: { $gte: todayStart, $lte: todayEnd } }),
-        safeCount(Admission, { dischargeDate: { $gte: todayStart, $lte: todayEnd }, status: 'Discharged' }),
+        safeCount(Admission, { status: { $in: ['DISCHARGED', 'Discharged'] }, updatedAt: { $gte: todayStart, $lte: todayEnd } }),
         safeCount(Doctor, { isActive: true }),
         safeCount(Employee, { isActive: true }),
         safeSum(Bill, [
