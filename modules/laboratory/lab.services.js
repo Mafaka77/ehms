@@ -1,3 +1,4 @@
+const mongoose = require('mongoose')
 const LabCategory = require('./lab_category.model')
 const LabSampleType = require('./lab_sample_type.model')
 const LabTest = require('./lab_test.model')
@@ -496,7 +497,8 @@ exports.getAllLabOrders = async (query = {}) => {
  
         let filter = {}
         if (search) {
-            const searchRegex = new RegExp(search, 'i')
+            const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+            const searchRegex = new RegExp(escapedSearch, 'i')
             const Patient = mongoose.model('Patient')
             const matchingPatients = await Patient.find({
                 $or: [
