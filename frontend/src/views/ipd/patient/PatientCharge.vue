@@ -58,6 +58,12 @@ const formatAmount = (amount, shouldMask = false) => {
   return '₹' + Number(amount || 0).toLocaleString();
 }
 
+const formatUser = (user) => {
+  if (!user) return '-'
+  if (typeof user === 'string') return user
+  return user.fullName || user.name || user.email || '-'
+}
+
 const getLocalDatetimeString = () => {
   const d = new Date()
   const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
@@ -767,6 +773,8 @@ onBeforeUnmount(() => {
                 <th class="px-5 py-2.5 text-center w-24">Qty</th>
                 <th class="px-5 py-2.5 text-right w-28">Total Amount</th>
                 <th class="px-5 py-2.5 text-center w-24">Status</th>
+                <th class="px-5 py-2.5 text-left w-28">Created By</th>
+                <th class="px-5 py-2.5 text-left w-28">Updated By</th>
                 <th v-if="authStore.hasPermission('ipd.charges.update') || authStore.hasPermission('ipd.charges.delete')" class="px-5 py-2.5 text-right w-16">Action</th>
               </tr>
             </thead>
@@ -853,6 +861,32 @@ onBeforeUnmount(() => {
                   >
                     {{ charge.isBilled ? 'Billed' : 'Unbilled' }}
                   </span>
+                </td>
+                <td class="px-5 py-3 text-left">
+                  <span 
+                    v-if="formatUser(charge.createdBy) !== '-'"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-slate-100/80 text-slate-700 border border-slate-200/60"
+                    :title="formatUser(charge.createdBy)"
+                  >
+                    <svg class="w-3 h-3 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span class="truncate max-w-[110px]">{{ formatUser(charge.createdBy) }}</span>
+                  </span>
+                  <span v-else class="text-xs text-slate-400 font-medium">-</span>
+                </td>
+                <td class="px-5 py-3 text-left">
+                  <span 
+                    v-if="formatUser(charge.updatedBy) !== '-'"
+                    class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] font-semibold bg-indigo-50/80 text-indigo-700 border border-indigo-100"
+                    :title="formatUser(charge.updatedBy)"
+                  >
+                    <svg class="w-3 h-3 text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    <span class="truncate max-w-[110px]">{{ formatUser(charge.updatedBy) }}</span>
+                  </span>
+                  <span v-else class="text-xs text-slate-400 font-medium">-</span>
                 </td>
                 <td v-if="authStore.hasPermission('ipd.charges.update') || authStore.hasPermission('ipd.charges.delete')" class="px-5 py-3 text-right">
                   <div v-if="editingChargeId === charge._id" class="flex items-center justify-end gap-1">

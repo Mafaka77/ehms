@@ -973,9 +973,12 @@ exports.getAdmissionCharges = async (admissionId) => {
         const PatientCharge = require('../../common/patient_charge.model')
         const PatientChargeAddon = require('../../common/patient_charge_addon.model')
         require('./ipd_charge_category.model') // ensure ChargeCategory schema is registered
+        require('../../auth/user.model') // ensure User model is registered
         const charges = await PatientCharge.find({ admissionId })
             .populate('chargeCategoryId')
             .populate('doctorId', 'fullName name specializationId')
+            .populate('createdBy', 'fullName name email')
+            .populate('updatedBy', 'fullName name email')
             .sort({ createdAt: -1 })
         
         const chargesWithAddons = await Promise.all(charges.map(async (charge) => {
