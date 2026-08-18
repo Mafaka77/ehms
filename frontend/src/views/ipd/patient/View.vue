@@ -208,6 +208,24 @@ const fetchAdmissionDetails = async () => {
 }
 
 // Format Date helpers
+const getLocalDatetimeString = (date = new Date()) => {
+  if (!date) return ''
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+  const formatter = new Intl.DateTimeFormat('en-CA', options)
+  const parts = formatter.formatToParts(d)
+  
+  const year = parts.find(p => p.type === 'year').value
+  const month = parts.find(p => p.type === 'month').value
+  const day = parts.find(p => p.type === 'day').value
+  let hour = parts.find(p => p.type === 'hour').value
+  if (hour === '24') hour = '00'
+  const minute = parts.find(p => p.type === 'minute').value
+  
+  return `${year}-${month}-${day}T${hour}:${minute}`
+}
+
 const formatDate = (dateString) => {
   if (!dateString) return '-'
   return new Date(dateString).toLocaleString('en-IN', {
@@ -216,7 +234,8 @@ const formatDate = (dateString) => {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
   })
 }
 
@@ -265,16 +284,9 @@ const editAdmissionForm = ref({
 
 const openEditAdmissionModal = () => {
   if (!admission.value) return
-  let formattedDate = ''
-  if (admission.value.admissionDate) {
-    const d = new Date(admission.value.admissionDate)
-    const year = d.getFullYear()
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const hours = String(d.getHours()).padStart(2, '0')
-    const minutes = String(d.getMinutes()).padStart(2, '0')
-    formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`
-  }
+  const formattedDate = admission.value.admissionDate 
+    ? getLocalDatetimeString(admission.value.admissionDate) 
+    : getLocalDatetimeString()
 
   editAdmissionForm.value = {
     admissionDate: formattedDate,
@@ -288,7 +300,19 @@ const openEditAdmissionModal = () => {
 
 const submitEditAdmission = async () => {
   editAdmissionSubmitting.value = true
-  const res = await admissionStore.updateAdmission(admission.value._id, editAdmissionForm.value)
+  let utcAdmissionDate = ''
+  if (editAdmissionForm.value.admissionDate) {
+    const raw = editAdmissionForm.value.admissionDate
+    const dateStr = raw.includes('+') || raw.endsWith('Z') ? raw : `${raw}+05:30`
+    const d = new Date(dateStr)
+    utcAdmissionDate = !isNaN(d.getTime()) ? d.toISOString() : ''
+  }
+
+  const payload = {
+    ...editAdmissionForm.value,
+    admissionDate: utcAdmissionDate
+  }
+  const res = await admissionStore.updateAdmission(admission.value._id, payload)
   editAdmissionSubmitting.value = false
 
   if (res.success) {
@@ -358,9 +382,9 @@ const printPatientInfo = () => {
   const ward = bed.wardId || {}
 
   const allergiesText = Array.isArray(p.allergies) ? p.allergies.join(', ') : (p.allergies || 'None Known')
-  const dobFormatted = p.dateOfBirth ? new Date(p.dateOfBirth).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
-  const admitDateFormatted = adm.admissionDate ? new Date(adm.admissionDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : '—'
-  const printTime = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
+  const dobFormatted = p.dateOfBirth ? new Date(p.dateOfBirth).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' }) : '—'
+  const admitDateFormatted = adm.admissionDate ? new Date(adm.admissionDate).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' }) : '—'
+  const printTime = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Kolkata' })
 
   const content = `
     <!DOCTYPE html>
