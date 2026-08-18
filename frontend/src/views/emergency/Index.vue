@@ -303,7 +303,7 @@ const openEditModal = (visit) => {
     chiefComplaint: visit.chiefComplaint || '',
     priority: visit.priority || 'MEDIUM',
     notes: visit.notes || '',
-    consultationFee: visit.consultationFee || 0,
+    consultationFee: visit.consultationFee !== undefined ? visit.consultationFee : 0,
     hasBill: !!(visit.consultationBillId || visit.dischargeBillId || visit.billId),
     patientName: visit.patientId?.fullName || ''
   }
@@ -322,7 +322,7 @@ const handleUpdate = async () => {
     chiefComplaint: editForm.value.chiefComplaint,
     priority: editForm.value.priority,
     notes: editForm.value.notes,
-    consultationFee: editForm.value.consultationFee,
+    consultationFee: Number(editForm.value.consultationFee || 0),
     patientName: editForm.value.patientName
   })
   isUpdating.value = false

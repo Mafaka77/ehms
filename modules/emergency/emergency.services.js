@@ -181,11 +181,14 @@ exports.updateEmergencyVisit = async (id, data) => {
             throw error;
         }
 
-        if (data.doctorId) visit.doctorId = data.doctorId;
+        if (data.doctorId !== undefined) visit.doctorId = data.doctorId || null;
         if (data.arrivalDateTime) visit.arrivalDateTime = data.arrivalDateTime;
         if (data.chiefComplaint !== undefined) visit.chiefComplaint = data.chiefComplaint;
         if (data.priority) visit.priority = data.priority;
         if (data.visitStatus) visit.visitStatus = data.visitStatus;
+        if (data.notes !== undefined) visit.notes = data.notes;
+        if (data.consultationFee !== undefined) visit.consultationFee = Number(data.consultationFee);
+        if (data.paymentStatus) visit.paymentStatus = data.paymentStatus;
 
         await visit.save();
 

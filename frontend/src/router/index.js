@@ -356,13 +356,13 @@ const routes = [
             path: 'order/create',
             name: 'endoscopy-order-create',
             component: () => import('../views/endoscopy/order/Create.vue'),
-            meta: { permission: 'endoscopy.create' }
+            meta: { permission: 'endoscopy.order' }
           },
           {
             path: 'order/edit/:id',
             name: 'endoscopy-order-edit',
             component: () => import('../views/endoscopy/order/Edit.vue'),
-            meta: { permission: 'endoscopy.edit' },
+            meta: { permission: 'endoscopy.order' },
             props: true
           },
           {

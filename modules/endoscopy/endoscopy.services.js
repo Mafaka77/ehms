@@ -262,7 +262,7 @@ exports.createEndoscopyOrder = async (data, userId) => {
                 orderData[field] = null
             }
         }
-        if (orderData.referral === 'Self') {
+        if (orderData.referral && orderData.referral !== 'Doctor') {
             orderData.doctorId = null
         }
 
@@ -491,7 +491,7 @@ exports.updateEndoscopyOrder = async (id, data) => {
             }
         }
 
-        if (updateData.referral === 'Self') {
+        if (updateData.referral && updateData.referral !== 'Doctor') {
             updateData.doctorId = null
         }
 

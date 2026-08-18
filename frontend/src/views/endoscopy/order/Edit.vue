@@ -6,12 +6,19 @@ import { useSnackbarStore } from '../../../stores/snackbarStore'
 import BaseInput from '../../../components/BaseInput.vue'
 import api from '../../../axios/api'
 
+const props = defineProps({
+  id: {
+    type: String,
+    default: ''
+  }
+})
+
 const router = useRouter()
 const route = useRoute()
 const endoscopyStore = useEndoscopyStore()
 const snackbarStore = useSnackbarStore()
 
-const orderId = route.params.id
+const orderId = computed(() => props.id || route.params.id)
 const loading = ref(false)
 const pageLoading = ref(true)
 const error = ref('')
@@ -103,6 +110,12 @@ const clearDoctor = () => {
   doctorSearchQuery.value = ''
 }
 
+watch(() => form.referral, (newVal) => {
+  if (newVal !== 'Doctor') {
+    clearDoctor()
+  }
+})
+
 // ── Quick-add Patient ─────────────────────────────────────────────────────────
 const showPatientModal = ref(false)
 const newPatient = reactive({ fullName: '', mobileNo: '' })
@@ -176,7 +189,7 @@ const fetchAllTests = async () => {
   }
 }
 
-const isTestSelected = (testId) => selectedTests.value.some(t => t.testId === testId)
+const isTestSelected = (testId) => selectedTests.value.some(t => String(t.testId) === String(testId))
 
 const addTest = (test) => {
   if (!isTestSelected(test._id)) {
@@ -187,10 +200,11 @@ const removeTest = (index) => selectedTests.value.splice(index, 1)
 
 // ── Load existing order ───────────────────────────────────────────────────────
 const fetchOrderData = async () => {
-  if (!orderId) return
+  const currentOrderId = orderId.value
+  if (!currentOrderId) return
   pageLoading.value = true
   try {
-    const result = await endoscopyStore.getOrderById(orderId)
+    const result = await endoscopyStore.getOrderById(currentOrderId)
     const order = result.order
     const items = result.items || []
 
@@ -200,7 +214,7 @@ const fetchOrderData = async () => {
     if (order.patientId && typeof order.patientId === 'object') {
       selectedPatient.value = order.patientId
       form.patientId = order.patientId._id
-      patientSearchQuery.value = order.patientId.fullName
+      patientSearchQuery.value = order.patientId.fullName || ''
     } else {
       form.patientId = order.patientId
     }
@@ -209,7 +223,7 @@ const fetchOrderData = async () => {
     if (order.doctorId && typeof order.doctorId === 'object') {
       selectedDoctor.value = order.doctorId
       form.doctorId = order.doctorId._id
-      doctorSearchQuery.value = order.doctorId.fullName
+      doctorSearchQuery.value = order.doctorId.fullName || ''
     } else if (order.doctorId) {
       form.doctorId = order.doctorId
     }
@@ -251,10 +265,11 @@ const handleSubmit = async () => {
     const orderData = { 
       ...form, 
       opdAppointmentId: form.opdAppointmentId || null,
-      doctorId: form.referral === 'Self' ? null : (form.doctorId || null),
+      doctorId: form.referral === 'Doctor' ? (form.doctorId || null) : null,
       tests: selectedTests.value 
     }
-    const response = await endoscopyStore.updateOrder(orderId, orderData)
+    const currentOrderId = orderId.value
+    const response = await endoscopyStore.updateOrder(currentOrderId, orderData)
     if (response.success) {
       snackbarStore.show({ message: 'Endoscopy order updated successfully!', type: 'success' })
       router.push({ name: 'endoscopy-order' })
@@ -388,6 +403,7 @@ onMounted(async () => {
                     <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700"><input type="radio" v-model="form.referral" value="Doctor" class="text-teal-600" :disabled="loading"> Doctor</label>
                     <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700"><input type="radio" v-model="form.referral" value="Self" class="text-teal-600" :disabled="loading"> Self</label>
                     <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-700"><input type="radio" v-model="form.referral" value="Other" class="text-teal-600" :disabled="loading"> Other</label>
+                    <label v-if="form.referral === 'IPD'" class="flex items-center gap-2 cursor-pointer text-sm text-slate-700"><input type="radio" v-model="form.referral" value="IPD" class="text-teal-600" :disabled="loading"> IPD</label>
                   </div>
                 </div>
 

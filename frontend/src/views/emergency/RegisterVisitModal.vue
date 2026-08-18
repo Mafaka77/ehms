@@ -65,7 +65,7 @@ const visitForm = ref({
   chiefComplaint: '',
   priority: 'MEDIUM',
   notes: '',
-  consultationFee: 300
+  consultationFee: 0
 })
 const isRegistering = ref(false)
 
