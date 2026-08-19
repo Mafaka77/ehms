@@ -70,6 +70,21 @@ const clearFilters = () => {
   }
 }
 
+const isSyncing = ref(false)
+const syncAppointmentDates = async () => {
+  if (confirm('Are you sure you want to sync all appointment dates with their creation dates?')) {
+    isSyncing.value = true
+    const res = await opdStore.syncAppointmentDates()
+    isSyncing.value = false
+    if (res.success) {
+      snackbarStore.show({ message: res.message || 'Appointment dates synced successfully', type: 'success' })
+      fetchAppointments()
+    } else {
+      snackbarStore.show({ message: res.message || 'Failed to sync appointment dates', type: 'error' })
+    }
+  }
+}
+
 onMounted(async () => {
   opdStore.fetchOpdDoctors() // Non-blocking preload
   await fetchAppointments()
@@ -377,6 +392,17 @@ watch(() => editForm.value.doctorId, (newDocId) => {
       </div>
 
       <div class="flex items-center gap-2.5 w-full sm:w-auto">
+        <!-- <button 
+          @click="syncAppointmentDates"
+          :disabled="isSyncing"
+          class="px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer disabled:opacity-50"
+        >
+          <svg class="w-4 h-4 text-slate-500" :class="{ 'animate-spin': isSyncing }" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {{ isSyncing ? 'Syncing...' : 'Sync Dates' }}
+        </button> -->
+
         <button 
           @click="showReportModal = true"
           class="px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"

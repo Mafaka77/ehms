@@ -131,7 +131,7 @@ exports.createAppointment = async (data) => {
         const appointmentData = {
             patientId: data.patientId,
             doctorId: data.doctorId,
-            appointmentDate: data.appointmentDate,
+            appointmentDate: data.appointmentDate ? new Date(data.appointmentDate) : new Date(),
             consultationFee: consultationFee,
             notes: data.notes,
             paymentStatus: data.paymentStatus
@@ -229,7 +229,7 @@ exports.updateAppointment = async (id, data) => {
         }
 
         if (data.doctorId) appointment.doctorId = data.doctorId;
-        if (data.appointmentDate) appointment.appointmentDate = data.appointmentDate;
+        if (data.appointmentDate) appointment.appointmentDate = data.appointmentDate ? new Date(data.appointmentDate) : new Date();
         if (data.consultationFee !== undefined) appointment.consultationFee = data.consultationFee;
         if (data.notes !== undefined) appointment.notes = data.notes;
         if (data.status) appointment.status = data.status;

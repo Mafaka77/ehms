@@ -131,7 +131,7 @@ exports.createEmergencyVisit = async (data) => {
         const visitData = {
             patientId: data.patientId,
             doctorId: data.doctorId || null,
-            arrivalDateTime: data.arrivalDateTime || new Date(),
+            arrivalDateTime: data.arrivalDateTime?new Date(data.arrivalDateTime):new Date(),
             chiefComplaint: data.chiefComplaint || '',
             priority: data.priority || 'MEDIUM',
             notes: data.notes || '',
@@ -182,7 +182,7 @@ exports.updateEmergencyVisit = async (id, data) => {
         }
 
         if (data.doctorId !== undefined) visit.doctorId = data.doctorId || null;
-        if (data.arrivalDateTime) visit.arrivalDateTime = data.arrivalDateTime;
+        if (data.arrivalDateTime) visit.arrivalDateTime = new Date(data.arrivalDateTime) ;
         if (data.chiefComplaint !== undefined) visit.chiefComplaint = data.chiefComplaint;
         if (data.priority) visit.priority = data.priority;
         if (data.visitStatus) visit.visitStatus = data.visitStatus;

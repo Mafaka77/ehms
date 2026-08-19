@@ -287,7 +287,7 @@ exports.createAdmission = async (data) => {
         // 4. Create admission record
         const admissionData = {
             patientId: data.patientId,
-            admissionDate: data.admissionDate || new Date(),
+            admissionDate: data.admissionDate ? new Date(data.admissionDate) : new Date(),
             admissionType: data.admissionType || 'NORMAL',
             payerType: data.payerType || 'NORMAL',
             consultantDoctorId: data.consultantDoctorId,

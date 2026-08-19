@@ -167,7 +167,7 @@ exports.createAppointment = async (data) => {
         const appointmentData = {
             patientId: data.patientId,
             doctorId: data.doctorId,
-            appointmentDate: data.appointmentDate,
+            appointmentDate: data.appointmentDate ? new Date(data.appointmentDate) : new Date(),
             consultationFee: consultationFee,
             notes: data.notes,
             paymentStatus: data.paymentStatus
