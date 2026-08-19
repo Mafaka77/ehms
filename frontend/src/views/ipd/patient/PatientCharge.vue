@@ -1405,7 +1405,7 @@ onBeforeUnmount(() => {
               <template v-if="selectedActiveAddons.length > 0">
                 <div class="pt-1.5 border-t border-slate-200/50 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   <span>Included Addons / Package Components ({{ selectedActiveAddons.length }})</span>
-                  <span>{{ formatAmount(addon.defaultAmount || addon.amount, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
+                  <span>{{ formatAmount(addonsSubtotal, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
                 </div>
                 <div 
                   v-for="addon in selectedActiveAddons" 
@@ -1413,13 +1413,13 @@ onBeforeUnmount(() => {
                   class="flex justify-between items-center pl-2 text-[11px] text-slate-600"
                 >
                   <span class="truncate max-w-[220px]">• {{ addon.itemName }}</span>
-                  <span class="font-medium text-slate-700">{{ formatAmount(otCustomAddonAmount, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
+                  <span class="font-medium text-slate-700">{{ formatAmount(addon.defaultAmount || addon.amount || 0, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
                 </div>
               </template>
 
               <div class="pt-2 border-t border-indigo-200/60 flex justify-between items-center font-bold text-xs text-slate-900">
                 <span>Total Calculated Amount:</span>
-                <span class="font-extrabold text-indigo-700 text-sm">{{ formatAmount(addonsSubtotal, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
+                <span class="font-extrabold text-indigo-700 text-sm">{{ formatAmount(totalCalculatedCharge, isCategoryMasked(chargeForm.chargeCategoryId)) }}</span>
               </div>
             </div>
           </div>
