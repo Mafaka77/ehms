@@ -81,7 +81,7 @@ const resetModal = () => {
     chiefComplaint: '',
     priority: 'MEDIUM',
     notes: '',
-    consultationFee: 300
+    consultationFee: 0
   }
 }
 
