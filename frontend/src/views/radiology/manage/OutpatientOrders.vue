@@ -3,6 +3,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import { useRadiologyStore } from '../../../stores/radiologyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useDoctorStore } from '../../../stores/doctorStore'
+import SearchableSelect from '../../../components/SearchableSelect.vue'
 
 const emit = defineEmits(['saved'])
 const radiologyStore = useRadiologyStore()
@@ -12,7 +13,11 @@ const doctorStore = useDoctorStore()
 const selectedPerformedById = ref('')
 
 const doctorOptions = computed(() => {
-  return doctorStore.doctors || []
+  const list = (doctorStore.doctors || []).map(doc => ({
+    value: doc._id,
+    label: doc.fullName || doc.name || 'Dr. Unknown'
+  }))
+  return [{ value: '', label: '-- None / Unassigned --' }, ...list]
 })
 
 const currentPage = ref(1)
@@ -388,16 +393,12 @@ onMounted(async () => {
             </div>
             <div class="sm:col-span-2 pt-3 border-t border-slate-200/60">
               <label class="text-[10px] text-indigo-600 uppercase tracking-wider font-extrabold block mb-1">Performed By (Radiologist/Doctor)</label>
-              <select 
+              <SearchableSelect 
                 v-model="selectedPerformedById" 
-                @change="updatePerformedDoctor"
-                class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all cursor-pointer shadow-xs"
-              >
-                <option value="">-- Select Performing Doctor --</option>
-                <option v-for="doc in doctorOptions" :key="doc._id" :value="doc._id">
-                  {{ doc.fullName }}
-                </option>
-              </select>
+                @update:model-value="updatePerformedDoctor"
+                placeholder="-- Select Performing Doctor --"
+                :options="doctorOptions"
+              />
             </div>
           </div>
 

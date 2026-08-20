@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useEndoscopyStore } from '../../../stores/endoscopyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useDoctorStore } from '../../../stores/doctorStore'
+import SearchableSelect from '../../../components/SearchableSelect.vue'
 
 const emit = defineEmits(['saved'])
 const endoscopyStore = useEndoscopyStore()
@@ -20,10 +21,11 @@ const loadingDetails = ref(false)
 const selectedPerformedDoctorId = ref('')
 
 const doctorOptions = computed(() => {
-  return (doctorStore.doctors || []).map(doc => ({
+  const list = (doctorStore.doctors || []).map(doc => ({
     value: doc._id,
     label: doc.fullName || doc.name || 'Dr. Unknown'
   }))
+  return [{ value: '', label: '-- None / Unassigned --' }, ...list]
 })
 
 const fetchOrders = async () => {
@@ -390,16 +392,12 @@ onMounted(async () => {
             </div>
             <div class="sm:col-span-2 pt-3 border-t border-slate-200/60">
               <label class="text-[10px] text-teal-600 uppercase tracking-wider font-extrabold block mb-1">Performed By (Doctor)</label>
-              <select 
+              <SearchableSelect 
                 v-model="selectedPerformedDoctorId" 
-                @change="updatePerformedDoctor"
-                class="w-full text-xs font-semibold bg-white border border-slate-300 rounded-xl px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500 transition-all cursor-pointer shadow-xs"
-              >
-                <option value="">-- Select Performing Doctor --</option>
-                <option v-for="doc in doctorOptions" :key="doc.value" :value="doc.value">
-                  {{ doc.label }}
-                </option>
-              </select>
+                @update:model-value="updatePerformedDoctor"
+                placeholder="-- Select Performing Doctor --"
+                :options="doctorOptions"
+              />
             </div>
           </div>
 
