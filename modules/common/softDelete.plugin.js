@@ -13,6 +13,16 @@ module.exports = function softDeletePlugin(schema) {
     }
   })
 
+  schema.methods.softDelete = function() {
+    this.isDeleted = true
+    this.deletedAt = new Date()
+    return this.save()
+  }
+
+  schema.statics.softDelete = function(filter) {
+    return this.updateMany(filter, { isDeleted: true, deletedAt: new Date() })
+  }
+
   // Exclude soft-deleted documents from find operations
   schema.pre(/^find/, function() {
     const query = this.getQuery()

@@ -115,7 +115,9 @@ exports.deleteCategory = async (id) => {
             err.status = STATUS_CODES.NOT_FOUND
             throw err
         }
-        await category.softDelete()
+        category.isDeleted = true
+        category.deletedAt = new Date()
+        await category.save()
         // Soft delete associated tests
         await EndoscopyTest.updateMany({ categoryId: id }, { isDeleted: true, deletedAt: new Date() })
         return category
@@ -237,7 +239,9 @@ exports.deleteTest = async (id) => {
             err.status = STATUS_CODES.NOT_FOUND
             throw err
         }
-        await test.softDelete()
+        test.isDeleted = true
+        test.deletedAt = new Date()
+        await test.save()
         return test
     } catch (error) {
         throw error
