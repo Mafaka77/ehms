@@ -38,6 +38,7 @@ const newIndentForm = ref({
   sourceType: 'OTHERS',
   priority: 'NORMAL',
   requestedBy: '',
+  requestedByModel: 'User',
   remarks: '',
   items: []
 })
@@ -107,6 +108,7 @@ const handleRequesterSearch = () => {
 const selectRequester = (req) => {
   selectedRequester.value = req
   newIndentForm.value.requestedBy = req._id
+  newIndentForm.value.requestedByModel = req.type || 'User'
   requesterSearchQuery.value = ''
   matchingRequesters.value = []
 }
@@ -114,6 +116,7 @@ const selectRequester = (req) => {
 const clearRequester = () => {
   selectedRequester.value = null
   newIndentForm.value.requestedBy = ''
+  newIndentForm.value.requestedByModel = 'User'
 }
 
 const selectMedicine = async (med) => {
@@ -264,6 +267,7 @@ const openCreateModal = () => {
     sourceType: 'OTHERS',
     priority: 'NORMAL',
     requestedBy: '',
+    requestedByModel: 'User',
     remarks: '',
     items: []
   }
@@ -297,10 +301,14 @@ const openEditModal = async (indent) => {
   isEditing.value = true
   editingIndentId.value = indent._id
 
+  const reqId = data.requestedBy?._id || data.requestedBy || ''
+  const reqModel = data.requestedByModel || data.requestedBy?.type || 'User'
+
   newIndentForm.value = {
     sourceType: data.sourceType || 'OTHERS',
     priority: data.priority || 'NORMAL',
-    requestedBy: data.requestedBy?._id || data.requestedBy || '',
+    requestedBy: reqId,
+    requestedByModel: reqModel,
     remarks: data.remarks || '',
     items: (data.items || []).map(item => ({
       medicineId: item.medicineId?._id || item.medicineId,
@@ -313,7 +321,7 @@ const openEditModal = async (indent) => {
   }
 
   if (data.requestedBy) {
-    selectedRequester.value = data.requestedBy
+    selectedRequester.value = typeof data.requestedBy === 'object' ? data.requestedBy : { _id: data.requestedBy }
     requesterSearchQuery.value = data.requestedBy.fullName || ''
   } else {
     selectedRequester.value = null
@@ -385,7 +393,8 @@ const canEditIndent = computed(() => (indent) => {
   if (['SuperAdmin', 'Super Admin', 'Pharmacist'].includes(role)) return true
   if (!authStore.hasPermission('pharmacy.indent.update')) return false
   const requestedById = indent.requestedBy?._id || indent.requestedBy
-  return requestedById?.toString() === authStore.user?._id?.toString()
+  const createdById = indent.createdBy?._id || indent.createdBy
+  return requestedById?.toString() === authStore.user?._id?.toString() || createdById?.toString() === authStore.user?._id?.toString()
 })
 
 // Returns true if the current user is allowed to delete a given indent.
@@ -395,7 +404,8 @@ const canDeleteIndent = computed(() => (indent) => {
   if (['SuperAdmin', 'Super Admin', 'Pharmacist'].includes(role)) return true
   if (!authStore.hasPermission('pharmacy.indent.delete')) return false
   const requestedById = indent.requestedBy?._id || indent.requestedBy
-  return requestedById?.toString() === authStore.user?._id?.toString()
+  const createdById = indent.createdBy?._id || indent.createdBy
+  return requestedById?.toString() === authStore.user?._id?.toString() || createdById?.toString() === authStore.user?._id?.toString()
 })
 </script>
 
@@ -574,7 +584,7 @@ const canDeleteIndent = computed(() => (indent) => {
         </div>
         <div class="p-6 overflow-y-auto space-y-6">
         <!-- Header Info -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100">
           <div>
             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Indent No</p>
             <p class="text-sm font-bold text-slate-900">{{ selectedIndent.indentNo }}</p>
@@ -586,6 +596,10 @@ const canDeleteIndent = computed(() => (indent) => {
           <div>
             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Source</p>
             <p class="text-sm font-semibold text-slate-700">{{ selectedIndent.sourceType }}</p>
+          </div>
+          <div>
+            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Requested By</p>
+            <p class="text-sm font-semibold text-slate-700">{{ selectedIndent.requestedBy?.fullName || 'Unknown' }}</p>
           </div>
           <div>
             <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Status</p>
@@ -734,8 +748,8 @@ const canDeleteIndent = computed(() => (indent) => {
 
               <div v-else class="bg-teal-50 border border-teal-100 rounded-xl p-3 flex items-center justify-between">
                 <div>
-                  <p class="text-xs font-bold text-teal-900">{{ selectedRequester.fullName }}</p>
-                  <p class="text-[10px] text-teal-600 font-semibold font-mono">{{ selectedRequester.type }}</p>
+                  <p class="text-xs font-bold text-teal-900">{{ selectedRequester.fullName || 'Selected Requester' }}</p>
+                  <p class="text-[10px] text-teal-600 font-semibold font-mono">{{ selectedRequester.type || newIndentForm.requestedByModel || 'Requester' }}</p>
                 </div>
                 <button 
                   @click="clearRequester"

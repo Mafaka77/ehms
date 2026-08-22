@@ -82,14 +82,20 @@ const fetchResults = async () => {
 }
 
 const generateEditorContent = () => {
-  let html = '<table><tbody><tr><th>Test Name</th><th>Result</th><th>Unit</th><th>Reference Ranges</th></tr>'
+  let html = '<table><thead><tr><th style="text-align: center; padding: 2px 4px;">Test</th><th style="text-align: center; padding: 2px 4px;">Result</th><th style="text-align: center; padding: 2px 4px;">Unit</th><th style="text-align: center; padding: 2px 4px;">Reference Ranges</th></tr></thead><tbody>'
 
-  tests.value.forEach(test => {
-    html += `<tr><td colspan="4" class="test-title-header"><u><strong style="font-weight: 900; font-size: 13px;">${test.testName.toUpperCase()}</strong></u></td></tr>`
+  tests.value.forEach((test, testIdx) => {
+    // Add separator between tests if there are multiple tests
+    if (testIdx > 0) {
+      html += `<tr><td colspan="4" class="test-separator-row" style="border-top: 1px dashed #cbd5e1; padding: 4px 0 2px 0;"></td></tr>`
+    }
+
+    // Test Name header
+    html += `<tr><td colspan="4" class="test-header-row" style="padding: ${testIdx > 0 ? '4px' : '2px'} 0 0 0;"><strong><u>${test.testName.toUpperCase()}</u></strong></td></tr>`
 
     const groups = {}
-    test.parameters.forEach(param => {
-      const sec = param.section || 'General'
+    ;(test.parameters || []).forEach(param => {
+      const sec = param.section && param.section !== 'General' ? param.section : ''
       if (!groups[sec]) groups[sec] = []
       groups[sec].push(param)
     })
@@ -97,31 +103,49 @@ const generateEditorContent = () => {
     const sortedSections = Object.keys(groups).sort((a,b) => a.localeCompare(b))
     
     sortedSections.forEach(section => {
-      html += `<tr><td colspan="4" class="section-header"><strong>${section.toUpperCase()}</strong></td></tr>`
+      if (section) {
+        html += `<tr><td colspan="4" class="section-title-row" style="padding: 8px 0 4px 0; font-weight: 700; font-size: 11px;">&nbsp;&nbsp;&nbsp;&nbsp;${section}</td></tr>`
+      }
       
       groups[section].sort((a,b) => (a.displayOrder||0) - (b.displayOrder||0)).forEach(param => {
          let rangeStr = ''
          if (param.referenceIntervals && param.referenceIntervals.length > 0) {
-            rangeStr = param.referenceIntervals.map(i => `${i.label}: ${i.range}`).join(' | ')
+            rangeStr = param.referenceIntervals.map(i => `${i.label ? i.label + ' : ' : ''}${i.range}`).join('<br>')
          } else {
             const arr = []
-            if (param.normalRangeMale) arr.push(`M: ${param.normalRangeMale}`)
-            if (param.normalRangeFemale) arr.push(`F: ${param.normalRangeFemale}`)
-            if (param.normalRangeChild) arr.push(`C: ${param.normalRangeChild}`)
-            rangeStr = arr.join(' | ') || '-'
+            if (param.normalRangeMale && param.normalRangeFemale && param.normalRangeMale === param.normalRangeFemale) {
+              arr.push(param.normalRangeMale)
+            } else {
+              if (param.normalRangeMale) arr.push(`Male: ${param.normalRangeMale}`)
+              if (param.normalRangeFemale) arr.push(`Female: ${param.normalRangeFemale}`)
+            }
+            if (param.normalRangeChild) arr.push(`Child: ${param.normalRangeChild}`)
+            rangeStr = arr.join('<br>') || '-'
          }
          
          const valueStr = param.measuredValue || '-'
-         const outOfRangeStar = param.isOutOfRange ? ' <span style="color:red">*</span>' : ''
+         const formattedValue = param.isOutOfRange 
+           ? `<strong>${valueStr}</strong>` 
+           : valueStr
          
          html += `<tr>`
-         html += `<td><strong>${param.name}</strong></td>`
-         html += `<td><strong>${valueStr}</strong>${outOfRangeStar}</td>`
-         html += `<td>${param.unit || '-'}</td>`
-         html += `<td>${rangeStr}</td>`
+         html += `<td style="width: 36%; padding: 2px 4px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${param.name}</td>`
+         html += `<td style="width: 18%; text-align: center; padding: 2px 4px;"><strong>${formattedValue}</strong></td>`
+         html += `<td style="width: 14%; text-align: center; padding: 2px 4px;">${param.unit || ''}</td>`
+         html += `<td style="width: 32%; text-align: center; padding: 2px 4px;">${rangeStr}</td>`
          html += `</tr>`
       })
     })
+
+    // Paragraph / Methodology / Notes under each test
+    const notesArr = []
+    if (test.paragraph || test.remarks) {
+      notesArr.push(test.paragraph || test.remarks)
+    }
+
+    if (notesArr.length > 0) {
+      html += `<tr><td colspan="4" style="font-size: 9.5px; color: #1e293b; padding: 2px 0 2px 0; line-height: 1.2;">${notesArr.join('<br>')}</td></tr>`
+    }
   })
   
   html += '</tbody></table>'
@@ -249,19 +273,20 @@ const generateReportPDF = async (preview = false) => {
     const tfoot = element.querySelector('tfoot')
     
     const contRect = element.getBoundingClientRect()
-    const tbodyRect = tbody.getBoundingClientRect()
-    const tfootRect = tfoot.getBoundingClientRect()
+    const tbodyRect = tbody ? tbody.getBoundingClientRect() : contRect
+    const tfootRect = tfoot ? tfoot.getBoundingClientRect() : { top: tbodyRect.bottom, bottom: tbodyRect.bottom }
     
     const headerY = 0
-    const headerH = Math.round(tbodyRect.top - contRect.top)
+    const headerH = Math.max(0, Math.round(tbodyRect.top - contRect.top))
     
     const bodyY = headerH
-    const bodyH = Math.round(tfootRect.top - tbodyRect.top)
+    const bodyH = Math.max(0, tfoot ? Math.round(tfootRect.top - tbodyRect.top) : Math.round(tbodyRect.height || (tbodyRect.bottom - tbodyRect.top)))
     
     const footerY = bodyY + bodyH
-    const footerH = Math.round(tfootRect.bottom - tfootRect.top)
+    const footerH = Math.max(0, tfoot ? Math.round(tfootRect.bottom - tfootRect.top) : 0)
     
     const cropCanvas = (y, h) => {
+      if (h <= 0) return null
       const c = document.createElement('canvas')
       c.width = canvas.width
       const sy = Math.max(0, y * scaleFactor)
@@ -276,50 +301,68 @@ const generateReportPDF = async (preview = false) => {
     
     const headerData = cropCanvas(headerY, headerH)
     const bodyData = cropCanvas(bodyY, bodyH)
-    const footerData = cropCanvas(footerY, footerH)
+    const footerData = footerH > 0 ? cropCanvas(footerY, footerH) : null
     
     const ratio = pdfWidth / canvas.width
     const headerPdfH = (headerH * scaleFactor) * ratio
     const bodyPdfH = (bodyH * scaleFactor) * ratio
     const footerPdfH = (footerH * scaleFactor) * ratio
     
-    const bodyAvailableSpace = pageHeight - headerPdfH - footerPdfH
-    let bodyHeightLeft = bodyPdfH
-    let bodyOffset = 0
+    const subPageTopMargin = 12 // Top margin in mm on page 2+
+    const page1BodySpace = Math.max(10, pageHeight - headerPdfH - footerPdfH)
+    const pageNBodySpace = Math.max(10, pageHeight - subPageTopMargin - footerPdfH)
     
-    const totalPages = Math.max(1, Math.ceil(bodyPdfH / bodyAvailableSpace))
-    let currentPage = 1
+    let totalPages = 1
+    if (bodyPdfH > page1BodySpace) {
+      const remainingH = bodyPdfH - page1BodySpace
+      totalPages = 1 + Math.ceil(remainingH / pageNBodySpace)
+    }
     
     const drawPageFrame = (offset, pageNum, total) => {
+      const isFirstPage = pageNum === 1
+      const currentTopSpace = isFirstPage ? headerPdfH : subPageTopMargin
+
       // Draw body in the middle
-      pdf.addImage(bodyData, 'JPEG', 0, headerPdfH - offset, pdfWidth, bodyPdfH)
+      if (bodyData) {
+        pdf.addImage(bodyData, 'JPEG', 0, currentTopSpace - offset, pdfWidth, bodyPdfH)
+      }
       
       // Cover overflow with solid white rectangles
       pdf.setFillColor(255, 255, 255)
-      pdf.rect(0, 0, pdfWidth, headerPdfH, 'F')
-      pdf.rect(0, pageHeight - footerPdfH, pdfWidth, footerPdfH + 2, 'F')
+      if (currentTopSpace > 0) {
+        pdf.rect(0, 0, pdfWidth, currentTopSpace, 'F')
+      }
+      if (footerPdfH > 0) {
+        pdf.rect(0, pageHeight - footerPdfH, pdfWidth, footerPdfH + 2, 'F')
+      }
       
-      // Draw header at the top
-      pdf.addImage(headerData, 'JPEG', 0, 0, pdfWidth, headerPdfH)
+      // Draw letterhead & patient demographics ONLY on the first page
+      if (isFirstPage && headerData && headerPdfH > 0) {
+        pdf.addImage(headerData, 'JPEG', 0, 0, pdfWidth, headerPdfH)
+      }
       // Draw footer at the absolute bottom
-      pdf.addImage(footerData, 'JPEG', 0, pageHeight - footerPdfH, pdfWidth, footerPdfH)
+      if (footerData && footerPdfH > 0) {
+        pdf.addImage(footerData, 'JPEG', 0, pageHeight - footerPdfH, pdfWidth, footerPdfH)
+      }
       
-      // Draw page number at the bottom left (within the bottom margin)
+      // Draw page number at the top right (within the top margin)
       pdf.setFontSize(8)
-      pdf.setTextColor(51, 65, 85) // slate-700 for high contrast
+      pdf.setTextColor(100, 116, 139) // slate-500
       const pageText = `Page ${pageNum} of ${total}`
-      pdf.text(pageText, 15, pageHeight - 8)
+      pdf.text(pageText, pdfWidth - 12, 6, { align: 'right' })
     }
     
+    let currentPage = 1
+    let bodyOffset = 0
     drawPageFrame(bodyOffset, currentPage, totalPages)
-    bodyHeightLeft -= bodyAvailableSpace
+    let bodyHeightLeft = bodyPdfH - page1BodySpace
     
     while (bodyHeightLeft > 0) {
-      bodyOffset += bodyAvailableSpace
+      bodyOffset += (currentPage === 1 ? page1BodySpace : pageNBodySpace)
       currentPage++
       pdf.addPage()
       drawPageFrame(bodyOffset, currentPage, totalPages)
-      bodyHeightLeft -= bodyAvailableSpace
+      bodyHeightLeft -= pageNBodySpace
     }
     
     const patientName = props.order?.patientId?.fullName?.replace(/\s+/g, '_') || 'Patient'
@@ -489,34 +532,19 @@ const formatDate = (dateString) => {
               <div class="results-table-container print:border-none print:rounded-none print:shadow-none bg-white border border-slate-200 rounded-b-lg p-2 print:p-0 border-t-0">
                 <editor-content :editor="editor" class="tiptap-editor" />
               </div>
+
+              <!-- Signatures Section directly below remarks -->
+              <div class="signatures">
+                <div>
+                </div>
+                <div class="text-center pt-6 pb-1">
+                  <span class="sig-line">Authorized Signatory / Pathologist</span>
+                </div>
+              </div>
                   </div>
                 </td>
               </tr>
             </tbody>
-
-            <tfoot>
-              <tr>
-                <td>
-                  <!-- Signatures Section -->
-            <div class="signatures">
-              <div>
-               
-              </div>
-              <div class="text-right">
-                <span class="sig-line">Authorized Signatory / Pathologist</span>
-              </div>
-            </div>
-
-            <div class="notice">
-              <p>*** End of Report ***</p>
-              <p class="wish">This is a computer-verified diagnostic report and does not require a physical signature.</p>
-              
-              <!-- For browsers that support CSS page counters -->
-              <div v-show="!printingPDF" class="page-number-placeholder screen-only print:hidden">Page numbers will be generated by the browser during print</div>
-            </div>
-                </td>
-              </tr>
-            </tfoot>
           </table>
         </div>
       </div>
@@ -607,7 +635,7 @@ const formatDate = (dateString) => {
   background-color: #ffffff;
   border: 1px dashed #cbd5e1;
   color: #0f172a;
-  padding: 10mm 15mm 15mm 15mm;
+  padding: 8mm 12mm 10mm 12mm;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   font-family: Arial, Helvetica, system-ui, -apple-system, sans-serif;
@@ -615,7 +643,7 @@ const formatDate = (dateString) => {
   -moz-osx-font-smoothing: grayscale;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .report-content {
@@ -626,7 +654,7 @@ const formatDate = (dateString) => {
 
 .report-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
 }
 
 .report-header h1 {
@@ -639,17 +667,17 @@ const formatDate = (dateString) => {
 }
 
 .report-header p {
-  font-size: 10.5px;
+  font-size: 8.5px;
   color: #1e293b;
   font-weight: 600;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .report-divider {
   border: 0;
   border-top: 2px solid #1e3a8a;
-  margin: 10px 0;
+  margin: 6px 0;
 }
 
 .report-header h2 {
@@ -657,22 +685,22 @@ const formatDate = (dateString) => {
   font-weight: 800;
   letter-spacing: 0.05em;
   color: #0f172a;
-  margin: 6px 0 0 0;
+  margin: 4px 0 0 0;
 }
 
 .demographics {
   display: grid;
   grid-template-columns: 1.2fr 0.8fr;
-  column-gap: 24px;
-  row-gap: 6px;
-  font-size: 11px;
+  column-gap: 20px;
+  row-gap: 4px;
+  font-size: 10.5px;
   font-weight: 500;
-  margin-bottom: 20px;
-  padding: 12px 14px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
   border: 1px solid #94a3b8;
   border-radius: 8px;
   background-color: #f8fafc;
-  line-height: 1.6;
+  line-height: 1.4;
 }
 
 .demographics p {
@@ -686,8 +714,7 @@ const formatDate = (dateString) => {
 }
 
 .results-table-container {
-  flex-grow: 1;
-  margin-bottom: 30px;
+  margin-bottom: 0;
 }
 
 .tiptap-editor {
@@ -707,19 +734,20 @@ const formatDate = (dateString) => {
 .tiptap-editor :deep(.tiptap table) {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
 }
 
 .tiptap-editor :deep(.tiptap th) {
-  border-top: 2px solid #0f172a;
-  border-bottom: 2px solid #0f172a;
+  border-top: 1.5px solid #0f172a;
+  border-bottom: 1.5px solid #0f172a;
   font-weight: 700;
-  padding: 8px 6px;
+  padding: 2px 4px;
   color: #000000;
   font-size: 11px;
-  text-align: left;
+  text-align: center;
 }
 
+.tiptap-editor :deep(.tiptap th:nth-child(1)),
 .tiptap-editor :deep(.tiptap th:nth-child(2)),
 .tiptap-editor :deep(.tiptap th:nth-child(3)),
 .tiptap-editor :deep(.tiptap th:nth-child(4)) {
@@ -727,71 +755,64 @@ const formatDate = (dateString) => {
 }
 
 .tiptap-editor :deep(.tiptap td) {
-  border-bottom: 1px solid #cbd5e1;
-  padding: 8px 6px;
+  border: none;
+  padding: 2px 4px;
   color: #0f172a;
   font-size: 11px;
   font-weight: 500;
   vertical-align: top;
+  line-height: 1.35;
 }
 
 .tiptap-editor :deep(.tiptap td:nth-child(2)),
-.tiptap-editor :deep(.tiptap td:nth-child(3)),
+.tiptap-editor :deep(.tiptap td:nth-child(3)) {
+  text-align: center;
+}
+
 .tiptap-editor :deep(.tiptap td:nth-child(4)) {
   text-align: center;
 }
 
 .tiptap-editor :deep(.tiptap td p) {
   margin: 0;
+  padding: 0;
+  line-height: 1.2;
 }
 
 .tiptap-editor :deep(.tiptap strong) {
   color: #000000;
-  font-weight: 700;
+  font-weight: 800;
 }
 
-.tiptap-editor :deep(.tiptap td:first-child) {
-  font-weight: 700;
-  color: #000000;
+.tiptap-editor :deep(.tiptap td.test-header-row) {
+  font-weight: 800 !important;
+  font-size: 11.5px !important;
+  color: #000000 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: uppercase !important;
 }
 
-.tiptap-editor :deep(.tiptap td.test-title-header) {
-  background-color: #000000 !important;
-  color: #ffffff !important;
-  font-weight: 900 !important;
-  font-size: 13px !important;
-  padding: 10px 14px !important;
-  text-align: center !important;
-  letter-spacing: 0.06em !important;
-  border: 1px solid #000000 !important;
-  text-decoration: underline !important;
+.tiptap-editor :deep(.tiptap td.section-title-row) {
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  color: #000000 !important;
+  padding: 8px 0 4px 0 !important;
 }
 
-.tiptap-editor :deep(.tiptap td.test-title-header strong),
-.tiptap-editor :deep(.tiptap td.test-title-header b),
-.tiptap-editor :deep(.tiptap td.test-title-header u),
-.tiptap-editor :deep(.tiptap td.test-title-header p) {
-  color: #ffffff !important;
-  font-weight: 900 !important;
-  font-size: 13px !important;
-  text-align: center !important;
-  text-decoration: underline !important;
-}
-
-.tiptap-editor :deep(.tiptap td.section-header) {
-  background-color: #f1f5f9;
-  font-weight: 700;
-  color: #000000;
+.tiptap-editor :deep(.tiptap td.test-separator-row) {
+  border: none !important;
+  border-top: 1px dashed #cbd5e1 !important;
+  padding: 4px 0 2px 0 !important;
 }
 
 .signatures {
-  margin-top: auto;
-  padding-top: 40px;
+  margin-top: 28px;
   display: flex;
   justify-content: space-between;
   font-size: 10px;
   font-weight: 600;
   color: #0f172a;
+  page-break-inside: avoid;
 }
 
 .signatures .operator-name {
@@ -853,8 +874,8 @@ const formatDate = (dateString) => {
     overflow: visible !important;
   }
 
-  /* Ensures that table sections repeat correctly across pages */
-  thead { display: table-header-group; }
+  /* Only print thead once at the beginning of document */
+  thead { display: table-row-group; }
   tfoot { display: table-footer-group; }
   tr { page-break-inside: avoid; }
 

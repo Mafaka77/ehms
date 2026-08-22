@@ -297,7 +297,7 @@ exports.getLabOrderResults = async (req, res) => {
 exports.saveLabOrderResults = async (req, res) => {
     try {
         const { id } = req.params;
-        const result = await labService.saveLabOrderResults(id, req.body.results, req.user._id);
+        const result = await labService.saveLabOrderResults(id, req.body.results, req.user._id, { tests: req.body.tests || req.body.testRemarks });
         return res.code(STATUS_CODES.OK).send({ message: 'Lab order results saved successfully', data: result, status: STATUS_CODES.OK })
     } catch (error) {
         return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })

@@ -54,10 +54,22 @@ const PharmacyIndentSchema = new mongoose.Schema(
       default: null,
     },
 
+    requestedByModel: {
+      type: String,
+      enum: ["User", "Doctor", "Employee"],
+      default: "User",
+    },
+
     requestedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      refPath: "requestedByModel",
       required: true,
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
     },
 
     approvedBy: {

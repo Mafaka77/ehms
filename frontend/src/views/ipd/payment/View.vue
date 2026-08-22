@@ -4,6 +4,7 @@ import api from '../../../axios/api'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import InvoiceModal from './Invoice.vue'
+import logoUrl from '../../../assets/logo_final.png'
 
 const props = defineProps({
   admission: {
@@ -135,21 +136,336 @@ const formatDate = (dateString) => {
   })
 }
 
+const getPayerTypeLabel = (type) => {
+  switch (type) {
+    case 'MUHCS': return 'MUHCS'
+    case 'MR_STATE': return 'MR (STATE)'
+    case 'MR_CENTRAL': return 'MR (CENTRAL)'
+    case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
+    case 'NORMAL':
+    default: return type || 'NORMAL'
+  }
+}
+
+const numberToWords = (num) => {
+  if (num === 0 || !num) return 'Zero Rupees Only'
+  
+  const a = ['', 'One ', 'Two ', 'Three ', 'Four ', 'Five ', 'Six ', 'Seven ', 'Eight ', 'Nine ', 'Ten ', 'Eleven ', 'Twelve ', 'Thirteen ', 'Fourteen ', 'Fifteen ', 'Sixteen ', 'Seventeen ', 'Eighteen ', 'Nineteen ']
+  const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+  
+  const inWords = (n) => {
+    if ((n = n.toString()).length > 9) return 'overflow'
+    n = ('000000000' + n).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/)
+    if (!n) return ''
+    let str = ''
+    str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : ''
+    str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : ''
+    str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : ''
+    str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : ''
+    str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : ''
+    return str.trim()
+  }
+  
+  let wholePart = Math.floor(Math.abs(num))
+  let fractionalPart = Math.round((Math.abs(num) - wholePart) * 100)
+  
+  let words = inWords(wholePart) + ' Rupees'
+  if (fractionalPart > 0) {
+    words += ' and ' + inWords(fractionalPart) + ' Paise'
+  }
+  return words + ' Only'
+}
+
 // Print logic
-const showInvoice = ref(false)
-const invoiceBillDetails = ref(null)
 const fetchingInvoice = ref(false)
 const exportingPdf = ref(false)
 
 const handlePrint = async (bill) => {
+  if (!bill?._id) return
   fetchingInvoice.value = true
   try {
-    const res = await api.get(`/billing/bills/${bill._id}`)
-    invoiceBillDetails.value = res.data.data
-    showInvoice.value = true
+    const [res, catRes, chargesRes] = await Promise.all([
+      api.get(`/billing/bills/${bill._id}`),
+      admissionStore.fetchChargeCategories(),
+      admissionStore.fetchAdmissionCharges(props.admission._id)
+    ])
+    const billDetails = res.data.data
+    const allCategories = catRes.success ? catRes.data : []
+    const allCharges = chargesRes.success ? chargesRes.data : []
+    const patient = props.admission.patientId || billDetails.patientId || {}
+    const adm = props.admission || {}
+
+    // Helper to match category definition from PatientCharge
+    const getCategoryInfo = (chargeOrItem) => {
+      const catObj = chargeOrItem.chargeCategoryId
+      if (catObj && typeof catObj === 'object' && catObj.name) {
+        return {
+          id: String(catObj._id || catObj.code || catObj.name),
+          name: catObj.name,
+          code: (catObj.code || '').toUpperCase()
+        }
+      }
+      if (catObj) {
+        const found = allCategories.find(c => String(c._id) === String(catObj))
+        if (found) {
+          return {
+            id: String(found._id),
+            name: found.name,
+            code: (found.code || '').toUpperCase()
+          }
+        }
+      }
+      const type = (chargeOrItem.chargeType || chargeOrItem.itemType || '').toUpperCase()
+      if (type) {
+        const found = allCategories.find(c => (c.code || '').toUpperCase() === type || c.name.toLowerCase() === type.toLowerCase())
+        if (found) {
+          return {
+            id: String(found._id),
+            name: found.name,
+            code: (found.code || '').toUpperCase()
+          }
+        }
+        if (type === 'ROOM' || type === 'ROOM_RENT' || type === 'BED') return { id: 'ROOM', name: 'Room Rent', code: 'ROOM' }
+        if (type === 'DOCTOR_VISIT' || type === 'CONSULTATION' || type === 'DOCTOR') return { id: 'DOCTOR', name: 'Doctor Visit', code: 'DOCTOR' }
+        if (type === 'PHARMACY' || type === 'MEDICINE') return { id: 'PHARMACY', name: 'Pharmacy', code: 'PHARMACY' }
+        if (type === 'LAB' || type === 'LABORATORY') return { id: 'LAB', name: 'Laboratory', code: 'LAB' }
+        if (type === 'RADIOLOGY') return { id: 'RADIOLOGY', name: 'Radiology', code: 'RADIOLOGY' }
+        if (type === 'NURSING') return { id: 'NURSING', name: 'Nursing Charges', code: 'NURSING' }
+        if (type === 'OT' || type === 'SURGERY' || type === 'OPERATION') return { id: 'OT', name: 'Operation Theatre', code: 'OT' }
+        if (type === 'PROCEDURE') return { id: 'PROCEDURE', name: 'Procedures', code: 'PROCEDURE' }
+        return {
+          id: type,
+          name: type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          code: type
+        }
+      }
+      return {
+        id: 'OTHER',
+        name: 'Other Medications/Test',
+        code: 'OTHER'
+      }
+    }
+
+    // Group items inside this specific bill by Category ID
+    const categoryGroupsMap = new Map()
+    const billItems = billDetails.items || []
+
+    billItems.forEach(item => {
+      const matchingCharge = allCharges.find(c => String(c._id) === String(item.patientChargeId || item._id))
+      const cat = getCategoryInfo(matchingCharge || item)
+      if (!categoryGroupsMap.has(cat.id)) {
+        categoryGroupsMap.set(cat.id, {
+          id: cat.id,
+          code: cat.code,
+          name: cat.name,
+          items: [],
+          totalAmount: 0,
+          totalQty: 0
+        })
+      }
+      const g = categoryGroupsMap.get(cat.id)
+      g.items.push(item)
+      g.totalAmount += (item.amount || 0)
+      g.totalQty += (item.quantity || 1)
+    })
+
+    const categorySummaryRows = []
+    let rowCounter = 1
+
+    categoryGroupsMap.forEach((group) => {
+      const code = group.code
+      const catNameLower = group.name.toLowerCase()
+
+      const isPharmacy = code === 'PHARMACY' || catNameLower.includes('pharmacy') || catNameLower.includes('medicine') || catNameLower.includes('drug')
+      const isRoom = code === 'ROOM' || code === 'ROOM_RENT' || code === 'BED' || catNameLower.includes('room') || catNameLower.includes('bed')
+      const isDoctor = code === 'DOCTOR' || code === 'DOCTOR_VISIT' || catNameLower.includes('doctor') || catNameLower.includes('consult')
+      const isLab = code === 'LAB' || code === 'LABORATORY' || catNameLower.includes('lab')
+      const isRadiology = code === 'RADIOLOGY' || catNameLower.includes('radiology') || catNameLower.includes('x-ray') || catNameLower.includes('usg') || catNameLower.includes('scan')
+      const isOt = code === 'OT' || catNameLower.includes('operation') || catNameLower.includes('surgery') || catNameLower.includes('theatre')
+      const isNursing = code === 'NURSING' || catNameLower.includes('nursing')
+
+      let unitLabel = 'Items'
+      if (isRoom) unitLabel = group.totalQty === 1 ? 'Day' : 'Days'
+      else if (isDoctor) unitLabel = group.totalQty === 1 ? 'Visit' : 'Visits'
+      else if (isPharmacy) unitLabel = group.totalQty === 1 ? 'Item' : 'Items'
+      else if (isLab) unitLabel = group.totalQty === 1 ? 'Test' : 'Tests'
+      else if (isRadiology) unitLabel = group.totalQty === 1 ? 'Scan' : 'Scans'
+      else if (isOt) unitLabel = group.totalQty === 1 ? 'Proc' : 'Procedures'
+      else if (isNursing) unitLabel = group.totalQty === 1 ? 'Item' : 'Items'
+
+      categorySummaryRows.push({
+        sn: rowCounter++,
+        categoryName: group.name,
+        qty: `${group.totalQty} ${unitLabel}`,
+        amount: group.totalAmount
+      })
+    })
+
+    const totalBillAmount = billDetails.netAmount ?? billDetails.totalAmount ?? categorySummaryRows.reduce((sum, r) => sum + r.amount, 0)
+    
+    let statusText = (billDetails.status || 'DUE').toUpperCase()
+    let statusClass = 'status-due'
+    if (statusText === 'PAID') {
+      statusClass = 'status-paid'
+    } else if (statusText === 'PARTIALLY_PAID') {
+      statusText = 'PARTIALLY PAID'
+      statusClass = 'status-partial'
+    } else if (statusText === 'DRAFT' || statusText === 'UNPAID') {
+      statusText = 'DUE'
+      statusClass = 'status-due'
+    }
+
+    const invoiceHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>IPD Invoice - ${billDetails.billNo || 'Bill'}</title>
+          <style>
+            @page { size: A4 portrait; margin: 10mm 15mm; }
+            body { font-family: ui-mono, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace, 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 0; padding: 16px; font-size: 11px; line-height: 1.4; }
+            .receipt-header { text-align: center; margin-bottom: 12px; }
+            .receipt-divider { border: 0; border-top: 1px dashed #cbd5e1; margin: 8px 0; }
+            .receipt-header h2 { font-size: 12px; font-weight: bold; letter-spacing: 0.05em; color: #1e293b; margin: 4px 0 0 0; }
+            
+            .status-due { background: #fef2f2; color: #dc2626; border: 1.5px solid #f87171; font-weight: 900; font-size: 10.5px; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+            .status-paid { background: #dcfce7; color: #15803d; border: 1.5px solid #22c55e; font-weight: 900; font-size: 10.5px; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+            .status-partial { background: #fef3c7; color: #b45309; border: 1.5px solid #f59e0b; font-weight: 900; font-size: 10.5px; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+            
+            .demo-grid { width: 100%; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; padding: 8px 10px; margin-bottom: 14px; font-size: 10.5px; border-collapse: collapse; }
+            .demo-grid td { padding: 4px 6px; vertical-align: top; }
+            .label { font-weight: 700; color: #475569; text-transform: uppercase; font-size: 9px; }
+            .val { font-weight: 600; color: #0f172a; }
+            .font-mono { font-family: monospace; font-weight: bold; }
+
+            table.bill-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11px; }
+            table.bill-table th { background: #1e3a8a; color: #ffffff; text-align: left; padding: 7px 10px; font-weight: 700; text-transform: uppercase; font-size: 10px; }
+            table.bill-table td { border-bottom: 1px solid #e2e8f0; padding: 7px 10px; color: #1e293b; }
+            table.bill-table tr:nth-child(even) { background-color: #f8fafc; }
+            table.bill-table tr.grand-total-row td { background: #f1f5f9; padding: 8px 10px; border-top: 2px solid #1e3a8a; border-bottom: 2px solid #1e3a8a; font-weight: 800; }
+            
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+
+            .in-words-box { background: #f8fafc; border: 1px dashed #cbd5e1; padding: 8px 12px; border-radius: 6px; font-size: 11px; margin-bottom: 14px; }
+
+            .footer { margin-top: 40px; display: flex; justify-content: flex-end; align-items: flex-end; font-size: 10.5px; color: #475569; page-break-inside: avoid; }
+            .sig-box { text-align: center; width: 200px; }
+            .sig-line { border-top: 1.5px solid #334155; margin-top: 45px; padding-top: 5px; font-weight: 700; color: #0f172a; }
+          </style>
+        </head>
+        <body>
+          <!-- Header Brand (From Invoice.vue) -->
+          <div class="receipt-header">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <img src="${logoUrl}" alt="Logo" style="height: 60px; width: auto; object-fit: contain;" />
+              <div style="text-align: right; font-size: 10.5px; color: #64748b; line-height: 1.35;">
+                <p style="margin: 0; font-weight: 800; color: #0f172a; font-size: 11.5px; letter-spacing: 0.2px;">EMMANUEL HOSPITAL</p>
+                <p style="margin: 0;">Y-67, Luangmual, Aizawl, Mizoram - 796009</p>
+                <p style="margin: 0;">Phone: 0389-2913340 / 8974326872</p>
+              </div>
+            </div>
+            <hr class="receipt-divider" />
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; margin-bottom: 4px;">
+              <h2 style="font-size: 12px; font-weight: 800; letter-spacing: 0.05em; color: #1e293b; margin: 0; text-transform: uppercase;">
+                IPD BILL / INVOICE
+              </h2>
+              <div style="font-size: 10px; color: #64748b;">
+                Date: <strong>${new Date(billDetails.generatedAt || billDetails.createdAt || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+                <span class="${statusClass}" style="margin-left: 8px;">${statusText}</span>
+              </div>
+            </div>
+          </div>
+
+          <table class="demo-grid">
+            <tr>
+              <td style="width: 25%;">
+                <span class="label">Patient Name</span><br>
+                <span class="val" style="font-size: 12px; color: #1e3a8a;">${patient.fullName || '-'}</span>
+              </td>
+              <td style="width: 25%;">
+                <span class="label">MRN / Patient ID</span><br>
+                <span class="val font-mono">${patient.mrn || patient.patientCode || '-'}</span>
+              </td>
+              <td style="width: 25%;">
+                <span class="label">IPD Admission No</span><br>
+                <span class="val font-mono">${adm.admissionNo || '-'}</span>
+              </td>
+              <td style="width: 25%;">
+                <span class="label">Payer Type</span><br>
+                <span class="val font-mono" style="font-weight: 800; color: #1e3a8a;">${getPayerTypeLabel(adm.payerType)}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <span class="label">Age / Gender / Mobile</span><br>
+                <span class="val">${patient.age || '-'} Yrs / ${patient.gender || '-'} / ${patient.mobileNo || '-'}</span>
+              </td>
+              <td>
+                <span class="label">Bed / Ward Location</span><br>
+                <span class="val">${adm.bedId?.bedNo || adm.bedId?.bedNumber ? 'Bed ' + (adm.bedId.bedNo || adm.bedId.bedNumber) + ' (' + (adm.bedId.wardId?.name || 'Ward') + ')' : '-'}</span>
+              </td>
+              <td>
+                <span class="label">Consultant Doctor</span><br>
+                <span class="val">${adm.consultantDoctorId?.fullName || adm.doctorId?.fullName || '-'}</span>
+              </td>
+              <td>
+                <span class="label">Invoice / Bill No</span><br>
+                <span class="val font-mono" style="color: #4338ca; font-weight: 700;">${billDetails.billNo || '-'}</span>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Category Summary Table -->
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th style="width: 8%; text-align: center;">#</th>
+                <th style="width: 54%;">Charge Category</th>
+                <th style="width: 18%; text-align: center;">Quantity / Duration</th>
+                <th style="width: 20%; text-align: right;">Total Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${categorySummaryRows.length === 0 ? '<tr><td colspan="4" class="text-center" style="padding: 15px;">No items recorded in this bill.</td></tr>' : 
+                categorySummaryRows.map(row => `
+                  <tr>
+                    <td class="text-center font-mono" style="color: #64748b;">${row.sn}</td>
+                    <td style="padding-left: 12px; font-weight: 700; color: #0f172a; font-size: 11.5px;">${row.categoryName}</td>
+                    <td class="text-center font-mono">${row.qty}</td>
+                    <td class="text-right font-mono" style="font-weight: 800; font-size: 11.5px;">₹${row.amount.toFixed(2)}</td>
+                  </tr>
+                `).join('')
+              }
+              <tr class="grand-total-row">
+                <td colspan="3" class="text-right" style="text-transform: uppercase; font-weight: 800; font-size: 11px;">Total Bill${statusText === 'DUE' ? ' (Total Due)' : ''}:</td>
+                <td class="text-right font-mono" style="font-size: 13px; color: #1e3a8a; font-weight: 900;">₹${totalBillAmount.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="in-words-box" style="margin-top: 14px;">
+            <strong>Total Amount in Words:</strong> ${numberToWords(totalBillAmount)}
+          </div>
+
+          <div class="footer">
+            <div class="sig-box">
+              <div class="sig-line">Authorized Signatory</div>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          <\/script>
+        </body>
+      </html>
+    `
+
+    const printWin = window.open('', '_blank')
+    printWin.document.write(invoiceHtml)
+    printWin.document.close()
   } catch (error) {
-    console.error('Error fetching bill details for print:', error)
-    snackbarStore.show({ message: 'Failed to load bill details for printing', type: 'error' })
+    console.error('Error printing invoice:', error)
+    snackbarStore.show({ message: 'Failed to generate invoice print', type: 'error' })
   } finally {
     fetchingInvoice.value = false
   }
@@ -239,7 +555,7 @@ const handleExportAllBillsAndCharges = async () => {
           <table class="header-table">
             <tr>
               <td>
-                <div class="hospital-title">EMMANUEL HOSPITAL & RESEARCH CENTRE</div>
+                <div class="hospital-title">EMMANUEL HOSPITAL</div>
                 <div class="sub-title">Detailed IPD Charges & Invoicing Statement</div>
               </td>
               <td class="text-right" style="font-size: 10px; color: #64748b;">
@@ -474,6 +790,284 @@ const handleExportAllBillsAndCharges = async () => {
     exportingPdf.value = false
   }
 }
+
+// Final Bill Printing (Consolidated by Category with Pharmacy / Medicine charges summarized)
+const printingFinalBill = ref(false)
+
+const handlePrintFinalBill = async () => {
+  if (!props.admission?._id) return
+  printingFinalBill.value = true
+
+  try {
+    const [chargesRes, advRes, billListRes, catRes] = await Promise.all([
+      admissionStore.fetchAdmissionCharges(props.admission._id),
+      admissionStore.fetchAdmissionAdvances(props.admission._id),
+      admissionStore.fetchAdmissionBills(props.admission._id),
+      admissionStore.fetchChargeCategories()
+    ])
+
+    const allCharges = chargesRes.success ? chargesRes.data : []
+    const allAdvances = advRes.success ? advRes.data : []
+    const allCategories = catRes.success ? catRes.data : []
+
+    // Helper to calculate total for a single charge (base amount + addons)
+    const getChargeTotal = (c) => {
+      const base = c.amount || 0
+      const addonsTotal = (c.addons || []).reduce((sum, a) => sum + (a.amount || 0), 0)
+      return base + addonsTotal
+    }
+
+    // Helper to match category definition from PatientCharge
+    const getCategoryInfo = (charge) => {
+      if (charge.chargeCategoryId && typeof charge.chargeCategoryId === 'object' && charge.chargeCategoryId.name) {
+        return {
+          id: String(charge.chargeCategoryId._id || charge.chargeCategoryId.code || charge.chargeCategoryId.name),
+          name: charge.chargeCategoryId.name,
+          code: (charge.chargeCategoryId.code || '').toUpperCase()
+        }
+      }
+      if (charge.chargeCategoryId) {
+        const found = allCategories.find(c => String(c._id) === String(charge.chargeCategoryId))
+        if (found) {
+          return {
+            id: String(found._id),
+            name: found.name,
+            code: (found.code || '').toUpperCase()
+          }
+        }
+      }
+      if (charge.chargeType) {
+        const found = allCategories.find(c => c.code === charge.chargeType || c.name.toLowerCase() === charge.chargeType.toLowerCase())
+        if (found) {
+          return {
+            id: String(found._id),
+            name: found.name,
+            code: (found.code || '').toUpperCase()
+          }
+        }
+        return {
+          id: charge.chargeType,
+          name: charge.chargeType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          code: charge.chargeType.toUpperCase()
+        }
+      }
+      return {
+        id: 'OTHER',
+        name: 'Other Medications/Test',
+        code: 'OTHER'
+      }
+    }
+
+    // Group charges by Category ID
+    const categoryGroupsMap = new Map()
+
+    allCharges.forEach(charge => {
+      const cat = getCategoryInfo(charge)
+      if (!categoryGroupsMap.has(cat.id)) {
+        categoryGroupsMap.set(cat.id, {
+          id: cat.id,
+          code: cat.code,
+          name: cat.name,
+          charges: []
+        })
+      }
+      categoryGroupsMap.get(cat.id).charges.push(charge)
+    })
+
+    // Group charges by Category and summarize directly by category
+    const categorySummaryRows = []
+    let rowCounter = 1
+
+    categoryGroupsMap.forEach((group) => {
+      const code = group.code
+      const catNameLower = group.name.toLowerCase()
+
+      const isPharmacy = code === 'PHARMACY' || catNameLower.includes('pharmacy') || catNameLower.includes('medicine') || catNameLower.includes('drug')
+      const isRoom = code === 'ROOM' || code === 'ROOM_RENT' || code === 'BED' || catNameLower.includes('room') || catNameLower.includes('bed')
+      const isDoctor = code === 'DOCTOR' || code === 'DOCTOR_VISIT' || catNameLower.includes('doctor') || catNameLower.includes('consult')
+      const isLab = code === 'LAB' || code === 'LABORATORY' || catNameLower.includes('lab')
+      const isRadiology = code === 'RADIOLOGY' || catNameLower.includes('radiology') || catNameLower.includes('x-ray') || catNameLower.includes('usg') || catNameLower.includes('scan')
+      const isOt = code === 'OT' || catNameLower.includes('operation') || catNameLower.includes('surgery') || catNameLower.includes('theatre')
+      const isNursing = code === 'NURSING' || catNameLower.includes('nursing')
+
+      const totalAmt = group.charges.reduce((sum, c) => sum + getChargeTotal(c), 0)
+      const totalQty = group.charges.reduce((sum, c) => sum + (c.quantity || 1), 0)
+
+      let unitLabel = 'Qty'
+      if (isRoom) unitLabel = totalQty === 1 ? 'Day' : 'Days'
+      else if (isDoctor) unitLabel = totalQty === 1 ? 'Visit' : 'Visits'
+      else if (isPharmacy) unitLabel = totalQty === 1 ? 'Item' : 'Items'
+      else if (isLab) unitLabel = totalQty === 1 ? 'Test' : 'Tests'
+      else if (isRadiology) unitLabel = totalQty === 1 ? 'Scan' : 'Scans'
+      else if (isOt) unitLabel = totalQty === 1 ? 'Proc' : 'Procedures'
+      else if (isNursing) unitLabel = totalQty === 1 ? 'Item' : 'Items'
+
+      categorySummaryRows.push({
+        sn: rowCounter++,
+        categoryName: group.name,
+        qty: `${totalQty} ${unitLabel}`,
+        amount: totalAmt
+      })
+    })
+
+    const totalChargesSum = categorySummaryRows.reduce((sum, r) => sum + r.amount, 0)
+    const totalAdvancesSum = allAdvances.reduce((sum, a) => sum + (a.amount || 0), 0)
+    const balanceDue = totalChargesSum - totalAdvancesSum
+
+    const patient = props.admission.patientId || {}
+    const adm = props.admission || {}
+
+    const finalBillHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>IPD Final Bill - ${patient.fullName || 'Patient'}</title>
+          <style>
+            @page { size: A4 portrait; margin: 10mm 15mm; }
+            body { font-family: ui-mono, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace, 'Segoe UI', Arial, sans-serif; color: #0f172a; margin: 0; padding: 16px; font-size: 11px; line-height: 1.4; }
+            .receipt-header { text-align: center; margin-bottom: 12px; }
+            .receipt-divider { border: 0; border-top: 1px dashed #cbd5e1; margin: 8px 0; }
+            .receipt-header h2 { font-size: 12px; font-weight: bold; letter-spacing: 0.05em; color: #1e293b; margin: 4px 0 0 0; }
+            .status-badge { background: #fef2f2; color: #dc2626; border: 1.5px solid #f87171; font-weight: 900; font-size: 10.5px; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+            
+            .demo-grid { width: 100%; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; padding: 8px 10px; margin-bottom: 14px; font-size: 10.5px; border-collapse: collapse; }
+            .demo-grid td { padding: 4px 6px; vertical-align: top; }
+            .label { font-weight: 700; color: #475569; text-transform: uppercase; font-size: 9px; }
+            .val { font-weight: 600; color: #0f172a; }
+            .font-mono { font-family: monospace; font-weight: bold; }
+
+            table.bill-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11px; }
+            table.bill-table th { background: #1e3a8a; color: #ffffff; text-align: left; padding: 7px 10px; font-weight: 700; text-transform: uppercase; font-size: 10px; }
+            table.bill-table td { border-bottom: 1px solid #e2e8f0; padding: 7px 10px; color: #1e293b; }
+            table.bill-table tr:nth-child(even) { background-color: #f8fafc; }
+            table.bill-table tr.grand-total-row td { background: #f1f5f9; padding: 8px 10px; border-top: 2px solid #1e3a8a; border-bottom: 2px solid #1e3a8a; font-weight: 800; }
+            
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+
+            .in-words-box { background: #f8fafc; border: 1px dashed #cbd5e1; padding: 8px 12px; border-radius: 6px; font-size: 11px; margin-bottom: 14px; }
+
+            .footer { margin-top: 40px; display: flex; justify-content: flex-end; align-items: flex-end; font-size: 10.5px; color: #475569; page-break-inside: avoid; }
+            .sig-box { text-align: center; width: 200px; }
+            .sig-line { border-top: 1.5px solid #334155; margin-top: 45px; padding-top: 5px; font-weight: 700; color: #0f172a; }
+          </style>
+        </head>
+        <body>
+          <!-- Header Brand (From Invoice.vue) -->
+          <div class="receipt-header">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <img src="${logoUrl}" alt="Logo" style="height: 60px; width: auto; object-fit: contain;" />
+              <div style="text-align: right; font-size: 10.5px; color: #64748b; line-height: 1.35;">
+                <p style="margin: 0; font-weight: 800; color: #0f172a; font-size: 11.5px; letter-spacing: 0.2px;">EMMANUEL HOSPITAL</p>
+                <p style="margin: 0;">Y-67, Luangmual, Aizawl, Mizoram - 796009</p>
+                <p style="margin: 0;">Phone: 0389-2913340 / 8974326872</p>
+              </div>
+            </div>
+            <hr class="receipt-divider" />
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; margin-bottom: 4px;">
+              <h2 style="font-size: 12px; font-weight: 800; letter-spacing: 0.05em; color: #1e293b; margin: 0; text-transform: uppercase;">
+                IPD FINAL BILL
+              </h2>
+              <div style="font-size: 10px; color: #64748b;">
+                Date: <strong>${adm.dischargeDate ? new Date(adm.dischargeDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</strong>
+              </div>
+            </div>
+          </div>
+
+          <table class="demo-grid">
+            <tr>
+              <td style="width: 25%;">
+                <span class="label">Patient Name</span><br>
+                <span class="val" style="font-size: 12px; color: #1e3a8a;">${patient.fullName || '-'}</span>
+              </td>
+              <td style="width: 25%;">
+                <span class="label">MRN / Patient ID</span><br>
+                <span class="val font-mono">${patient.mrn || patient.patientCode || '-'}</span>
+              </td>
+              <td style="width: 25%;">
+                <span class="label">IPD Admission No</span><br>
+                <span class="val font-mono">${adm.admissionNo || '-'}</span>
+              </td>
+              <td style="width: 25%;">
+                <span class="label">Payer Type</span><br>
+                <span class="val font-mono" style="font-weight: 800; color: #1e3a8a;">${getPayerTypeLabel(adm.payerType)}</span>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <span class="label">Age / Gender / Mobile</span><br>
+                <span class="val">${patient.age || '-'} Yrs / ${patient.gender || '-'} / ${patient.mobileNo || '-'}</span>
+              </td>
+              <td>
+                <span class="label">Bed / Ward Location</span><br>
+                <span class="val">${adm.bedId?.bedNo || adm.bedId?.bedNumber ? 'Bed ' + (adm.bedId.bedNo || adm.bedId.bedNumber) + ' (' + (adm.bedId.wardId?.name || 'Ward') + ')' : '-'}</span>
+              </td>
+              <td>
+                <span class="label">Consultant Doctor</span><br>
+                <span class="val">${adm.consultantDoctorId?.fullName || adm.doctorId?.fullName || '-'}</span>
+              </td>
+              <td>
+                <span class="label">Admission / Discharge Date</span><br>
+                <span class="val">${adm.admissionDate ? new Date(adm.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'} to ${adm.dischargeDate ? new Date(adm.dischargeDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              </td>
+            </tr>
+          </table>
+
+          <!-- Category Summary Table -->
+          <table class="bill-table">
+            <thead>
+              <tr>
+                <th style="width: 8%; text-align: center;">#</th>
+                <th style="width: 54%;">Charge Category</th>
+                <th style="width: 18%; text-align: center;">Quantity / Duration</th>
+                <th style="width: 20%; text-align: right;">Total Amount (₹)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${categorySummaryRows.length === 0 ? '<tr><td colspan="4" class="text-center" style="padding: 15px;">No charges recorded for this admission.</td></tr>' : 
+                categorySummaryRows.map(row => `
+                  <tr>
+                    <td class="text-center font-mono" style="color: #64748b;">${row.sn}</td>
+                    <td style="padding-left: 12px; font-weight: 700; color: #0f172a; font-size: 11.5px;">${row.categoryName}</td>
+                    <td class="text-center font-mono">${row.qty}</td>
+                    <td class="text-right font-mono" style="font-weight: 800; font-size: 11.5px;">₹${row.amount.toFixed(2)}</td>
+                  </tr>
+                `).join('')
+              }
+              <tr class="grand-total-row">
+                <td colspan="3" class="text-right" style="text-transform: uppercase; font-weight: 800; font-size: 11px;">Total Bill:</td>
+                <td class="text-right font-mono" style="font-size: 13px; color: #1e3a8a; font-weight: 900;">₹${totalChargesSum.toFixed(2)}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="in-words-box" style="margin-top: 14px;">
+            <strong>Total Amount in Words:</strong> ${numberToWords(totalChargesSum)}
+          </div>
+
+          <div class="footer">
+            <div class="sig-box">
+              <div class="sig-line">Authorized Signatory</div>
+            </div>
+          </div>
+
+          <script>
+            window.onload = function() { window.print(); }
+          <\/script>
+        </body>
+      </html>
+    `
+
+    const printWin = window.open('', '_blank')
+    printWin.document.write(finalBillHtml)
+    printWin.document.close()
+  } catch (error) {
+    console.error('Error printing final bill:', error)
+    snackbarStore.show({ message: 'Failed to generate final bill', type: 'error' })
+  } finally {
+    printingFinalBill.value = false
+  }
+}
 </script>
 
 <template>
@@ -501,6 +1095,22 @@ const handleExportAllBillsAndCharges = async () => {
       </div>
       
       <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-end">
+        <!-- Print Final Bill Button -->
+        <button 
+          @click="handlePrintFinalBill"
+          :disabled="printingFinalBill"
+          class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+        >
+          <svg v-if="printingFinalBill" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <svg v-else class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          Print Final Bill
+        </button>
+
         <!-- Export All Bills & Charges Button -->
         <button 
           @click="handleExportAllBillsAndCharges"

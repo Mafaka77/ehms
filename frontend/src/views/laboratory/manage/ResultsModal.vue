@@ -44,7 +44,7 @@ const calculateAge = (patient) => {
 const testsWithSections = computed(() => {
   return tests.value.map(test => {
     const groups = {}
-    test.parameters.forEach(param => {
+    ;(test.parameters || []).forEach(param => {
       const sec = param.section || 'General'
       if (!groups[sec]) groups[sec] = []
       groups[sec].push(param)
@@ -55,10 +55,8 @@ const testsWithSections = computed(() => {
       params: groups[section]
     })).sort((a, b) => a.section.localeCompare(b.section))
 
-    return {
-      ...test,
-      groupedParams
-    }
+    test.groupedParams = groupedParams
+    return test
   })
 })
 const fetchResults = async () => {
@@ -67,7 +65,10 @@ const fetchResults = async () => {
   try {
     const res = await labStore.fetchOrderResults(props.order._id)
     orderData.value = res.order
-    tests.value = res.tests
+    tests.value = (res.tests || []).map(t => ({
+      ...t,
+      paragraph: t.paragraph || t.remarks || ''
+    }))
   } catch (error) {
     console.error('Error fetching results:', error)
     snackbarStore.show({ message: 'Failed to load test parameters', type: 'error' })
@@ -88,7 +89,7 @@ const saveResults = async () => {
     // Flatten results to send to backend
     const resultsData = []
     tests.value.forEach(test => {
-      test.parameters.forEach(param => {
+      (test.parameters || []).forEach(param => {
         resultsData.push({
           orderItemId: test.orderItemId,
           parameterId: param.parameterId,
@@ -103,7 +104,7 @@ const saveResults = async () => {
     let hasEmptyOptional = false
 
     tests.value.forEach(test => {
-      test.parameters.forEach(param => {
+      (test.parameters || []).forEach(param => {
         const val = param.measuredValue ? param.measuredValue.toString().trim() : ''
         if (!val) {
           if (param.isRequired) hasEmptyRequired = true
@@ -125,7 +126,12 @@ const saveResults = async () => {
       }
     }
 
-    const res = await labStore.saveOrderResults(props.order._id, resultsData)
+    const testRemarks = tests.value.map(t => ({
+      orderItemId: t.orderItemId,
+      paragraph: t.paragraph || ''
+    }))
+
+    const res = await labStore.saveOrderResults(props.order._id, resultsData, testRemarks)
     snackbarStore.show({ message: 'Lab results saved successfully!', type: 'success' })
     emit('saved')
     emit('close')
@@ -215,8 +221,8 @@ const formatDate = (dateString) => {
                   <div class="col-span-1 text-center">Out of Range</div>
                 </div>
 
-                <!-- Lab Test Name Row -->
-                <div class="col-span-12 bg-indigo-50/60 px-4 py-2.5 text-sm font-bold text-indigo-900 uppercase tracking-widest border-b border-indigo-100 text-center">
+                <!-- Lab Test Name Row (No bottom border line) -->
+                <div class="col-span-12 bg-indigo-50/60 px-4 py-2.5 text-sm font-bold text-indigo-900 uppercase tracking-widest text-center">
                   {{ test.testName }}
                 </div>
 
@@ -316,6 +322,22 @@ const formatDate = (dateString) => {
                     </div>
                   </div>
                 </template>
+              </div>
+
+              <!-- Paragraph for this Test -->
+              <div class="pt-3 border-t border-slate-100">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                  <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
+                  </svg>
+                  Paragraph
+                </label>
+                <textarea 
+                  v-model="test.paragraph"
+                  rows="2"
+                  placeholder="Enter paragraph / remarks for this test..."
+                  class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs placeholder-slate-400 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all resize-y"
+                ></textarea>
               </div>
             </div>
           </div>

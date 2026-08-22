@@ -781,6 +781,8 @@ exports.getLabOrderResults = async (orderId) => {
                 testName: item.testName,
                 methodology: testDoc?.methodology || null,
                 status: item.status,
+                remarks: item.remarks || '',
+                paragraph: item.remarks || '',
                 parameters: parameters.map(p => {
                     const matchedResult = results.find(r => r.parameterId.toString() === p._id.toString());
                     return {
@@ -813,7 +815,7 @@ exports.getLabOrderResults = async (orderId) => {
     }
 }
 
-exports.saveLabOrderResults = async (orderId, resultsData, userId) => {
+exports.saveLabOrderResults = async (orderId, resultsData, userId, options = {}) => {
     const session = await LabOrder.startSession();
     session.startTransaction();
     try {
@@ -826,23 +828,38 @@ exports.saveLabOrderResults = async (orderId, resultsData, userId) => {
             throw error
         }
 
-        for (const res of resultsData) {
-            const query = {
-                orderId,
-                orderItemId: res.orderItemId,
-                parameterId: res.parameterId
-            };
-            const update = {
-                measuredValue: res.measuredValue,
-                isOutOfRange: !!res.isOutOfRange,
-                enteredBy: userId,
-                enteredAt: new Date()
-            };
-            await LabResult.findOneAndUpdate(query, update, {
-                upsert: true,
-                new: true,
-                session
-            });
+        if (Array.isArray(resultsData)) {
+            for (const res of resultsData) {
+                const query = {
+                    orderId,
+                    orderItemId: res.orderItemId,
+                    parameterId: res.parameterId
+                };
+                const update = {
+                    measuredValue: res.measuredValue,
+                    isOutOfRange: !!res.isOutOfRange,
+                    enteredBy: userId,
+                    enteredAt: new Date()
+                };
+                await LabResult.findOneAndUpdate(query, update, {
+                    upsert: true,
+                    new: true,
+                    session
+                });
+            }
+        }
+
+        // Save test-level remarks/paragraph if provided
+        const testRemarks = options.tests || options.testRemarks || [];
+        if (Array.isArray(testRemarks)) {
+            for (const t of testRemarks) {
+                if (t.orderItemId) {
+                    const text = t.paragraph !== undefined ? t.paragraph : t.remarks;
+                    await LabOrderItem.findByIdAndUpdate(t.orderItemId, {
+                        remarks: text || ''
+                    }).session(session);
+                }
+            }
         }
 
         await LabOrderItem.updateMany(

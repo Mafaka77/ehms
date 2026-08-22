@@ -521,11 +521,14 @@ export const useLabStore = defineStore('lab', {
             }
         },
 
-        async saveOrderResults(orderId, resultsData) {
+        async saveOrderResults(orderId, resultsData, testsData = []) {
             this.loading = true;
             this.error = null;
             try {
-                const response = await api.post(`/lab/order/${orderId}/results`, { results: resultsData });
+                const response = await api.post(`/lab/order/${orderId}/results`, { 
+                    results: resultsData,
+                    tests: testsData
+                });
                 return response.data.data;
             } catch (error) {
                 console.error('Error saving order results:', error);

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose')
 const Supplier = require('./medicine_supplier.model')
 const MedicineCategory = require('./medicine_category.model')
 const Medicine = require('./medicine.model')
@@ -11,6 +12,9 @@ const PharmacyIndent = require('./pharmacy_indent_model')
 const PharmacyIndentItem = require('./pharmacy_indent_item.model')
 const Admission = require('../clinical/ipd/admission.model')
 const nursingServices = require('../nursing/nursing.services')
+const User = require('../auth/user.model')
+const Doctor = require('../hr/doctor.model')
+const Employee = require('../hr/employee.model')
 
 // ── Suppliers ──────────────────────────────────────────────
 
@@ -944,6 +948,36 @@ exports.returnIpdMedicineItem = async (itemId, returnQty, remarks) => {
 
 // ── Pharmacy Indents ──────────────────────────────────────
 
+const resolveIndentRequester = async (indent) => {
+    if (!indent) return indent
+    const indentObj = indent.toObject ? indent.toObject() : { ...indent }
+    if (indentObj.requestedBy && typeof indentObj.requestedBy === 'object' && indentObj.requestedBy.fullName) {
+        return indentObj
+    }
+    const rawId = indentObj.requestedBy?._id || indentObj.requestedBy
+    if (rawId && mongoose.Types.ObjectId.isValid(rawId)) {
+        const doc = await Doctor.findById(rawId, 'fullName')
+        if (doc) {
+            indentObj.requestedBy = { _id: doc._id, fullName: doc.fullName, type: 'Doctor' }
+            indentObj.requestedByModel = 'Doctor'
+            return indentObj
+        }
+        const emp = await Employee.findById(rawId, 'fullName')
+        if (emp) {
+            indentObj.requestedBy = { _id: emp._id, fullName: emp.fullName, type: 'Employee' }
+            indentObj.requestedByModel = 'Employee'
+            return indentObj
+        }
+        const user = await User.findById(rawId, 'fullName')
+        if (user) {
+            indentObj.requestedBy = { _id: user._id, fullName: user.fullName, type: 'User' }
+            indentObj.requestedByModel = 'User'
+            return indentObj
+        }
+    }
+    return indentObj
+}
+
 exports.createIndent = async (userId, data) => {
     try {
         const items = data.items || []
@@ -963,9 +997,30 @@ exports.createIndent = async (userId, data) => {
             }
         }
 
+        let reqId = data.requestedBy || userId
+        let reqModel = data.requestedByModel || 'User'
+
+        if (data.requestedBy) {
+            if (!data.requestedByModel || data.requestedByModel === 'User') {
+                const isDoc = await Doctor.exists({ _id: data.requestedBy })
+                if (isDoc) {
+                    reqModel = 'Doctor'
+                } else {
+                    const isEmp = await Employee.exists({ _id: data.requestedBy })
+                    if (isEmp) {
+                        reqModel = 'Employee'
+                    } else {
+                        reqModel = 'User'
+                    }
+                }
+            }
+        }
+
         const indentData = {
             ...data,
-            requestedBy: userId
+            createdBy: userId,
+            requestedBy: reqId,
+            requestedByModel: reqModel
         }
         delete indentData.items
 
@@ -985,7 +1040,13 @@ exports.createIndent = async (userId, data) => {
 
         await PharmacyIndentItem.insertMany(indentItems)
 
-        return indent
+        const created = await PharmacyIndent.findById(indent._id)
+            .populate('requestedBy', 'fullName')
+            .populate('approvedBy', 'fullName')
+            .populate('patientId', 'fullName patientCode')
+            .populate('wardId', 'name')
+
+        return await resolveIndentRequester(created)
     } catch (error) {
         throw error
     }
@@ -1006,10 +1067,13 @@ exports.getIndents = async (query = {}, user = {}) => {
         }
 
         // Only Admin and Pharmacist roles can see all indents.
-        // All other users can only see indents they created.
+        // All other users can only see indents they created or requested.
         const privilegedRoles = ['Admin', 'Pharmacist', 'SuperAdmin', 'HospitalAdmin']
         if (!privilegedRoles.includes(user.roleName)) {
-            filter.requestedBy = user._id
+            filter.$or = [
+                { requestedBy: user._id },
+                { createdBy: user._id }
+            ]
         }
 
         const total = await PharmacyIndent.countDocuments(filter)
@@ -1022,7 +1086,9 @@ exports.getIndents = async (query = {}, user = {}) => {
             .skip(skip)
             .limit(limit)
 
-        return { indents, pagination: { total, page, limit, pages: Math.ceil(total / limit) } }
+        const resolvedIndents = await Promise.all(indents.map(resolveIndentRequester))
+
+        return { indents: resolvedIndents, pagination: { total, page, limit, pages: Math.ceil(total / limit) } }
     } catch (error) {
         throw error
     }
@@ -1059,7 +1125,8 @@ exports.getIndentById = async (id) => {
             return itemObj
         })
             
-        return { ...indent.toObject(), items: itemsWithStock }
+        const resolvedIndent = await resolveIndentRequester(indent)
+        return { ...resolvedIndent, items: itemsWithStock }
     } catch (error) {
         throw error
     }
@@ -1147,7 +1214,7 @@ exports.updateIndentStatus = async (id, userId, statusData) => {
             { new: true }
         ).populate('requestedBy', 'fullName').populate('approvedBy', 'fullName')
         
-        return indent
+        return await resolveIndentRequester(indent)
     } catch (error) {
         throw error
     }
@@ -1170,6 +1237,24 @@ exports.updateIndent = async (id, data) => {
             updateData.status = 'APPROVED'
         }
 
+        if (updateData.requestedBy) {
+            let reqModel = updateData.requestedByModel || 'User'
+            if (!updateData.requestedByModel || updateData.requestedByModel === 'User') {
+                const isDoc = await Doctor.exists({ _id: updateData.requestedBy })
+                if (isDoc) {
+                    reqModel = 'Doctor'
+                } else {
+                    const isEmp = await Employee.exists({ _id: updateData.requestedBy })
+                    if (isEmp) {
+                        reqModel = 'Employee'
+                    } else {
+                        reqModel = 'User'
+                    }
+                }
+            }
+            updateData.requestedByModel = reqModel
+        }
+
         Object.assign(indent, updateData)
         await indent.save()
 
@@ -1185,7 +1270,13 @@ exports.updateIndent = async (id, data) => {
             await PharmacyIndentItem.insertMany(indentItems)
         }
 
-        return indent
+        const updatedIndent = await PharmacyIndent.findById(id)
+            .populate('requestedBy', 'fullName')
+            .populate('approvedBy', 'fullName')
+            .populate('patientId', 'fullName patientCode')
+            .populate('wardId', 'name')
+
+        return await resolveIndentRequester(updatedIndent)
     } catch (error) {
         throw error
     }
