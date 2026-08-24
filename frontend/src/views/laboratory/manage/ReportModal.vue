@@ -87,11 +87,11 @@ const generateEditorContent = () => {
   tests.value.forEach((test, testIdx) => {
     // Add separator between tests if there are multiple tests
     if (testIdx > 0) {
-      html += `<tr><td colspan="4" class="test-separator-row" style="border-top: 1px dashed #cbd5e1; padding: 4px 0 2px 0;"></td></tr>`
+      html += `<tr><td colspan="4" class="test-separator-row" style="border-top: 1px dashed #cbd5e1; padding: 1px 0;"></td></tr>`
     }
 
     // Test Name header
-    html += `<tr><td colspan="4" class="test-header-row" style="padding: ${testIdx > 0 ? '4px' : '2px'} 0 0 0;"><strong><u>${test.testName.toUpperCase()}</u></strong></td></tr>`
+    html += `<tr><td colspan="4" class="test-header-row" style="padding: 1px 0 0 0;"><strong><u>${test.testName.toUpperCase()}</u></strong></td></tr>`
 
     const groups = {}
     ;(test.parameters || []).forEach(param => {
@@ -104,7 +104,7 @@ const generateEditorContent = () => {
     
     sortedSections.forEach(section => {
       if (section) {
-        html += `<tr><td colspan="4" class="section-title-row" style="padding: 8px 0 4px 0; font-weight: 700; font-size: 11px;">&nbsp;&nbsp;&nbsp;&nbsp;${section}</td></tr>`
+        html += `<tr><td colspan="4" class="section-title-row" style="padding: 2px 0 2px 0; font-weight: 700; font-size: 11px;">&nbsp;&nbsp;&nbsp;&nbsp;${section}</td></tr>`
       }
       
       groups[section].sort((a,b) => (a.displayOrder||0) - (b.displayOrder||0)).forEach(param => {
@@ -152,7 +152,7 @@ const generateEditorContent = () => {
   
   const methods = tests.value.filter(t => t.methodology).map(t => `<strong>${t.testName}</strong>: ${t.methodology}`)
   if (methods.length > 0) {
-    html += '<p></p><p><strong>Methods:</strong></p>'
+    html += '<p style="margin-top: 4px; margin-bottom: 2px;"><strong>Methods:</strong></p>'
     if (methods.length === 1 && tests.value.length === 1) {
       html += `<p>${tests.value[0].methodology}</p>`
     } else {
@@ -160,7 +160,7 @@ const generateEditorContent = () => {
     }
   }
 
-  html += '<p></p><p><strong>Remarks:</strong> </p>'
+  html += '<p style="margin-top: 4px; margin-bottom: 2px;"><strong>Remarks:</strong> </p>'
   
   return html
 }
@@ -304,66 +304,166 @@ const generateReportPDF = async (preview = false) => {
     const footerData = footerH > 0 ? cropCanvas(footerY, footerH) : null
     
     const ratio = pdfWidth / canvas.width
+    const mmPerDomPx = scaleFactor * ratio
     const headerPdfH = (headerH * scaleFactor) * ratio
     const bodyPdfH = (bodyH * scaleFactor) * ratio
     const footerPdfH = (footerH * scaleFactor) * ratio
     
     const subPageTopMargin = 12 // Top margin in mm on page 2+
-    const page1BodySpace = Math.max(10, pageHeight - headerPdfH - footerPdfH)
-    const pageNBodySpace = Math.max(10, pageHeight - subPageTopMargin - footerPdfH)
+    const marginSinglePage = 5 // 5mm bottom margin when everything fits on 1 page
+    const marginMultiPage = 18 // 18mm bottom margin when multiple pages are required
     
-    let totalPages = 1
-    if (bodyPdfH > page1BodySpace) {
-      const remainingH = bodyPdfH - page1BodySpace
-      totalPages = 1 + Math.ceil(remainingH / pageNBodySpace)
+    // Check if everything fits on a single page (with 2mm tolerance to avoid orphan signature pages)
+    const singlePageLimit = Math.max(10, pageHeight - headerPdfH - footerPdfH - 2)
+    const fitsOnSinglePage = bodyPdfH <= singlePageLimit
+    
+    const pageBottomMargin = fitsOnSinglePage ? marginSinglePage : marginMultiPage
+    const page1MaxBodySpace = Math.max(10, pageHeight - headerPdfH - footerPdfH - pageBottomMargin)
+    const pageNMaxBodySpace = Math.max(10, pageHeight - subPageTopMargin - footerPdfH - pageBottomMargin)
+    
+    // Collect atomic block elements inside tbody to find natural page break boundaries
+    const candidateElements = [
+      ...element.querySelectorAll('.tiptap-editor .tiptap table thead tr'),
+      ...element.querySelectorAll('.tiptap-editor .tiptap table tbody tr'),
+      ...element.querySelectorAll('.tiptap-editor .tiptap > *:not(table)'),
+      ...element.querySelectorAll('.tiptap-editor .tiptap > ul > li, .tiptap-editor .tiptap > ol > li'),
+      ...element.querySelectorAll('.signatures')
+    ]
+    
+    const elements = []
+    const seen = new Set()
+    
+    for (const el of candidateElements) {
+      if (!el || seen.has(el)) continue
+      seen.add(el)
+      const rect = el.getBoundingClientRect()
+      if (rect.height <= 0) continue
+      const topPx = rect.top - tbodyRect.top
+      const bottomPx = rect.bottom - tbodyRect.top
+      const isHeader = el.classList?.contains('test-header-row') || 
+                       el.classList?.contains('section-title-row') ||
+                       el.querySelector?.('.test-header-row, .section-title-row') !== null ||
+                       el.tagName === 'THEAD' ||
+                       el.closest('thead') !== null
+      
+      elements.push({
+        el,
+        topPx,
+        bottomPx,
+        topMm: topPx * mmPerDomPx,
+        bottomMm: bottomPx * mmPerDomPx,
+        heightMm: rect.height * mmPerDomPx,
+        isHeader
+      })
     }
     
-    const drawPageFrame = (offset, pageNum, total) => {
-      const isFirstPage = pageNum === 1
-      const currentTopSpace = isFirstPage ? headerPdfH : subPageTopMargin
-
-      // Draw body in the middle
-      if (bodyData) {
-        pdf.addImage(bodyData, 'JPEG', 0, currentTopSpace - offset, pdfWidth, bodyPdfH)
+    elements.sort((a, b) => a.topPx - b.topPx)
+    
+    // Calculate page slices based on elements to avoid cutting rows in half
+    const pages = []
+    let currentStartMm = 0
+    let pageIdx = 0
+    
+    while (currentStartMm < bodyPdfH - 0.5) {
+      const availableSpaceMm = (pageIdx === 0) ? page1MaxBodySpace : pageNMaxBodySpace
+      const idealEndMm = currentStartMm + availableSpaceMm
+      
+      if (idealEndMm >= bodyPdfH - 0.5) {
+        pages.push({ startMm: currentStartMm, endMm: bodyPdfH })
+        break
       }
       
-      // Cover overflow with solid white rectangles
-      pdf.setFillColor(255, 255, 255)
-      if (currentTopSpace > 0) {
-        pdf.rect(0, 0, pdfWidth, currentTopSpace, 'F')
+      let splitMm = idealEndMm
+      
+      // Check for elements that overlap with idealEndMm (straddle the page break)
+      const overlapping = elements.filter(item => item.topMm < idealEndMm && item.bottomMm > idealEndMm)
+      
+      if (overlapping.length > 0) {
+        const candidates = overlapping.filter(item => item.topMm > currentStartMm + 2)
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => a.topMm - b.topMm)
+          splitMm = candidates[0].topMm
+        }
+      } else {
+        const beforeEnd = elements.filter(item => item.bottomMm <= idealEndMm && item.bottomMm > currentStartMm + 2)
+        if (beforeEnd.length > 0) {
+          beforeEnd.sort((a, b) => b.bottomMm - a.bottomMm)
+          splitMm = beforeEnd[0].bottomMm
+        }
       }
-      if (footerPdfH > 0) {
-        pdf.rect(0, pageHeight - footerPdfH, pdfWidth, footerPdfH + 2, 'F')
+      
+      // Avoid orphan section headers (or headers with only 1 item) at the bottom of the page
+      const itemsBeforeSplit = elements.filter(item => item.bottomMm <= splitMm + 0.1 && item.topMm >= currentStartMm)
+      if (itemsBeforeSplit.length > 0) {
+        const lastItem = itemsBeforeSplit[itemsBeforeSplit.length - 1]
+        if (lastItem.isHeader && lastItem.topMm > currentStartMm + 5) {
+          splitMm = lastItem.topMm
+        } else if (itemsBeforeSplit.length >= 2) {
+          const secondLastItem = itemsBeforeSplit[itemsBeforeSplit.length - 2]
+          if (secondLastItem.isHeader && secondLastItem.topMm > currentStartMm + 5) {
+            splitMm = secondLastItem.topMm
+          }
+        }
       }
+      
+      // Fallback in case no valid split point was found
+      if (splitMm <= currentStartMm + 5) {
+        splitMm = idealEndMm
+      }
+      
+      pages.push({ startMm: currentStartMm, endMm: splitMm })
+      currentStartMm = splitMm
+      pageIdx++
+    }
+    
+    // If only signatures/remarks overflow into page 2 and total body fits within single page height, merge to 1 page
+    if (pages.length === 2 && bodyPdfH <= (pageHeight - headerPdfH - footerPdfH - 1)) {
+      pages.splice(0, 2, { startMm: 0, endMm: bodyPdfH })
+    }
+    
+    const totalPages = pages.length
+    let prevEndPx = 0
+    
+    pages.forEach((pageDef, idx) => {
+      const pageNum = idx + 1
+      if (idx > 0) {
+        pdf.addPage()
+      }
+      
+      const isFirstPage = (pageNum === 1)
+      const isLastPage = (idx === totalPages - 1)
+      const currentTopSpace = isFirstPage ? headerPdfH : subPageTopMargin
+      
+      // Add slight offset on subsequent pages to avoid subpixel border bleeding from previous row
+      const startPx = isFirstPage ? prevEndPx : Math.min(bodyH, prevEndPx + 1)
+      const endPx = isLastPage ? bodyH : Math.round(pageDef.endMm / mmPerDomPx)
+      prevEndPx = endPx
+      const sliceH = Math.max(1, endPx - startPx)
+      
+      const sliceData = cropCanvas(bodyY + startPx, sliceH)
+      const slicePdfH = (sliceH * scaleFactor) * ratio
       
       // Draw letterhead & patient demographics ONLY on the first page
       if (isFirstPage && headerData && headerPdfH > 0) {
         pdf.addImage(headerData, 'JPEG', 0, 0, pdfWidth, headerPdfH)
       }
-      // Draw footer at the absolute bottom
-      if (footerData && footerPdfH > 0) {
+      
+      // Draw body slice
+      if (sliceData && slicePdfH > 0) {
+        pdf.addImage(sliceData, 'JPEG', 0, currentTopSpace, pdfWidth, slicePdfH)
+      }
+      
+      // Draw footer if present
+      if (footerData && footerPdfH > 0 && isLastPage) {
         pdf.addImage(footerData, 'JPEG', 0, pageHeight - footerPdfH, pdfWidth, footerPdfH)
       }
       
-      // Draw page number at the top right (within the top margin)
+      // Draw page number at top right
       pdf.setFontSize(8)
       pdf.setTextColor(100, 116, 139) // slate-500
-      const pageText = `Page ${pageNum} of ${total}`
+      const pageText = `Page ${pageNum} of ${totalPages}`
       pdf.text(pageText, pdfWidth - 12, 6, { align: 'right' })
-    }
-    
-    let currentPage = 1
-    let bodyOffset = 0
-    drawPageFrame(bodyOffset, currentPage, totalPages)
-    let bodyHeightLeft = bodyPdfH - page1BodySpace
-    
-    while (bodyHeightLeft > 0) {
-      bodyOffset += (currentPage === 1 ? page1BodySpace : pageNBodySpace)
-      currentPage++
-      pdf.addPage()
-      drawPageFrame(bodyOffset, currentPage, totalPages)
-      bodyHeightLeft -= pageNBodySpace
-    }
+    })
     
     const patientName = props.order?.patientId?.fullName?.replace(/\s+/g, '_') || 'Patient'
     const orderNo = props.order?.orderNo || 'Report'
@@ -456,8 +556,7 @@ const formatDate = (dateString) => {
             <tbody>
               <tr>
                 <td>
-                  <!-- Parameters results list rendered in Editor -->
-                  <div class="mb-6">
+                  <div>
               <!-- Editor Toolbar (hidden on print) -->
               <div v-if="editor" v-show="!printingPDF" class="flex flex-wrap items-center gap-1 p-1.5 bg-slate-50 border border-slate-200 border-b-0 rounded-t-lg print:hidden">
                 <button @click="editor.chain().focus().toggleBold().run()" :class="{ 'bg-slate-200 text-indigo-700 font-extrabold': editor.isActive('bold') }" class="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-700 font-bold transition-colors" title="Bold">
@@ -796,17 +895,17 @@ const formatDate = (dateString) => {
   font-weight: 700 !important;
   font-size: 11px !important;
   color: #000000 !important;
-  padding: 8px 0 4px 0 !important;
+  padding: 2px 0 2px 0 !important;
 }
 
 .tiptap-editor :deep(.tiptap td.test-separator-row) {
   border: none !important;
   border-top: 1px dashed #cbd5e1 !important;
-  padding: 4px 0 2px 0 !important;
+  padding: 1px 0 !important;
 }
 
 .signatures {
-  margin-top: 28px;
+  margin-top: 20px;
   display: flex;
   justify-content: space-between;
   font-size: 10px;
