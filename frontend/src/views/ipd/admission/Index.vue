@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
+import { DateTime } from 'luxon'
 import { useRouter } from 'vue-router'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { usePatientStore } from '../../../stores/patientStore'
@@ -11,6 +12,7 @@ import BaseInput from '../../../components/BaseInput.vue'
 import BaseSelect from '../../../components/BaseSelect.vue'
 import BaseTextarea from '../../../components/BaseTextarea.vue'
 import SearchableSelect from '../../../components/SearchableSelect.vue'
+
 
 const router = useRouter()
 const admissionStore = useIpdAdmissionStore()
@@ -47,21 +49,8 @@ const newPatient = ref({
 const isCreatingPatient = ref(false)
 
 const getLocalDatetimeString = () => {
-  const d = new Date()
-  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
-  const formatter = new Intl.DateTimeFormat('en-CA', options)
-  const parts = formatter.formatToParts(d)
-  
-  const year = parts.find(p => p.type === 'year').value
-  const month = parts.find(p => p.type === 'month').value
-  const day = parts.find(p => p.type === 'day').value
-  let hour = parts.find(p => p.type === 'hour').value
-  if (hour === '24') hour = '00'
-  const minute = parts.find(p => p.type === 'minute').value
-  
-  return `${year}-${month}-${day}T${hour}:${minute}`
+  return DateTime.now().setZone('Asia/Kolkata').toFormat("yyyy-MM-dd'T'HH:mm")
 }
-
 // STEP 2: Doctor, Ward & Bed Selection
 const admissionForm = ref({
   consultantDoctorId: '',
@@ -238,9 +227,14 @@ const submitAdmission = async () => {
   }
 
   isSubmittingAdmission.value = true
+  const admissionDateUTC = admissionForm.value.admissionDate
+    ? DateTime.fromISO(admissionForm.value.admissionDate, { zone: 'Asia/Kolkata' }).toUTC().toISO()
+    : new Date().toISOString()
+
   const payload = {
     patientId: selectedPatient.value._id,
-    ...admissionForm.value
+    ...admissionForm.value,
+    admissionDate: admissionDateUTC
   }
 
   const res = await admissionStore.createAdmission(payload)
@@ -319,6 +313,22 @@ const handleDeleteAdmission = async (admission) => {
   }
 }
 
+// Sync Admission Dates Action
+// const isSyncingDates = ref(false)
+// const handleSyncDates = async () => {
+//   if (!confirm('Are you sure you want to sync admission dates with createdAt timestamps?')) return
+//   isSyncingDates.value = true
+//   const res = await admissionStore.syncDates()
+//   isSyncingDates.value = false
+//   if (res.success) {
+//     const count = res.data?.data?.updatedCount ?? res.data?.updatedCount ?? ''
+//     snackbarStore.show({ message: res.data?.message || (count !== '' ? `Successfully synced ${count} admission dates!` : 'Admission dates synced successfully!'), type: 'success' })
+//     fetchAdmissions()
+//   } else {
+//     snackbarStore.show({ message: res.message, type: 'error' })
+//   }
+// }
+
 // Helpers
 const getStatusColor = (status) => {
   switch (status) {
@@ -334,6 +344,33 @@ const getAdmissionTypeColor = (type) => {
     case 'EMERGENCY': return 'bg-rose-100/70 text-rose-800 border-rose-200 font-bold'
     case 'TRANSFER': return 'bg-amber-100/70 text-amber-800 border-amber-200 font-bold'
     default: return 'bg-slate-100/70 text-slate-700 border-slate-200'
+  }
+}
+
+const getPayerTypeLabel = (type) => {
+  switch (type) {
+    case 'MUHCS': return 'MUHCS'
+    case 'MR_STATE': return 'MR (STATE)'
+    case 'MR_CENTRAL': return 'MR (CENTRAL)'
+    case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
+    case 'NORMAL':
+    default: return 'NORMAL'
+  }
+}
+
+const getPayerTypeColor = (type) => {
+  switch (type) {
+    case 'MUHCS':
+      return 'bg-purple-50 text-purple-700 border-purple-200'
+    case 'MR_STATE':
+      return 'bg-teal-50 text-teal-700 border-teal-200'
+    case 'MR_CENTRAL':
+      return 'bg-cyan-50 text-cyan-700 border-cyan-200'
+    case 'HEALTH_INSURANCE':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'NORMAL':
+    default:
+      return 'bg-slate-50 text-slate-600 border-slate-200'
   }
 }
 
@@ -378,6 +415,19 @@ const doctorOptions = computed(() => {
       </div>
 
       <div class="flex items-center gap-3 w-full sm:w-auto">
+        <!-- <button
+          v-if="isSuperAdmin"
+          @click="handleSyncDates"
+          :disabled="isSyncingDates"
+          class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/80 px-4 py-2.5 rounded-xl font-bold text-sm shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+          title="Sync Admission Dates with CreatedAt"
+        >
+          <svg :class="{ 'animate-spin': isSyncingDates }" class="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>{{ isSyncingDates ? 'Syncing...' : 'Sync Dates' }}</span>
+        </button> -->
+
         <button 
           v-if="authStore.hasPermission('ipd.admit')"
           @click="openAdmitModal"
@@ -489,7 +539,15 @@ const doctorOptions = computed(() => {
             >
               <!-- IPD No & Date -->
               <td class="px-5 py-3.5">
-                <span class="font-mono text-indigo-700 font-bold block text-xs">{{ adm.admissionNo }}</span>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-mono text-indigo-700 font-bold text-xs">{{ adm.admissionNo }}</span>
+                  <span 
+                    class="px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase tracking-wider inline-block"
+                    :class="getPayerTypeColor(adm.payerType)"
+                  >
+                    {{ getPayerTypeLabel(adm.payerType) }}
+                  </span>
+                </div>
                 <span class="text-slate-400 text-[11px] mt-0.5 block">{{ formatDate(adm.admissionDate) }}</span>
               </td>
               

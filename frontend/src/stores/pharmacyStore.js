@@ -143,6 +143,20 @@ export const usePharmacyStore = defineStore('pharmacy', {
 
     // ── Categories ───────────────────────────────────────────
 
+    async fetchCategoryById(id) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get(`/pharmacy/category/${id}`)
+        return { success: true, data: response.data.data }
+      } catch (err) {
+        this.error = err.response?.data?.message || 'Failed to fetch category details'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchCategories(page = 1, limit = 10, search = '', isActive = '') {
       this.loading = true
       this.error = null
@@ -223,10 +237,10 @@ export const usePharmacyStore = defineStore('pharmacy', {
 
     // ── Medicines ────────────────────────────────────────────
 
-    async fetchAllMedicinesForExport(search = '', stockStatus = '') {
+    async fetchAllMedicinesForExport(search = '', stockStatus = '', categoryId = '') {
       try {
         const response = await api.get('/pharmacy/medicines', {
-          params: { page: 1, limit: 10000, search, stockStatus }
+          params: { page: 1, limit: 10000, search, stockStatus, categoryId }
         })
         return response.data.data || []
       } catch (err) {

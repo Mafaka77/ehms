@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { DateTime } from 'luxon'
 import { useEmergencyStore } from '../../stores/emergencyStore'
 import { usePatientStore } from '../../stores/patientStore'
 import { useDoctorStore } from '../../stores/doctorStore'
@@ -43,19 +44,7 @@ const newPatient = ref({
 const isCreatingPatient = ref(false)
 
 const getLocalDatetimeString = () => {
-  const d = new Date()
-  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
-  const formatter = new Intl.DateTimeFormat('en-CA', options)
-  const parts = formatter.formatToParts(d)
-  
-  const year = parts.find(p => p.type === 'year').value
-  const month = parts.find(p => p.type === 'month').value
-  const day = parts.find(p => p.type === 'day').value
-  let hour = parts.find(p => p.type === 'hour').value
-  if (hour === '24') hour = '00'
-  const minute = parts.find(p => p.type === 'minute').value
-  
-  return `${year}-${month}-${day}T${hour}:${minute}`
+  return DateTime.now().setZone('Asia/Kolkata').toFormat("yyyy-MM-dd'T'HH:mm")
 }
 
 // -- STEP 2: REGISTER VISIT --
@@ -172,9 +161,13 @@ const submitVisit = async () => {
   }
   
   isRegistering.value = true
+  const arrivalDateTimeUTC = visitForm.value.arrivalDateTime
+    ? DateTime.fromISO(visitForm.value.arrivalDateTime, { zone: 'Asia/Kolkata' }).toUTC().toISO()
+    : DateTime.now().toUTC().toISO()
+
   const payload = {
     ...visitForm.value,
-    arrivalDateTime: visitForm.value.arrivalDateTime + '+05:30',
+    arrivalDateTime: arrivalDateTimeUTC,
     patientId: selectedPatient.value._id
   }
 

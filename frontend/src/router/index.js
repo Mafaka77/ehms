@@ -396,6 +396,13 @@ const routes = [
             component:()=>import('../views/pharmacy/category/Create.vue'),
             meta:{permission:'pharmacy.view'}
           },
+          {
+            path:'category/view/:id',
+            name:'pharmacy-category-view',
+            component:()=>import('../views/pharmacy/category/View.vue'),
+            meta:{permission:'pharmacy.view'},
+            props:true
+          },
           // {
           //   path:'payment',
           //   name:'pharmacy-payment',

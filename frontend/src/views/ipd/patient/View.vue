@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { DateTime } from 'luxon'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useAuthStore } from '../../../stores/authStore'
@@ -210,20 +211,12 @@ const fetchAdmissionDetails = async () => {
 // Format Date helpers
 const getLocalDatetimeString = (date = new Date()) => {
   if (!date) return ''
-  const d = new Date(date)
-  if (isNaN(d.getTime())) return ''
-  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
-  const formatter = new Intl.DateTimeFormat('en-CA', options)
-  const parts = formatter.formatToParts(d)
-  
-  const year = parts.find(p => p.type === 'year').value
-  const month = parts.find(p => p.type === 'month').value
-  const day = parts.find(p => p.type === 'day').value
-  let hour = parts.find(p => p.type === 'hour').value
-  if (hour === '24') hour = '00'
-  const minute = parts.find(p => p.type === 'minute').value
-  
-  return `${year}-${month}-${day}T${hour}:${minute}`
+  if (typeof date === 'string') {
+    const dt = DateTime.fromISO(date, { zone: 'utc' }).setZone('Asia/Kolkata')
+    if (dt.isValid) return dt.toFormat("yyyy-MM-dd'T'HH:mm")
+  }
+  const dt = DateTime.fromJSDate(new Date(date)).setZone('Asia/Kolkata')
+  return dt.isValid ? dt.toFormat("yyyy-MM-dd'T'HH:mm") : ''
 }
 
 const formatDate = (dateString) => {
@@ -300,13 +293,9 @@ const openEditAdmissionModal = () => {
 
 const submitEditAdmission = async () => {
   editAdmissionSubmitting.value = true
-  let utcAdmissionDate = ''
-  if (editAdmissionForm.value.admissionDate) {
-    const raw = editAdmissionForm.value.admissionDate
-    const dateStr = raw.includes('+') || raw.endsWith('Z') ? raw : `${raw}+05:30`
-    const d = new Date(dateStr)
-    utcAdmissionDate = !isNaN(d.getTime()) ? d.toISOString() : ''
-  }
+  const utcAdmissionDate = editAdmissionForm.value.admissionDate
+    ? DateTime.fromISO(editAdmissionForm.value.admissionDate, { zone: 'Asia/Kolkata' }).toUTC().toISO()
+    : ''
 
   const payload = {
     ...editAdmissionForm.value,

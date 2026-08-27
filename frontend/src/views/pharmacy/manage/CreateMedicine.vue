@@ -13,6 +13,10 @@ const props = defineProps({
   medicine: {
     type: Object,
     default: null
+  },
+  defaultCategoryId: {
+    type: String,
+    default: ''
   }
 })
 
@@ -77,7 +81,7 @@ watch(() => props.show, (newVal) => {
     } else {
       form.medicineCode = ''
       form.medicineName = ''
-      form.categoryId = ''
+      form.categoryId = props.defaultCategoryId || ''
       form.supplierId = ''
       form.genericName = ''
       form.brandName = ''

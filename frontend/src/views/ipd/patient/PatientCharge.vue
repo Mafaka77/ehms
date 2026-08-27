@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
+import { DateTime } from 'luxon'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useDoctorStore } from '../../../stores/doctorStore'
@@ -65,19 +66,7 @@ const formatUser = (user) => {
 }
 
 const getLocalDatetimeString = () => {
-  const d = new Date()
-  const options = { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
-  const formatter = new Intl.DateTimeFormat('en-CA', options)
-  const parts = formatter.formatToParts(d)
-  
-  const year = parts.find(p => p.type === 'year').value
-  const month = parts.find(p => p.type === 'month').value
-  const day = parts.find(p => p.type === 'day').value
-  let hour = parts.find(p => p.type === 'hour').value
-  if (hour === '24') hour = '00'
-  const minute = parts.find(p => p.type === 'minute').value
-  
-  return `${year}-${month}-${day}T${hour}:${minute}`
+  return DateTime.now().setZone('Asia/Kolkata').toFormat("yyyy-MM-dd'T'HH:mm")
 }
 
 const chargeForm = ref({
@@ -466,11 +455,13 @@ const isGroupExpanded = (dateKey) => {
 const groupedCharges = computed(() => {
   const groups = {}
   charges.value.forEach(charge => {
-    const d = new Date(charge.createdAt)
+    const rawDate = charge.createdAt
+    const d = new Date(rawDate)
     const dateKey = d.toLocaleDateString('en-IN', {
       day: '2-digit',
       month: 'short',
-      year: 'numeric'
+      year: 'numeric',
+      timeZone: 'Asia/Kolkata'
     })
     const midnightDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
 
@@ -496,7 +487,8 @@ const formatDate = (dateString) => {
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'Asia/Kolkata'
   })
 }
 
@@ -505,7 +497,8 @@ const formatTime = (dateString) => {
   return new Date(dateString).toLocaleTimeString('en-IN', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: true,
+    timeZone: 'Asia/Kolkata'
   })
 }
 
@@ -572,6 +565,10 @@ const submitCharge = async () => {
 
   submitting.value = true
   
+  const chargeDateUTC = chargeForm.value.chargeDate
+    ? DateTime.fromISO(chargeForm.value.chargeDate, { zone: 'Asia/Kolkata' }).toUTC().toISO()
+    : DateTime.now().toUTC().toISO()
+
   const payload = {
     chargeCategoryId: chargeForm.value.chargeCategoryId,
     chargeMasterId: chargeForm.value.chargeMasterId || null,
@@ -579,7 +576,7 @@ const submitCharge = async () => {
     ot_description: isOtCategory.value ? (chargeForm.value.ot_description?.trim() || null) : null,
     rate: chargeForm.value.rate,
     quantity: chargeForm.value.quantity,
-    chargeDate: chargeForm.value.chargeDate + '+05:30',
+    chargeDate: chargeDateUTC,
     doctorId: isOtCharge.value ? null : (chargeForm.value.doctorId || null),
     addons: otPackageItems.value
       .filter(item => selectedAddons.value.includes(item._id))

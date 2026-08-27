@@ -1,10 +1,12 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import CreateCategoryModal from './Create.vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useAuthStore } from '../../../stores/authStore'
 
+const router = useRouter()
 const pharmacyStore = usePharmacyStore()
 const snackbarStore = useSnackbarStore()
 const authStore = useAuthStore()
@@ -32,6 +34,10 @@ const openAddModal = () => {
 const openEditModal = (cat) => {
   selectedCategory.value = cat
   isCreateModalOpen.value = true
+}
+
+const viewCategory = (cat) => {
+  router.push({ name: 'pharmacy-category-view', params: { id: cat._id } })
 }
 
 const handleCategoryCreated = (newCat) => {
@@ -193,11 +199,11 @@ onMounted(() => {
             >
               <!-- Name -->
               <td class="px-6 py-4">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 cursor-pointer" @click="viewCategory(cat)">
                   <div class="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center text-teal-700 font-bold text-sm group-hover:bg-teal-100 transition-colors">
                     {{ cat.name.charAt(0).toUpperCase() }}
                   </div>
-                  <span class="font-bold text-slate-800 text-sm">{{ cat.name }}</span>
+                  <span class="font-bold text-slate-800 text-sm hover:text-teal-600 transition-colors">{{ cat.name }}</span>
                 </div>
               </td>
               <!-- Description -->
@@ -220,6 +226,16 @@ onMounted(() => {
               <!-- Actions -->
               <td class="px-6 py-4 text-center">
                 <div class="flex items-center justify-center gap-2">
+                  <button 
+                    @click="viewCategory(cat)"
+                    class="p-2 rounded-xl text-slate-400 hover:bg-teal-50 hover:text-teal-600 transition-all focus:outline-none focus:ring-2 focus:ring-teal-100"
+                    title="View Category & Medicines"
+                  >
+                    <svg class="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </button>
                   <button 
                     @click="openEditModal(cat)"
                     class="p-2 rounded-xl text-slate-400 hover:bg-teal-50 hover:text-teal-600 transition-all focus:outline-none focus:ring-2 focus:ring-teal-100"

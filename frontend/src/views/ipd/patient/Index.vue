@@ -136,6 +136,33 @@ const getStatusColor = (status) => {
     default: return 'bg-slate-50 border-slate-200 text-slate-700'
   }
 }
+
+const getPayerTypeLabel = (type) => {
+  switch (type) {
+    case 'MUHCS': return 'MUHCS'
+    case 'MR_STATE': return 'MR (STATE)'
+    case 'MR_CENTRAL': return 'MR (CENTRAL)'
+    case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
+    case 'NORMAL':
+    default: return 'NORMAL'
+  }
+}
+
+const getPayerTypeColor = (type) => {
+  switch (type) {
+    case 'MUHCS':
+      return 'bg-purple-50 text-purple-700 border-purple-200'
+    case 'MR_STATE':
+      return 'bg-teal-50 text-teal-700 border-teal-200'
+    case 'MR_CENTRAL':
+      return 'bg-cyan-50 text-cyan-700 border-cyan-200'
+    case 'HEALTH_INSURANCE':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
+    case 'NORMAL':
+    default:
+      return 'bg-slate-50 text-slate-600 border-slate-200'
+  }
+}
 </script>
 
 <template>
@@ -315,7 +342,15 @@ const getStatusColor = (status) => {
             >
               <!-- IPD No & Date -->
               <td class="px-5 py-3.5">
-                <span class="font-mono text-indigo-700 font-bold block text-xs">{{ adm.admissionNo }}</span>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="font-mono text-indigo-700 font-bold text-xs">{{ adm.admissionNo }}</span>
+                  <span 
+                    class="px-1.5 py-0.5 rounded text-[9px] font-bold border uppercase tracking-wider inline-block"
+                    :class="getPayerTypeColor(adm.payerType)"
+                  >
+                    {{ getPayerTypeLabel(adm.payerType) }}
+                  </span>
+                </div>
                 <span class="text-slate-400 text-[11px] mt-0.5 block">{{ formatDate(adm.admissionDate) }}</span>
               </td>
               
