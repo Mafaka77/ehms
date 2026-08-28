@@ -57,7 +57,7 @@ const onCustomDateChange = () => {
 const logsData = computed(() => doctorActivityStore.activityLogs)
 const summary = computed(() => logsData.value?.summary)
 
-const allowedSources = ['OPD', 'IPD', 'EMERGENCY', 'RADIOLOGY', 'DENTAL_CONSULTATION','ENDOSCOPY']
+const allowedSources = ['OPD', 'IPD', 'EMERGENCY', 'RADIOLOGY', 'DENTAL', 'DENTAL_CONSULTATION', 'ENDOSCOPY']
 const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION']
 
 const items = computed(() => {
@@ -74,6 +74,29 @@ const items = computed(() => {
 
     return allowedSources.some(s => src.includes(s))
   })
+})
+
+// ── Pagination State ────────────────────────────────────────────────────────
+const currentPage = ref(1)
+const itemsPerPage = ref(10)
+
+const totalPages = computed(() => {
+  return Math.ceil(items.value.length / itemsPerPage.value) || 1
+})
+
+const paginatedItems = computed(() => {
+  const start = (currentPage.value - 1) * itemsPerPage.value
+  return items.value.slice(start, start + itemsPerPage.value)
+})
+
+const changePage = (page) => {
+  if (page >= 1 && page <= totalPages.value) {
+    currentPage.value = page
+  }
+}
+
+watch([dateRange, activityType, startDate, endDate], () => {
+  currentPage.value = 1
 })
 
 const formatDateTime = (d) => {
@@ -112,6 +135,9 @@ const activityBadgeClass = (type) => {
   switch (type) {
     case 'OPD Bill Invoice': return 'bg-sky-50 text-sky-700 border-sky-100'
     case 'OPD Consultation': return 'bg-sky-50 text-sky-700 border-sky-100'
+    case 'Dental Treatment Charge': return 'bg-teal-50 text-teal-700 border-teal-100'
+    case 'Dental Treatment Addon': return 'bg-teal-50 text-teal-700 border-teal-100'
+    case 'Dental Consultation': return 'bg-teal-50 text-teal-700 border-teal-100'
     case 'Emergency Consultation': return 'bg-rose-50 text-rose-700 border-rose-100'
     case 'IPD Charge Involved': return 'bg-violet-50 text-violet-700 border-violet-100'
     case 'Charge Addon': return 'bg-amber-50 text-amber-700 border-amber-100'
@@ -202,6 +228,7 @@ onMounted(() => {
             <option value="ALL">Full / All Activities</option>
             <option value="OPD">OPD Bill Invoices Only</option>
             <option value="IPD_CHARGE">IPD Charges &amp; Addons</option>
+            <option value="DENTAL">Dental Treatments &amp; Charges</option>
             <option value="BILL">General Bills &amp; Invoices</option>
           </select>
         </div>
@@ -233,7 +260,7 @@ onMounted(() => {
     </div>
 
     <!-- Summary Metrics Bar -->
-    <div v-if="summary" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+    <div v-if="summary" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
       
       <!-- Total Activities -->
       <div class="bg-indigo-50/70 border border-indigo-100 p-3.5 rounded-2xl">
@@ -244,16 +271,23 @@ onMounted(() => {
 
       <!-- OPD Bill Invoices -->
       <div class="bg-sky-50/70 border border-sky-100 p-3.5 rounded-2xl">
-        <p class="text-[10px] font-bold text-sky-500 uppercase tracking-wider">OPD Bill Invoices</p>
+        <p class="text-[10px] font-bold text-sky-500 uppercase tracking-wider">OPD Invoices</p>
         <p class="text-2xl font-black text-sky-700 mt-0.5">{{ summary.opdCount }}</p>
         <p class="text-[10px] text-sky-600 font-bold mt-0.5">{{ fmtRupee(summary.opdTotalAmount) }}</p>
       </div>
 
       <!-- IPD Charges & Addons -->
       <div class="bg-violet-50/70 border border-violet-100 p-3.5 rounded-2xl">
-        <p class="text-[10px] font-bold text-violet-500 uppercase tracking-wider">Charges &amp; Addons</p>
+        <p class="text-[10px] font-bold text-violet-500 uppercase tracking-wider">IPD Charges</p>
         <p class="text-2xl font-black text-violet-700 mt-0.5">{{ summary.ipdChargeCount }}</p>
         <p class="text-[10px] text-violet-600 font-bold mt-0.5">{{ fmtRupee(summary.ipdChargeTotalAmount) }}</p>
+      </div>
+
+      <!-- Dental Treatment Charges -->
+      <div class="bg-teal-50/70 border border-teal-100 p-3.5 rounded-2xl">
+        <p class="text-[10px] font-bold text-teal-600 uppercase tracking-wider">Dental Charges</p>
+        <p class="text-2xl font-black text-teal-700 mt-0.5">{{ summary.dentalCount || 0 }}</p>
+        <p class="text-[10px] text-teal-600 font-bold mt-0.5">{{ fmtRupee(summary.dentalTotalAmount || 0) }}</p>
       </div>
 
       <!-- General Invoices -->
@@ -293,7 +327,7 @@ onMounted(() => {
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
-            <tr v-for="item in items" :key="item.id" class="hover:bg-slate-50/60 transition-all">
+            <tr v-for="item in paginatedItems" :key="item.id" class="hover:bg-slate-50/60 transition-all">
               
               <!-- Date & Time -->
               <td class="py-3 px-4 text-slate-500 font-semibold whitespace-nowrap">
@@ -352,6 +386,68 @@ onMounted(() => {
             </tr>
           </tbody>
         </table>
+
+        <!-- Pagination Controls -->
+        <div v-if="items.length > 0" class="px-6 py-3.5 border-t border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-3 text-slate-500">
+            <p>
+              Showing <span class="font-bold text-slate-800">{{ (currentPage - 1) * itemsPerPage + 1 }}</span>
+              to <span class="font-bold text-slate-800">{{ Math.min(currentPage * itemsPerPage, items.length) }}</span>
+              of <span class="font-bold text-slate-800">{{ items.length }}</span> records
+            </p>
+            <div class="flex items-center gap-1.5 ml-2">
+              <span class="text-[11px] text-slate-400">Per page:</span>
+              <select
+                v-model="itemsPerPage"
+                @change="currentPage = 1"
+                class="px-2 py-1 rounded-lg border border-slate-200 bg-white font-semibold text-slate-700 text-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
+              >
+                <option :value="10">10</option>
+                <option :value="25">25</option>
+                <option :value="50">50</option>
+                <option :value="100">100</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="totalPages > 1" class="flex items-center gap-1.5">
+            <button
+              @click="changePage(1)"
+              :disabled="currentPage <= 1"
+              title="First Page"
+              class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              «
+            </button>
+            <button
+              @click="changePage(currentPage - 1)"
+              :disabled="currentPage <= 1"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Previous
+            </button>
+
+            <span class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">
+              Page {{ currentPage }} of {{ totalPages }}
+            </span>
+
+            <button
+              @click="changePage(currentPage + 1)"
+              :disabled="currentPage >= totalPages"
+              class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              Next
+            </button>
+            <button
+              @click="changePage(totalPages)"
+              :disabled="currentPage >= totalPages"
+              title="Last Page"
+              class="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white font-semibold text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              »
+            </button>
+          </div>
+        </div>
       </div>
 
       <div v-else class="p-12 text-center text-slate-400 text-xs">

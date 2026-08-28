@@ -252,15 +252,80 @@ exports.getDoctorActivityById = async (doctorId) => {
             } catch (e) {}
         }
 
+        const targetDoctorIds = [];
+        if (mongoose.Types.ObjectId.isValid(doctorId)) {
+            targetDoctorIds.push(new mongoose.Types.ObjectId(doctorId));
+            targetDoctorIds.push(doctorId.toString());
+        } else {
+            targetDoctorIds.push(doctorId);
+        }
+        if (doctor._id) {
+            targetDoctorIds.push(doctor._id);
+            targetDoctorIds.push(new mongoose.Types.ObjectId(doctor._id));
+        }
+        if (doctor.employeeId) {
+            targetDoctorIds.push(doctor.employeeId);
+            if (doctor.employeeId._id) targetDoctorIds.push(doctor.employeeId._id);
+        }
+
+        let dentalCharges = [];
+        try {
+            let doctorDentalApptIds = [];
+            if (DentalAppointment) {
+                const docAppts = await DentalAppointment.find({ doctorId: { $in: targetDoctorIds } }).select('_id').lean();
+                doctorDentalApptIds = docAppts.map(d => d._id);
+            }
+
+            const charges = await PatientCharge.find({
+                $or: [
+                    { doctorId: { $in: targetDoctorIds }, sourceType: 'DENTAL' },
+                    { dentalAppointmentId: { $in: doctorDentalApptIds } }
+                ]
+            })
+            .populate('patientId', 'patientCode fullName gender age mobileNo')
+            .populate('chargeCategoryId', 'name code')
+            .populate('chargeMasterId', 'name code')
+            .populate('doctorId', 'fullName doctorCode')
+            .populate({
+                path: 'dentalAppointmentId',
+                select: 'appointmentNo appointmentDate toothNumbers procedureStatus doctorId',
+                populate: { path: 'doctorId', select: 'fullName doctorCode' }
+            })
+            .sort({ createdAt: -1 })
+            .lean();
+
+            const chargeIds = charges.map(c => c._id);
+            const addons = await PatientChargeAddon.find({ patientChargeId: { $in: chargeIds } })
+                .populate('doctorId', 'fullName doctorCode')
+                .populate('chargeCategoryId', 'name')
+                .lean();
+
+            dentalCharges = charges.map(ch => {
+                const chAddons = addons.filter(a => a.patientChargeId && a.patientChargeId.toString() === ch._id.toString());
+                const addonsTotal = chAddons.reduce((sum, a) => sum + (a.amount || 0), 0);
+                return {
+                    ...ch,
+                    addons: chAddons,
+                    addonsTotal,
+                    totalAmount: (ch.amount || 0) + addonsTotal
+                };
+            });
+        } catch (e) {
+            console.error('Error fetching dental charges in getDoctorActivityById:', e);
+        }
+
         return {
             doctor,
             metrics: {
                 activeIpdCount: activeAdmissions.length,
                 opdTodayCount,
-                opdTotalCount
+                opdTotalCount,
+                dentalChargesCount: dentalCharges.length,
+                dentalTotalAmount: dentalCharges.reduce((sum, c) => sum + (c.totalAmount || c.amount || 0), 0)
             },
             activeAdmissions,
-            recentAppointments
+            recentAppointments,
+            dentalCharges
         };
     } catch (error) {
         throw error;
@@ -270,7 +335,7 @@ exports.getDoctorActivityById = async (doctorId) => {
 exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
     try {
         const { start, end } = getDateRangeFromQuery(query);
-        const filterType = query.type || 'ALL'; // ALL, OPD, IPD_CHARGE, ADDON, BILL
+        const filterType = query.type || 'ALL'; // ALL, OPD, IPD_CHARGE, DENTAL, ADDON, BILL
 
         let doctorDoc = null;
         if (mongoose.Types.ObjectId.isValid(doctorId)) {
@@ -304,7 +369,7 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
         let items = [];
 
         // 1. Fetch Consultation Bills (OPD, Emergency, Dental, Radiology)
-        if ((filterType === 'ALL' || filterType === 'OPD' || filterType === 'EMERGENCY' || filterType === 'BILL') && Bill) {
+        if ((filterType === 'ALL' || filterType === 'OPD' || filterType === 'EMERGENCY' || filterType === 'DENTAL' || filterType === 'BILL') && Bill) {
             try {
                 let opdIds = [];
                 if (OpdAppointment) {
@@ -397,47 +462,71 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
             } catch (e) {}
         }
 
-        // Step 1.5 Removed
-
-        // 2. Fetch Patient Charges
-        if ((filterType === 'ALL' || filterType === 'IPD_CHARGE') && PatientCharge) {
+        // 2. Fetch Patient Charges (IPD, DENTAL, etc.)
+        if ((filterType === 'ALL' || filterType === 'IPD_CHARGE' || filterType === 'DENTAL_CHARGE' || filterType === 'DENTAL') && PatientCharge) {
             try {
+                let doctorDentalApptIds = [];
+                if (DentalAppointment) {
+                    const docAppts = await DentalAppointment.find({ doctorId: { $in: targetDoctorIds } }).select('_id').lean();
+                    doctorDentalApptIds = docAppts.map(d => d._id);
+                }
+
                 const chargeFilter = {
                     createdAt: { $gte: start, $lte: end },
-                    doctorId: { $in: targetDoctorIds }
+                    $or: [
+                        { doctorId: { $in: targetDoctorIds } },
+                        { dentalAppointmentId: { $in: doctorDentalApptIds } }
+                    ]
                 };
+
+                if (filterType === 'IPD_CHARGE') {
+                    chargeFilter.sourceType = { $ne: 'DENTAL' };
+                } else if (filterType === 'DENTAL_CHARGE' || filterType === 'DENTAL') {
+                    chargeFilter.sourceType = 'DENTAL';
+                }
 
                 const charges = await PatientCharge.find(chargeFilter)
                 .populate('patientId', 'patientCode fullName mobileNo')
-                .populate('chargeCategoryId', 'name')
+                .populate('chargeCategoryId', 'name code')
+                .populate('dentalAppointmentId', 'appointmentNo toothNumbers')
                 .lean();
 
                 charges.forEach(ch => {
+                    const isDental = ch.sourceType === 'DENTAL' || !!ch.dentalAppointmentId;
+                    const actType = isDental ? 'Dental Treatment Charge' : 'IPD Charge Involved';
+                    const src = isDental ? 'DENTAL' : (ch.sourceType || 'IPD');
+                    const toothInfo = ch.dentalAppointmentId?.toothNumbers ? ` (Tooth #${ch.dentalAppointmentId.toothNumbers})` : '';
+                    const desc = isDental
+                        ? `${ch.chargeCategoryId?.name ? ch.chargeCategoryId.name + ' - ' : ''}${ch.description || 'Dental Treatment'}${toothInfo}`
+                        : `${ch.chargeCategoryId?.name ? ch.chargeCategoryId.name + ' - ' : ''}${ch.description || 'Doctor Charge'}`;
+
                     items.push({
                         id: `CH_${ch._id}`,
-                        activityType: 'IPD Charge Involved',
-                        source: ch.sourceType || 'IPD',
-                        code: ch.sourceType || 'IPD',
+                        activityType: actType,
+                        source: src,
+                        code: src,
                         billNo: '—',
                         billId: null,
                         date: ch.createdAt,
                         patientCode: ch.patientId?.patientCode || '—',
                         patientName: ch.patientId?.fullName || '—',
                         patientMobile: ch.patientId?.mobileNo || '—',
-                        description: `${ch.chargeCategoryId?.name ? ch.chargeCategoryId.name + ' - ' : ''}${ch.description || 'Doctor Charge'}`,
+                        description: desc,
                         grossAmount: ch.amount || 0,
                         discountAmount: 0,
                         netAmount: ch.amount || 0,
                         amount: ch.amount || 0,
-                        status: ch.paymentStatus || 'Unpaid',
-                        discountRecord: null
+                        status: ch.paymentStatus || (ch.isBilled ? 'Billed' : 'Unpaid'),
+                        discountRecord: null,
+                        rate: ch.rate,
+                        quantity: ch.quantity
                     });
                 });
             } catch (e) {}
         }
 
         // 3. Fetch Patient Charge Addons
-        if ((filterType === 'ALL' || filterType === 'IPD_CHARGE' || filterType === 'ADDON') && PatientChargeAddon) {
+        if ((filterType === 'ALL' || filterType === 'IPD_CHARGE' || filterType === 'DENTAL' || filterType === 'ADDON') && PatientChargeAddon) {
             try {
                 const addons = await PatientChargeAddon.find({
                     doctorId: { $in: targetDoctorIds },
@@ -458,7 +547,7 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
 
                     items.push({
                         id: `ADD_${add._id}`,
-                        activityType: 'Charge Addon',
+                        activityType: addonSource === 'DENTAL' ? 'Dental Treatment Addon' : 'Charge Addon',
                         source: addonSource,
                         code: addonSource,
                         billNo: '—',
@@ -479,10 +568,8 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
             } catch (e) {}
         }
 
-        // Step 4 Removed
-
-        // Filter out Pharmacy, Test/Diagnostic, Room/Bed/Ward, and Dental charges (Include only doctor activity OPD, IPD, EMERGENCY charges)
-        const allowedSources = ['OPD', 'IPD', 'EMERGENCY', 'RADIOLOGY', 'DENTAL_CONSULTATION', 'ENDOSCOPY'];
+        // Filter out Pharmacy, Test/Diagnostic, Room/Bed/Ward charges (Include only doctor activity: OPD, IPD, DENTAL, EMERGENCY, RADIOLOGY charges)
+        const allowedSources = ['OPD', 'IPD', 'EMERGENCY', 'RADIOLOGY', 'DENTAL', 'DENTAL_CONSULTATION', 'ENDOSCOPY'];
         const excludedKeywords = ['PHARMACY', 'LABORATORY', 'LAB', 'TEST', 'ROOM', 'BED', 'WARD', 'NURSING', 'ACCOMMODATION'];
 
         items = items.filter(item => {
@@ -503,6 +590,7 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
 
         const opdItems = items.filter(i => i.activityType === 'OPD Bill Invoice');
         const ipdItems = items.filter(i => i.activityType === 'IPD Charge Involved');
+        const dentalItems = items.filter(i => i.source === 'DENTAL' || i.activityType.includes('Dental'));
         const addonItems = items.filter(i => i.activityType === 'Charge Addon');
         const billItemsList = items.filter(i => i.activityType === 'Bill Invoice Involved');
 
@@ -512,11 +600,14 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
         const ipdChargeCount = ipdItems.length + addonItems.length;
         const ipdChargeTotalAmount = ipdItems.reduce((sum, i) => sum + (i.amount || 0), 0) + addonItems.reduce((sum, i) => sum + (i.amount || 0), 0);
 
+        const dentalCount = dentalItems.length;
+        const dentalTotalAmount = dentalItems.reduce((sum, i) => sum + (i.amount || 0), 0);
+
         const billCount = billItemsList.length;
         const billTotalAmount = billItemsList.reduce((sum, i) => sum + (i.amount || 0), 0);
 
         const totalActivityCount = items.length;
-        const grandTotalAmount = opdTotalAmount + ipdChargeTotalAmount;
+        const grandTotalAmount = opdTotalAmount + ipdChargeTotalAmount + dentalTotalAmount;
 
         return {
             dateRange: { start, end },
@@ -526,6 +617,8 @@ exports.getDoctorActivityLogs = async (doctorId, query = {}) => {
                 opdTotalAmount,
                 ipdChargeCount,
                 ipdChargeTotalAmount,
+                dentalCount,
+                dentalTotalAmount,
                 addonCount: addonItems.length,
                 billCount,
                 billTotalAmount,
