@@ -125,7 +125,7 @@ const generateEditorContent = () => {
          
          const valueStr = param.measuredValue || '-'
          const formattedValue = param.isOutOfRange 
-           ? `<span style="color: #dc2626;"><strong>${valueStr}</strong></span>` 
+           ? `<strong>${valueStr}</strong>` 
            : valueStr
          
          html += `<tr>`
