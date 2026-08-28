@@ -22,7 +22,8 @@ export const useNursingStore = defineStore('nursing', {
       limit: 10,
       pages: 1
     },
-    myStation: null
+    myStation: null,
+    myStations: []
   }),
 
   actions: {
@@ -219,12 +220,15 @@ export const useNursingStore = defineStore('nursing', {
         this.error = null
         try {
           const response = await api.get('/nursing/my-station')
-          this.myStation = response.data.data || null
-          console.log(response.data.data);
+          const data = response.data.data || null
+          this.myStation = data
+          this.myStations = data?.allAssignedStations || (data ? [data] : [])
           return this.myStation
         } catch (err) {
           console.error('Error fetching my station:', err)
           this.error = err.response?.data?.message || 'Failed to fetch my station'
+          this.myStation = null
+          this.myStations = []
           return null
         } finally {
           this.loading = false

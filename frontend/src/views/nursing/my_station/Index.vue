@@ -2,15 +2,39 @@
 import { ref, onMounted, computed } from 'vue'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useNursingStore } from '../../../stores/nursingStore'
+import { useAuthStore } from '../../../stores/authStore'
 
 const snackbar     = useSnackbarStore()
 const nursingStore = useNursingStore()
+const authStore    = useAuthStore()
 
 // ── State ─────────────────────────────────────────────────────────────────
 const loading = ref(true)
-// The API now returns { station, nurses, nurseCount } all-in-one
-const station = computed(() => nursingStore.myStation)
+const selectedStationId = ref('')
+
+const isSuperAdmin = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return roleName === 'SuperAdmin' || roleName === 'Super Admin'
+})
+
+const myStations = computed(() => {
+  if (isSuperAdmin.value && nursingStore.stations.length > 0) {
+    return nursingStore.stations
+  }
+  return nursingStore.myStations?.length ? nursingStore.myStations : (nursingStore.myStation ? [nursingStore.myStation] : [])
+})
+
+const station = computed(() => {
+  if (selectedStationId.value) {
+    return myStations.value.find(s => s._id === selectedStationId.value) || nursingStore.myStation
+  }
+  return myStations.value[0] || nursingStore.myStation
+})
 const nurses  = computed(() => station.value?.nurses || [])
+
+const selectStation = (st) => {
+  selectedStationId.value = st._id
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const ASSIGNMENT_TYPES = [
@@ -53,8 +77,17 @@ const initials = (name) => name?.split(' ').map(n => n[0]).join('').substring(0,
 // ── Mount: single API call returns everything ─────────────────────────────
 onMounted(async () => {
   await nursingStore.fetchWards()
+  if (isSuperAdmin.value) {
+    await nursingStore.fetchNursingStations(1, 100)
+  }
   const result = await nursingStore.fetchMyStation()
-  if (!result) snackbar.show({ message: 'Failed to load your nursing station', type: 'error' })
+  if (result) {
+    selectedStationId.value = result._id
+  } else if (isSuperAdmin.value && nursingStore.stations.length > 0) {
+    selectedStationId.value = nursingStore.stations[0]._id
+  } else {
+    snackbar.show({ message: 'Failed to load your nursing station', type: 'error' })
+  }
   loading.value = false
 })
 </script>
@@ -98,6 +131,38 @@ onMounted(async () => {
         <span :class="['px-3 py-1 text-xs font-bold tracking-wider uppercase rounded-full border', station.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200']">
           {{ station.isActive ? '● Active' : '○ Inactive' }}
         </span>
+      </div>
+
+      <!-- ── Multiple Stations Selector Pill Tabs ────────────────────────── -->
+      <div v-if="myStations.length > 1" class="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+          <div>
+            <span class="text-xs font-bold text-slate-800">Your Assigned Stations</span>
+            <p class="text-[11px] text-slate-400">You are assigned to {{ myStations.length }} stations. Click to switch station view.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap">
+          <button
+            v-for="st in myStations"
+            :key="st._id"
+            type="button"
+            @click="selectStation(st)"
+            class="px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-2xs"
+            :class="selectedStationId === st._id
+              ? 'bg-indigo-600 text-white shadow-indigo-200 shadow-md ring-2 ring-indigo-600 ring-offset-2'
+              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'"
+          >
+            <span class="w-2 h-2 rounded-full" :class="st.isActive ? 'bg-emerald-400' : 'bg-slate-300'"></span>
+            <span>{{ st.name }}</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono" :class="selectedStationId === st._id ? 'bg-white/20 text-white' : 'bg-slate-200/70 text-slate-600'">{{ st.code }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- ── Hero Banner ─────────────────────────────────────────────────── -->

@@ -261,7 +261,15 @@ const isDoctorCategory = computed(() => {
   if (!selectedCat) return false
   const code = (selectedCat.code || '').toUpperCase()
   const name = (selectedCat.name || '').toLowerCase()
-  return code === 'DOCTOR' || code === 'DOCTOR_CHARGES' || code === 'DOCTOR_VISIT' || name.includes('doctor')
+  return (
+    code === 'DOCTOR' ||
+    code === 'DOCTOR_CHARGES' ||
+    code === 'DOCTOR_VISIT' ||
+    name.includes('doctor') ||
+    code === 'PROCEDURE' ||
+    code === 'PROCEDURE_CHARGES' ||
+    name.includes('procedure')
+  )
 })
 
 const isOtCategory = computed(() => {
@@ -1183,7 +1191,7 @@ onBeforeUnmount(() => {
 
           <!-- Consulting Doctor Selection (Enabled only for Doctor Charges categories) -->
           <div v-if="!isOtCategory" class="space-y-1 relative">
-            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Consulting Doctor <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide"> Doctor <span class="text-[10px] text-slate-400 lowercase">(Optional)</span></label>
             <div class="relative">
               <button 
                 type="button"

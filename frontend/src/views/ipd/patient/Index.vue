@@ -44,11 +44,18 @@ watch(() => filters.value.page, () => {
 })
 
 const clearFilters = () => {
+  let defaultStationId = ''
+  if (nursingStore.myStations?.length > 1) {
+    defaultStationId = nursingStore.myStations.map(s => s._id).join(',')
+  } else if (nursingStore.myStation?._id) {
+    defaultStationId = nursingStore.myStation._id
+  }
+
   filters.value = {
     page: 1,
     limit: 10,
     status: 'ADMITTED',
-    nursingStationId: nursingStore.myStation?._id || '',
+    nursingStationId: defaultStationId,
     search: '',
     date: ''
   }
@@ -59,13 +66,24 @@ const isSuperAdmin = computed(() => {
   return roleName === 'SuperAdmin' || roleName === 'Super Admin'
 })
 
+const availableStations = computed(() => {
+  if (isSuperAdmin.value) {
+    return nursingStore.stations
+  }
+  return nursingStore.myStations || (nursingStore.myStation ? [nursingStore.myStation] : [])
+})
+
 onMounted(async () => {
   loading.value = true
   try {
-    // 1. Fetch the logged-in nurse's assigned station
+    // 1. Fetch the logged-in nurse's assigned station(s)
     const myStation = await nursingStore.fetchMyStation()
     if (myStation) {
-      filters.value.nursingStationId = myStation._id
+      if (nursingStore.myStations?.length > 1) {
+        filters.value.nursingStationId = nursingStore.myStations.map(s => s._id).join(',')
+      } else {
+        filters.value.nursingStationId = myStation._id
+      }
     }
     
     // 2. Fetch all nursing stations for SuperAdmin filter select dropdown
@@ -84,20 +102,45 @@ onMounted(async () => {
 
 // Station Details & KPIs
 const selectedStationDetails = computed(() => {
-  if (!filters.value.nursingStationId) return null
-  return nursingStore.stations.find(s => s._id === filters.value.nursingStationId) || nursingStore.myStation
+  if (!filters.value.nursingStationId) {
+    return nursingStore.myStation
+  }
+  return (
+    availableStations.value.find(s => s._id === filters.value.nursingStationId) ||
+    nursingStore.stations.find(s => s._id === filters.value.nursingStationId) ||
+    nursingStore.myStation
+  )
 })
 
 const totalBedsCount = computed(() => {
+  if (filters.value.nursingStationId && filters.value.nursingStationId.includes(',')) {
+    const stationIds = filters.value.nursingStationId.split(',')
+    const selectedStations = availableStations.value.filter(s => stationIds.includes(s._id))
+    return selectedStations.reduce((sum, s) => sum + (s.assignedBeds?.length || 0), 0)
+  }
   return selectedStationDetails.value?.assignedBeds?.length || 0
 })
 
 const occupiedBedsCount = computed(() => {
+  if (filters.value.nursingStationId && filters.value.nursingStationId.includes(',')) {
+    const stationIds = filters.value.nursingStationId.split(',')
+    const selectedStations = availableStations.value.filter(s => stationIds.includes(s._id))
+    return selectedStations.reduce((sum, s) => {
+      return sum + (s.assignedBeds ? s.assignedBeds.filter(b => b.status === 'OCCUPIED').length : 0)
+    }, 0)
+  }
   if (!selectedStationDetails.value?.assignedBeds) return 0
   return selectedStationDetails.value.assignedBeds.filter(b => b.status === 'OCCUPIED').length
 })
 
 const availableBedsCount = computed(() => {
+  if (filters.value.nursingStationId && filters.value.nursingStationId.includes(',')) {
+    const stationIds = filters.value.nursingStationId.split(',')
+    const selectedStations = availableStations.value.filter(s => stationIds.includes(s._id))
+    return selectedStations.reduce((sum, s) => {
+      return sum + (s.assignedBeds ? s.assignedBeds.filter(b => b.status === 'AVAILABLE').length : 0)
+    }, 0)
+  }
   if (!selectedStationDetails.value?.assignedBeds) return 0
   return selectedStationDetails.value.assignedBeds.filter(b => b.status === 'AVAILABLE').length
 })
@@ -183,13 +226,18 @@ const getPayerTypeColor = (type) => {
       </div>
 
       <!-- Current Assigned Station Badge -->
-      <div v-if="nursingStore.myStation" class="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl px-4 py-2.5 flex items-center gap-3 text-white shadow-md shadow-indigo-100">
+      <div v-if="selectedStationDetails || nursingStore.myStation" class="bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-2xl px-4 py-2.5 flex items-center gap-3 text-white shadow-md shadow-indigo-100">
         <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center font-black text-xs shrink-0">
           NS
         </div>
         <div>
           <span class="text-[9px] uppercase tracking-wider font-bold block text-indigo-100 leading-tight">Assigned Station</span>
-          <span class="text-xs font-black tracking-wide">{{ nursingStore.myStation.name }} ({{ nursingStore.myStation.code }})</span>
+          <span class="text-xs font-black tracking-wide" v-if="filters.nursingStationId && filters.nursingStationId.includes(',')">
+            Multiple Stations ({{ availableStations.length }})
+          </span>
+          <span class="text-xs font-black tracking-wide" v-else>
+            {{ (selectedStationDetails || nursingStore.myStation).name }} ({{ (selectedStationDetails || nursingStore.myStation).code }})
+          </span>
         </div>
       </div>
     </div>
@@ -254,14 +302,15 @@ const getPayerTypeColor = (type) => {
       <div class="p-4 border-b border-slate-100 bg-slate-50/40 flex flex-col lg:flex-row justify-between items-center gap-3">
         <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
           
-          <!-- Nursing Station Selector (SuperAdmin only) -->
+          <!-- Nursing Station Selector (SuperAdmin or multiple/assigned stations) -->
           <select 
-            v-if="isSuperAdmin"
+            v-if="isSuperAdmin || availableStations.length > 1"
             v-model="filters.nursingStationId"
             class="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 text-slate-700 min-w-[200px]"
           >
-            <option value="">All Nursing Stations</option>
-            <option v-for="s in nursingStore.stations" :key="s._id" :value="s._id">
+            <option v-if="isSuperAdmin" value="">All Nursing Stations</option>
+            <option v-else-if="availableStations.length > 1" :value="availableStations.map(s => s._id).join(',')">All My Stations ({{ availableStations.length }})</option>
+            <option v-for="s in availableStations" :key="s._id" :value="s._id">
               {{ s.name }} ({{ s.code }})
             </option>
           </select>

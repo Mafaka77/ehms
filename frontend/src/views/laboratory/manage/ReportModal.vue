@@ -125,12 +125,12 @@ const generateEditorContent = () => {
          
          const valueStr = param.measuredValue || '-'
          const formattedValue = param.isOutOfRange 
-           ? `<strong>${valueStr}</strong>` 
+           ? `<span style="color: #dc2626;"><strong>${valueStr}</strong></span>` 
            : valueStr
          
          html += `<tr>`
          html += `<td style="width: 36%; padding: 2px 4px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${param.name}</td>`
-         html += `<td style="width: 18%; text-align: center; padding: 2px 4px;"><strong>${formattedValue}</strong></td>`
+         html += `<td style="width: 18%; text-align: center; padding: 2px 4px;">${formattedValue}</td>`
          html += `<td style="width: 14%; text-align: center; padding: 2px 4px;">${param.unit || ''}</td>`
          html += `<td style="width: 32%; text-align: center; padding: 2px 4px;">${rangeStr}</td>`
          html += `</tr>`
@@ -201,11 +201,38 @@ const FontSize = Extension.create({
   },
 })
 
+const Color = Extension.create({
+  name: 'color',
+  addOptions() {
+    return {
+      types: ['textStyle'],
+    }
+  },
+  addGlobalAttributes() {
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          color: {
+            default: null,
+            parseHTML: element => element.style.color || element.getAttribute('color'),
+            renderHTML: attributes => {
+              if (!attributes.color) return {}
+              return { style: `color: ${attributes.color}` }
+            },
+          },
+        },
+      },
+    ]
+  },
+})
+
 const editor = useEditor({
   extensions: [
     StarterKit,
     TextStyle,
     FontSize,
+    Color,
     Table.configure({ resizable: false }),
     TableRow,
     TableHeader,
@@ -879,7 +906,6 @@ const formatDate = (dateString) => {
 }
 
 .tiptap-editor :deep(.tiptap strong) {
-  color: #000000;
   font-weight: 800;
 }
 

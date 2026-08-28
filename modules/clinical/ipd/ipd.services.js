@@ -367,7 +367,12 @@ exports.getAllAdmissions = async (query = {}) => {
 
         const nursingStationId = query.nursingStationId
         if (nursingStationId) {
-            const beds = await Bed.find({ nursingStationId }).select('_id')
+            const stationIds = Array.isArray(nursingStationId)
+                ? nursingStationId
+                : (typeof nursingStationId === 'string' && nursingStationId.includes(','))
+                    ? nursingStationId.split(',').map(s => s.trim()).filter(Boolean)
+                    : [nursingStationId]
+            const beds = await Bed.find({ nursingStationId: { $in: stationIds } }).select('_id')
             const bedIds = beds.map(b => b._id)
             filter.bedId = { $in: bedIds }
         }

@@ -217,8 +217,8 @@ exports.deleteNursingStation = async (id) => {
 
 // --- NURSING SERVICE ---
 exports.getStationByNurse = async (nurseId) => {
-  // 1. Fetch the assignment (using .lean() for performance)
-  const assignment = await NursingAssignment.findOne({
+  // 1. Fetch all active assignments for this nurse (latest first)
+  const assignments = await NursingAssignment.find({
     nurseId,
     isActive: true
   })
@@ -233,19 +233,55 @@ exports.getStationByNurse = async (nurseId) => {
       }
     ]
   })
-  .lean(); // Returns a plain JS object, much faster than .toObject()
+  .sort({ createdAt: -1 })
+  .lean();
 
-  if (!assignment) {
-    const error = new Error('No active nursing station found for this nurse');
-    error.status = STATUS_CODES.NOT_FOUND;
-    throw error; // Bubbles straight up to the controller
+  const assignedStations = (assignments || [])
+    .map(a => a.nursingStationId)
+    .filter(Boolean);
+
+  // Deduplicate and also include stations where this nurse is inchargeNurseId
+  const seenStationIds = new Set();
+  const uniqueAssignedStations = [];
+
+  for (const st of assignedStations) {
+    const sId = st._id.toString();
+    if (!seenStationIds.has(sId)) {
+      seenStationIds.add(sId);
+      uniqueAssignedStations.push(st);
+    }
   }
 
-  const station = assignment.nursingStationId;
+  // Also query if nurse is set as inchargeNurseId on any nursing station
+  const inchargeStations = await NursingStation.find({ inchargeNurseId: nurseId })
+    .populate([
+      { path: 'wardId', select: 'name code' },
+      { path: 'inchargeNurseId', select: 'fullName email employeeCode' },
+      { 
+        path: 'assignedBeds', 
+        populate: { path: 'wardId', select: 'name code floor' } 
+      }
+    ])
+    .lean();
 
-  // 2. Fetch all active co-workers at this exact station
-  const nurses = await NursingAssignment.find({
-    nursingStationId: station._id,
+  for (const st of (inchargeStations || [])) {
+    const sId = st._id.toString();
+    if (!seenStationIds.has(sId)) {
+      seenStationIds.add(sId);
+      uniqueAssignedStations.push(st);
+    }
+  }
+
+  if (uniqueAssignedStations.length === 0) {
+    const error = new Error('No active nursing station found for this nurse');
+    error.status = STATUS_CODES.NOT_FOUND;
+    throw error;
+  }
+
+  // 2. Fetch all active co-workers across all assigned stations
+  const stationIds = uniqueAssignedStations.map(s => s._id);
+  const allNurses = await NursingAssignment.find({
+    nursingStationId: { $in: stationIds },
     isActive: true
   })
   .populate({
@@ -255,11 +291,21 @@ exports.getStationByNurse = async (nurseId) => {
   .sort({ assignmentType: 1, createdAt: 1 })
   .lean(); 
 
-  // 3. Attach the coworker data to the station payload
-  station.nurses = nurses;
-  station.nurseCount = nurses.length;
+  const allAssignedStations = uniqueAssignedStations.map(st => {
+    const stNurses = allNurses.filter(n => n.nursingStationId && n.nursingStationId.toString() === st._id.toString());
+    return {
+      ...st,
+      nurses: stNurses,
+      nurseCount: stNurses.length
+    };
+  });
 
-  return station;
+  const primaryStation = {
+    ...allAssignedStations[0],
+    allAssignedStations
+  };
+
+  return primaryStation;
 };
 
 // ---------------------------------------------------------------------------

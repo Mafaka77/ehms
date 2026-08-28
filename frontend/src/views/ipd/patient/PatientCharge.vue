@@ -42,7 +42,13 @@ const isSuperAdmin = computed(() => {
   return roleName === 'SuperAdmin' || roleName === 'Super Admin';
 })
 
+const isNormalPayer = computed(() => {
+  const payer = props.admission?.payerType || 'NORMAL';
+  return payer === 'NORMAL';
+})
+
 const isCategoryMasked = (categoryId) => {
+  if (!isNormalPayer.value) return false;
   if (!categoryId) return false;
   if (typeof categoryId === 'object' && categoryId !== null) return !!categoryId.mask;
   const cat = chargeCategories.value.find(c => c._id === categoryId);
@@ -53,7 +59,7 @@ const formatAmount = (amount, shouldMask = false) => {
   if (isSuperAdmin.value) {
     return '₹' + Number(amount || 0).toLocaleString();
   }
-  if (shouldMask) {
+  if (shouldMask && isNormalPayer.value) {
     return '₹XXXX';
   }
   return '₹' + Number(amount || 0).toLocaleString();
@@ -819,7 +825,7 @@ onBeforeUnmount(() => {
                 <td class="px-5 py-3 text-right">
                   <div v-if="editingChargeId === charge._id" class="flex justify-end">
                     <input 
-                      v-if="isSuperAdmin"
+                      v-if="isSuperAdmin || !isNormalPayer"
                       type="number" 
                       v-model.number="editingForm.rate" 
                       min="0"
