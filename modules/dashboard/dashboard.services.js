@@ -136,7 +136,26 @@ exports.getRecentActivity = async () => {
             .select('appointmentDate status patientId doctorId').lean()
     }
 
-    return { recentPatients, recentAdmissions, recentAppointments }
+    let beds = []
+    try {
+        const Bed = require('../clinical/ipd/bed.model')
+        const allBeds = await Bed.find({ isActive: true })
+            .populate('wardId', 'name code wardType floor')
+            .populate('nursingStationId', 'name code')
+            .lean()
+
+        const statusOrder = { AVAILABLE: 1, OCCUPIED: 2, RESERVED: 3, MAINTENANCE: 4 }
+        beds = allBeds.sort((a, b) => {
+            const orderA = statusOrder[a.status] || 99
+            const orderB = statusOrder[b.status] || 99
+            if (orderA !== orderB) return orderA - orderB
+            return (a.bedNo || '').localeCompare(b.bedNo || '', undefined, { numeric: true, sensitivity: 'base' })
+        })
+    } catch (e) {
+        console.error('Error fetching beds for dashboard:', e)
+    }
+
+    return { recentPatients, recentAdmissions, recentAppointments, beds }
 }
 
 exports.getMonthlyChartData = async () => {
