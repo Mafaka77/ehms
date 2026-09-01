@@ -1,11 +1,34 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useLabStore } from '../../../stores/labStore'
+import { useAuthStore } from '../../../stores/authStore'
 import OutpatientOrders from './OutpatientOrders.vue'
 import IPDOrders from './IPDOrders.vue'
 
 const labStore = useLabStore()
-const activeTab = ref('outpatient')
+const authStore = useAuthStore()
+
+const activeTab = ref(
+  authStore.hasPermission('lab.opd.orders')
+    ? 'outpatient'
+    : authStore.hasPermission('lab.ipd.orders')
+      ? 'ipd'
+      : ''
+)
+
+watch(
+  () => [authStore.hasPermission('lab.opd.orders'), authStore.hasPermission('lab.ipd.orders')],
+  ([canOpd, canIpd]) => {
+    if (activeTab.value === 'outpatient' && !canOpd) {
+      activeTab.value = canIpd ? 'ipd' : ''
+    } else if (activeTab.value === 'ipd' && !canIpd) {
+      activeTab.value = canOpd ? 'outpatient' : ''
+    } else if (!activeTab.value) {
+      activeTab.value = canOpd ? 'outpatient' : canIpd ? 'ipd' : ''
+    }
+  },
+  { immediate: true }
+)
 
 const fetchStats = async () => {
   await labStore.fetchStats()
@@ -72,14 +95,19 @@ onMounted(async () => {
     </div>
 
     <!-- Tab Bar -->
-    <div class="border-b border-slate-100 flex items-center gap-1 select-none">
+    <div 
+      v-if="authStore.hasPermission('lab.opd.orders') || authStore.hasPermission('lab.ipd.orders')"
+      class="border-b border-slate-100 flex items-center gap-1 select-none"
+    >
       <button 
+        v-if="authStore.hasPermission('lab.opd.orders')"
         @click="activeTab = 'outpatient'"
         :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none cursor-pointer', activeTab === 'outpatient' ? 'border-indigo-600 text-indigo-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
       >
         Outpatient
       </button>
       <button 
+        v-if="authStore.hasPermission('lab.ipd.orders')"
         @click="activeTab = 'ipd'"
         :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none cursor-pointer', activeTab === 'ipd' ? 'border-indigo-600 text-indigo-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
       >
@@ -89,8 +117,11 @@ onMounted(async () => {
 
     <!-- Tab Contents -->
     <div class="transition-all duration-300">
-      <OutpatientOrders v-if="activeTab === 'outpatient'" @saved="fetchStats" />
-      <IPDOrders v-else-if="activeTab === 'ipd'" @saved="fetchStats" />
+      <OutpatientOrders v-if="activeTab === 'outpatient' && authStore.hasPermission('lab.opd.orders')" @saved="fetchStats" />
+      <IPDOrders v-else-if="activeTab === 'ipd' && authStore.hasPermission('lab.ipd.orders')" @saved="fetchStats" />
+      <div v-else-if="!authStore.hasPermission('lab.opd.orders') && !authStore.hasPermission('lab.ipd.orders')" class="bg-white rounded-2xl p-12 text-center border border-slate-100 shadow-sm text-slate-400">
+        You do not have permission to view laboratory orders.
+      </div>
     </div>
   </div>
 </template>
