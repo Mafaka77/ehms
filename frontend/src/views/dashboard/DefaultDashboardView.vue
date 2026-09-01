@@ -35,7 +35,7 @@ const fmtRupee = (n) => {
 const selectedWardFilter = ref('ALL')
 
 const beds = computed(() => {
-  const list = dashboardStore.activity?.beds || []
+  const list = dashboardStore.defaultDashboard?.beds || []
   const statusOrder = { AVAILABLE: 1, OCCUPIED: 2, RESERVED: 3, MAINTENANCE: 4 }
   return [...list].sort((a, b) => {
     const orderA = statusOrder[a.status] || 99
@@ -170,7 +170,7 @@ const statsCards = computed(() => [
 ])
 
 onMounted(async () => {
-  await dashboardStore.fetchRecentActivity()
+  await dashboardStore.fetchDefaultDashboard()
 })
 </script>
 
@@ -297,7 +297,7 @@ onMounted(async () => {
       </div>
 
       <!-- Loading State -->
-      <div v-if="dashboardStore.loadingActivity" class="p-6 space-y-4">
+      <div v-if="dashboardStore.loadingDefault" class="p-6 space-y-4">
         <div v-for="i in 3" :key="i" class="p-4 rounded-xl border border-slate-100 space-y-3 animate-pulse">
           <div class="h-4 bg-slate-200 rounded w-48"></div>
           <div class="space-y-2">

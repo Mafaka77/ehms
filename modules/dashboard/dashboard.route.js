@@ -2,9 +2,14 @@ const auth = require('../../middleware/auth')
 const authorizeRole = require('../../middleware/authorize')
 const dashboardController = require('./dashboard.controller')
 
-const adminRoles = ['SuperAdmin', 'HospitalAdmin']
+const adminRoles = ['SuperAdmin', 'HospitalAdmin','Receptionist']
 
 module.exports = async function (fastify, opts) {
+    fastify.get(
+        '/default',
+        { onRequest: [auth] },
+        dashboardController.getDefaultDashboard
+    )
     fastify.get(
         '/admin/stats',
         { onRequest: [auth, authorizeRole(adminRoles)] },

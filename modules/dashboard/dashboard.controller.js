@@ -17,6 +17,22 @@ exports.getAdminStats = async (req, reply) => {
     }
 }
 
+exports.getDefaultDashboard = async (req, reply) => {
+    try {
+        const data = await dashboardService.getDefaultDashboardData()
+        return reply.code(STATUS_CODES.OK).send({
+            success: true,
+            message: 'Default dashboard data fetched successfully',
+            data
+        })
+    } catch (error) {
+        return reply.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to fetch default dashboard data'
+        })
+    }
+}
+
 exports.getRecentActivity = async (req, reply) => {
     try {
         const activity = await dashboardService.getRecentActivity()
