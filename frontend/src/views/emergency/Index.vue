@@ -39,7 +39,8 @@ const filters = ref({
   limit: 10,
   priority: '',
   doctorId: '',
-  date: ''
+  date: '',
+  search: ''
 })
 
 const fetchVisits = async () => {
@@ -51,10 +52,20 @@ const fetchVisits = async () => {
   loading.value = false
 }
 
-// Watch filters (except page) to reset page to 1
+// Watch filters (except page and search) to reset page to 1
 watch(() => [filters.value.priority, filters.value.doctorId, filters.value.date], () => {
   filters.value.page = 1
   fetchVisits()
+})
+
+// Watch search with debounce
+let searchTimeout = null
+watch(() => filters.value.search, () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    filters.value.page = 1
+    fetchVisits()
+  }, 350)
 })
 
 // Watch page separately
@@ -68,8 +79,10 @@ const clearFilters = () => {
     limit: 10,
     priority: '',
     doctorId: '',
-    date: ''
+    date: '',
+    search: ''
   }
+  fetchVisits()
 }
 
 onMounted(async () => {
@@ -428,9 +441,23 @@ const handleUpdate = async () => {
             />
           </div>
 
+          <!-- Search Input -->
+          <div class="relative min-w-[220px]">
+            <input 
+              type="text" 
+              v-model="filters.search" 
+              @keyup.enter="fetchVisits"
+              placeholder="Search Visit No, Patient..." 
+              class="w-full pl-8 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-100 focus:border-rose-500 text-slate-700 shadow-2xs transition-all placeholder:text-slate-400"
+            />
+            <div class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+          </div>
+
           <!-- Clear Filters -->
           <button 
-            v-if="filters.priority || filters.doctorId || filters.date"
+            v-if="filters.priority || filters.doctorId || filters.date || filters.search"
             @click="clearFilters"
             class="text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1.5 rounded-lg border border-rose-100 transition-all cursor-pointer flex items-center gap-1"
           >
