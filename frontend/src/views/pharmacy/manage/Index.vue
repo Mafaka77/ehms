@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import Sales from './Sales.vue'
 import Stocks from './Stocks.vue'
 import IPDOrder from './IPDOrder.vue'
@@ -10,25 +10,22 @@ import { useAuthStore } from '../../../stores/authStore'
 const pharmacyStore = usePharmacyStore()
 const authStore = useAuthStore()
 const activeTab = ref(authStore.hasPermission('pharmacy.sale') ? 'sales' : (['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist','PharmacyManager'].includes(authStore.user?.roleName || authStore.user?.role?.name) ? 'stock' : 'indent'))
-let pollingInterval = null
 
 const refreshPendingCount = async () => {
-  await pharmacyStore.fetchPendingIpdOrdersCount()
+  if (authStore.hasPermission('pharmacy.sale')) {
+    await pharmacyStore.fetchPendingIpdOrdersCount()
+  }
 }
 
 onMounted(() => {
   refreshPendingCount()
-  // Poll every 10 seconds to keep the badge updated dynamically
-  pollingInterval = setInterval(refreshPendingCount, 10000)
 })
 
-onUnmounted(() => {
-  if (pollingInterval) {
-    clearInterval(pollingInterval)
+watch(activeTab, (newTab) => {
+  if (newTab === 'orders' || newTab === 'sales') {
+    refreshPendingCount()
   }
 })
-
-watch(activeTab, refreshPendingCount)
 </script>
 
 <template>

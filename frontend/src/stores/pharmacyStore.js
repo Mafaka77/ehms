@@ -443,7 +443,6 @@ export const usePharmacyStore = defineStore('pharmacy', {
     },
 
     async fetchIpdOrders(page = 1, limit = 10, search = '', status = '') {
-      this.loading = true
       this.error = null
       try {
         const response = await api.get('/pharmacy/ipd-orders', {
@@ -453,8 +452,6 @@ export const usePharmacyStore = defineStore('pharmacy', {
       } catch (err) {
         this.error = err.response?.data?.message || 'Failed to fetch IPD medicine orders'
         return { success: false, message: this.error }
-      } finally {
-        this.loading = false
       }
     },
 

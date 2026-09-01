@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 
@@ -184,24 +184,9 @@ const submitRejectReturn = async () => {
   processingReturn.value = false
 }
 
-let pollingInterval = null
-
-const pollData = async () => {
-  await fetchIpdOrders(true)
-  await fetchKpis()
-}
-
 onMounted(async () => {
   await fetchIpdOrders()
   await fetchKpis()
-  // Setup silent background polling every 10 seconds
-  pollingInterval = setInterval(pollData, 10000)
-})
-
-onUnmounted(() => {
-  if (pollingInterval) {
-    clearInterval(pollingInterval)
-  }
 })
 </script>
 
