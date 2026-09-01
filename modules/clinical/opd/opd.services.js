@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { DateTime } = require('luxon');
 const OpdAppointment = require('./opd_appointment.model');
 const Doctor = require('../../hr/doctor.model');
 const DoctorRemunerationRule = require('../../hr/doctor_renumeration_rule.model');
@@ -164,10 +165,18 @@ exports.createAppointment = async (data) => {
             }
         }
 
+        let appointmentDateUTC = new Date();
+        if (data.appointmentDate) {
+            const dt = typeof data.appointmentDate === 'string'
+                ? DateTime.fromISO(data.appointmentDate, { zone: 'Asia/Kolkata' })
+                : DateTime.fromJSDate(new Date(data.appointmentDate));
+            appointmentDateUTC = dt.isValid ? dt.toUTC().toJSDate() : new Date(data.appointmentDate);
+        }
+
         const appointmentData = {
             patientId: data.patientId,
             doctorId: data.doctorId,
-            appointmentDate: data.appointmentDate ? new Date(data.appointmentDate) : new Date(),
+            appointmentDate: appointmentDateUTC,
             consultationFee: consultationFee,
             notes: data.notes,
             paymentStatus: data.paymentStatus
@@ -218,7 +227,12 @@ exports.updateAppointment = async (id, data) => {
         }
 
         if (data.doctorId) appointment.doctorId = data.doctorId;
-        if (data.appointmentDate) appointment.appointmentDate = data.appointmentDate;
+        if (data.appointmentDate) {
+            const dt = typeof data.appointmentDate === 'string'
+                ? DateTime.fromISO(data.appointmentDate, { zone: 'Asia/Kolkata' })
+                : DateTime.fromJSDate(new Date(data.appointmentDate));
+            appointment.appointmentDate = dt.isValid ? dt.toUTC().toJSDate() : new Date(data.appointmentDate);
+        }
         if (data.consultationFee !== undefined) appointment.consultationFee = data.consultationFee;
         if (data.notes !== undefined) appointment.notes = data.notes;
         if (data.status) appointment.status = data.status;

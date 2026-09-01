@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { DateTime } from 'luxon'
 import { usePatientStore } from '../../stores/patientStore'
 import { useOpdStore } from '../../stores/opdStore'
 import { useDoctorStore } from '../../stores/doctorStore'
@@ -94,15 +95,14 @@ const saveNewPatient = async () => {
 }
 
 
-const getCurrentDateTimeLocal = () => {
-  const d = new Date()
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
+const getLocalDatetimeString = () => {
+  return DateTime.now().setZone('Asia/Kolkata').toFormat("yyyy-MM-dd'T'HH:mm")
 }
 
 // -- STEP 2: APPOINTMENT BOOKING --
 const appointmentData = ref({
   doctorId: '',
-  appointmentDate: getCurrentDateTimeLocal(),
+  appointmentDate: getLocalDatetimeString(),
   notes: '',
   paymentStatus: 'Unpaid'
 })
@@ -135,8 +135,13 @@ const submitAppointment = async () => {
   if (!selectedPatient.value) return
   
   isBooking.value = true
+  const istAppointmentDate = appointmentData.value.appointmentDate
+    ? DateTime.fromISO(appointmentData.value.appointmentDate, { zone: 'Asia/Kolkata' }).toISO({ includeOffset: true })
+    : DateTime.now().setZone('Asia/Kolkata').toISO({ includeOffset: true })
+
   const payload = {
     ...appointmentData.value,
+    appointmentDate: istAppointmentDate,
     patientId: selectedPatient.value._id,
     consultationFee: selectedDoctorFee.value || 0
   }
