@@ -54,7 +54,8 @@ const visitForm = ref({
   chiefComplaint: '',
   priority: 'MEDIUM',
   notes: '',
-  consultationFee: 0
+  consultationFee: 0,
+  hospitalCharges: 100
 })
 const isRegistering = ref(false)
 
@@ -70,7 +71,8 @@ const resetModal = () => {
     chiefComplaint: '',
     priority: 'MEDIUM',
     notes: '',
-    consultationFee: 0
+    consultationFee: 0,
+    hospitalCharges: 100
   }
 }
 
@@ -161,14 +163,15 @@ const submitVisit = async () => {
   }
   
   isRegistering.value = true
-  const arrivalDateTimeUTC = visitForm.value.arrivalDateTime
-    ? DateTime.fromISO(visitForm.value.arrivalDateTime, { zone: 'Asia/Kolkata' }).toUTC().toISO()
-    : DateTime.now().toUTC().toISO()
+  const istArrivalDateTime = visitForm.value.arrivalDateTime
+    ? DateTime.fromISO(visitForm.value.arrivalDateTime, { zone: 'Asia/Kolkata' }).toISO({ includeOffset: true })
+    : DateTime.now().setZone('Asia/Kolkata').toISO({ includeOffset: true })
 
   const payload = {
     ...visitForm.value,
-    arrivalDateTime: arrivalDateTimeUTC,
-    patientId: selectedPatient.value._id
+    arrivalDateTime: istArrivalDateTime,
+    patientId: selectedPatient.value._id,
+    hospitalCharges: Number(visitForm.value.hospitalCharges || 100)
   }
 
   const res = await emergencyStore.registerVisit(payload)
@@ -353,6 +356,23 @@ const submitVisit = async () => {
               placeholder="e.g. Severe chest pain, head injury..." 
             />
           </div>
+
+          <!-- Fee Breakdown Info -->
+          <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3 text-xs space-y-1.5">
+            <div class="flex justify-between text-slate-600">
+              <span>Emergency Rate:</span>
+              <span class="font-mono font-semibold">₹{{ visitForm.consultationFee || 0 }}</span>
+            </div>
+            <div class="flex justify-between text-slate-600">
+              <span>Hospital Charge:</span>
+              <span class="font-mono font-semibold">₹{{ visitForm.hospitalCharges }}</span>
+            </div>
+            <div class="flex justify-between text-slate-900 font-bold border-t border-slate-200 pt-1.5">
+              <span>Total Registration Amount:</span>
+              <span class="font-mono text-rose-600 font-extrabold">₹{{ (Number(visitForm.consultationFee) || 0) + (Number(visitForm.hospitalCharges) || 0) }}</span>
+            </div>
+          </div>
+
           <BaseTextarea v-model="visitForm.notes" id="notes" label="Assigned Notes / Instructions" placeholder="Brief assessment notes..." :rows="2" />
 
           <button 

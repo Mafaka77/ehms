@@ -41,6 +41,10 @@ module.exports = async (fastify, options) => {
     fastify.get('/ipd-orders/admission/:admissionId', { onRequest: [auth] }, pharmacyController.getIpdOrdersByAdmission)
     fastify.get('/ipd-orders',                        { onRequest: [auth] }, pharmacyController.getAllIpdOrders)
     fastify.put('/ipd-orders/:id/status',             { onRequest: [auth] }, pharmacyController.updateIpdOrderStatus)
+    fastify.post('/ipd-orders/return-request',        { onRequest: [auth] }, pharmacyController.requestReturnIpdMedicineItem)
+    fastify.post('/ipd-orders/return-cancel',         { onRequest: [auth] }, pharmacyController.cancelReturnRequestIpdMedicineItem)
+    fastify.post('/ipd-orders/return-approve',        { onRequest: [auth] }, pharmacyController.approveReturnIpdMedicineItem)
+    fastify.post('/ipd-orders/return-reject',         { onRequest: [auth] }, pharmacyController.rejectReturnIpdMedicineItem)
     fastify.post('/ipd-orders/return',                { onRequest: [auth] }, pharmacyController.returnIpdMedicineItem)
 
     // ── Pharmacy Indent routes ─────────────────────────────

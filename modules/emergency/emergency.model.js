@@ -54,6 +54,11 @@ const emergencyVisitSchema = new mongoose.Schema({
     default: 0
   },
 
+  hospitalCharges: {
+    type: Number,
+    default: 0
+  },
+
   paymentStatus: {
     type: String,
     enum: ['Paid', 'Partially Paid', 'Unpaid'],

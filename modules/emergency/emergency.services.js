@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { DateTime } = require('luxon');
 const EmergencyVisit = require('./emergency.model');
 const Doctor = require('../hr/doctor.model');
 const STATUS_CODES = require('../../utils/statuscode');
@@ -128,14 +129,23 @@ exports.getEmergencyVisits = async (query) => {
 
 exports.createEmergencyVisit = async (data) => {
     try {
+        let arrivalDateTimeUTC = new Date();
+        if (data.arrivalDateTime) {
+            const dt = typeof data.arrivalDateTime === 'string'
+                ? DateTime.fromISO(data.arrivalDateTime, { zone: 'Asia/Kolkata' })
+                : DateTime.fromJSDate(new Date(data.arrivalDateTime));
+            arrivalDateTimeUTC = dt.isValid ? dt.toUTC().toJSDate() : new Date(data.arrivalDateTime);
+        }
+
         const visitData = {
             patientId: data.patientId,
             doctorId: data.doctorId || null,
-            arrivalDateTime: data.arrivalDateTime?new Date(data.arrivalDateTime):new Date(),
+            arrivalDateTime: arrivalDateTimeUTC,
             chiefComplaint: data.chiefComplaint || '',
             priority: data.priority || 'MEDIUM',
             notes: data.notes || '',
             consultationFee: data.consultationFee !== undefined ? data.consultationFee : 300,
+            hospitalCharges: data.hospitalCharges !== undefined ? Number(data.hospitalCharges) : 100,
             paymentStatus: data.paymentStatus || 'Unpaid'
         };
 
@@ -182,12 +192,18 @@ exports.updateEmergencyVisit = async (id, data) => {
         }
 
         if (data.doctorId !== undefined) visit.doctorId = data.doctorId || null;
-        if (data.arrivalDateTime) visit.arrivalDateTime = new Date(data.arrivalDateTime) ;
+        if (data.arrivalDateTime) {
+            const dt = typeof data.arrivalDateTime === 'string'
+                ? DateTime.fromISO(data.arrivalDateTime, { zone: 'Asia/Kolkata' })
+                : DateTime.fromJSDate(new Date(data.arrivalDateTime));
+            visit.arrivalDateTime = dt.isValid ? dt.toUTC().toJSDate() : new Date(data.arrivalDateTime);
+        }
         if (data.chiefComplaint !== undefined) visit.chiefComplaint = data.chiefComplaint;
         if (data.priority) visit.priority = data.priority;
         if (data.visitStatus) visit.visitStatus = data.visitStatus;
         if (data.notes !== undefined) visit.notes = data.notes;
         if (data.consultationFee !== undefined) visit.consultationFee = Number(data.consultationFee);
+        if (data.hospitalCharges !== undefined) visit.hospitalCharges = Number(data.hospitalCharges);
         if (data.paymentStatus) visit.paymentStatus = data.paymentStatus;
 
         await visit.save();

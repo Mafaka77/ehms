@@ -108,6 +108,12 @@ const closeModal = () => {
   }, 200)
 }
 
+// Role check for ER Registration
+const canRegisterVisit = computed(() => {
+  const role = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return ['SuperAdmin', 'Super Admin', 'Receptionist'].includes(role)
+})
+
 // Open Register Modal
 const openRegisterModal = () => {
   showRegisterModal.value = true
@@ -368,6 +374,7 @@ const handleUpdate = async () => {
           Export Report
         </button>
         <button 
+          v-if="canRegisterVisit"
           @click="openRegisterModal"
           class="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md shadow-rose-100 transition-all flex items-center justify-center gap-2 w-full sm:w-auto cursor-pointer"
         >

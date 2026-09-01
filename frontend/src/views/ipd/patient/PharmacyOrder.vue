@@ -57,20 +57,31 @@ const submitReturn = async () => {
   }
 
   returnSubmitting.value = true
-  const res = await pharmacyStore.returnIpdMedicineItem(
+  const res = await pharmacyStore.requestReturnIpdMedicineItem(
     returnForm.value.itemId,
     returnForm.value.quantity,
     returnForm.value.remarks
   )
 
   if (res.success) {
-    snackbarStore.show({ message: res.message || 'Medicine returned successfully', type: 'success' })
+    snackbarStore.show({ message: 'Return request submitted to pharmacy successfully. Awaiting pharmacist approval.', type: 'success' })
     showReturnModal.value = false
     await fetchOrders()
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
   }
   returnSubmitting.value = false
+}
+
+const cancelReturnRequest = async (item) => {
+  if (!confirm('Are you sure you want to cancel this return request?')) return
+  const res = await pharmacyStore.cancelReturnIpdMedicineItem(item._id)
+  if (res.success) {
+    snackbarStore.show({ message: 'Return request cancelled', type: 'success' })
+    await fetchOrders()
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
 }
 
 // Form State
@@ -357,12 +368,42 @@ onMounted(async () => {
                 </td>
                 <td class="px-4 py-2.5 text-slate-500">{{ item.remarks || '-' }}</td>
                 <td class="px-4 py-2.5 text-right">
+                  <!-- Pending Return Request -->
+                  <div v-if="item.returnStatus === 'REQUESTED'" class="flex items-center justify-end gap-1.5 flex-wrap">
+                    <span class="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[10px] font-bold inline-flex items-center gap-1" title="Awaiting pharmacy verification and approval">
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      Req: {{ item.returnRequestedQuantity }} (Pending)
+                    </span>
+                    <button 
+                      @click="cancelReturnRequest(item)"
+                      class="px-1.5 py-0.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded text-[10px] font-semibold transition-all cursor-pointer"
+                      title="Cancel Return Request"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+
+                  <!-- Return Rejected -->
+                  <div v-else-if="item.returnStatus === 'REJECTED'" class="flex items-center justify-end gap-1.5 flex-wrap">
+                    <span class="px-1.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200 rounded text-[9px] font-bold" :title="'Reason: ' + (item.returnRejectionReason || 'Rejected')">
+                      Rejected
+                    </span>
+                    <button 
+                      v-if="item.issuedQuantity > (item.returnedQuantity || 0)"
+                      @click="openReturnModal(item)"
+                      class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 active:bg-rose-200 border border-rose-100 rounded text-[10px] font-bold transition-all cursor-pointer font-sans"
+                    >
+                      Re-Request
+                    </button>
+                  </div>
+
+                  <!-- Available to Return -->
                   <button 
-                    v-if="item.issuedQuantity > (item.returnedQuantity || 0)"
+                    v-else-if="item.issuedQuantity > (item.returnedQuantity || 0)"
                     @click="openReturnModal(item)"
                     class="px-2 py-1 bg-rose-50 hover:bg-rose-100 text-rose-700 active:bg-rose-200 border border-rose-100 rounded text-[10px] font-bold transition-all cursor-pointer font-sans"
                   >
-                    Return
+                    Request Return
                   </button>
                   <span v-else class="text-[10px] text-slate-400 font-medium">-</span>
                 </td>
@@ -606,8 +647,8 @@ onMounted(async () => {
         <!-- Modal Title Header -->
         <div class="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
           <div>
-            <h3 class="font-bold text-slate-800 text-base">Return Medicine</h3>
-            <p class="text-xs text-slate-400 mt-0.5">Return unused medication to the pharmacy.</p>
+            <h3 class="font-bold text-slate-800 text-base">Request Medicine Return</h3>
+            <p class="text-xs text-slate-400 mt-0.5">Submit a return request to pharmacy for approval.</p>
           </div>
           <button 
             @click="showReturnModal = false"
@@ -642,7 +683,7 @@ onMounted(async () => {
               :max="returnForm.max"
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
             />
-            <p class="text-[10px] text-slate-400">Specify how many units of this medicine you want to return.</p>
+            <p class="text-[10px] text-slate-400">Specify how many units of this medicine you are requesting to return.</p>
           </div>
 
           <!-- Return Remarks -->
@@ -651,7 +692,7 @@ onMounted(async () => {
             <textarea 
               v-model="returnForm.remarks"
               rows="3"
-              placeholder="Provide a reason for the return (e.g., patient discharged, dosage changed, unused...)"
+              placeholder="Provide reason for return (e.g. dose stopped, patient discharged, unopened vial...)"
               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 bg-white font-medium text-xs transition-all"
             ></textarea>
           </div>
@@ -676,7 +717,7 @@ onMounted(async () => {
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Confirm Return
+            Submit Return Request
           </button>
         </div>
       </div>

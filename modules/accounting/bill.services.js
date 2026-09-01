@@ -373,8 +373,12 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
         }
 
         // 2. Calculate amounts
-        const grossAmount = appointment.consultationFee || 0
-        const netAmount = Math.max(0, grossAmount - discountAmount)
+        const consultationFee = appointment.consultationFee || 0
+        const hospitalCharges = appointment.hospitalCharges || 0
+        const grossAmount = consultationFee + hospitalCharges
+        // Discount is applied only to consultation fee
+        const effectiveDiscount = Math.min(discountAmount, consultationFee)
+        const netAmount = Math.max(0, grossAmount - effectiveDiscount)
         const isFreeOrPaid = netAmount === 0
         const initialStatus = isFreeOrPaid ? 'PAID' : 'DRAFT'
         const initialBalance = isFreeOrPaid ? 0 : netAmount
@@ -385,7 +389,7 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
             opdAppointmentId: appointment._id,
             billType: 'OPD_CONSULTATION',
             grossAmount,
-            discountAmount,
+            discountAmount: effectiveDiscount,
             netAmount,
             paidAmount: 0,
             balanceAmount: initialBalance,
@@ -394,20 +398,39 @@ exports.generateBillFromOpdAppointment = async (opdAppointmentId, userId, discou
             generatedAt: new Date()
         }], { session })
 
-        // 4. Create BillItem for Consultation Fee
+        // 4. Create BillItems
+        const billItems = []
         const doctorName = appointment.doctorId ? ` - ${appointment.doctorId.fullName}` : ''
-        await BillItem.create([{
+
+        billItems.push({
             billId: bill._id,
             itemType: 'CONSULTATION',
             sourceModule: 'CONSULTATION',
             description: `OPD Consultation Fee${doctorName}`,
             referenceId: appointment._id,
             quantity: 1,
-            rate: grossAmount,
-            amount: grossAmount,
-            discountAmount: discountAmount,
-            netAmount: netAmount
-        }], { session })
+            rate: consultationFee,
+            amount: consultationFee,
+            discountAmount: effectiveDiscount,
+            netAmount: consultationFee - effectiveDiscount
+        })
+
+        if (hospitalCharges > 0) {
+            billItems.push({
+                billId: bill._id,
+                itemType: 'OTHER',
+                sourceModule: 'OTHER',
+                description: 'Hospital Charge',
+                referenceId: appointment._id,
+                quantity: 1,
+                rate: hospitalCharges,
+                amount: hospitalCharges,
+                discountAmount: 0,
+                netAmount: hospitalCharges
+            })
+        }
+
+        await BillItem.insertMany(billItems, { session })
 
         // 5. Update OPD Appointment reference
         if (isFreeOrPaid) {
@@ -587,8 +610,11 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
         }
 
         // 2. Calculate amounts
-        const grossAmount = visit.consultationFee || 0
-        const netAmount = Math.max(0, grossAmount - discountAmount)
+        const consultationFee = visit.consultationFee || 0
+        const hospitalCharges = visit.hospitalCharges || 0
+        const grossAmount = consultationFee + hospitalCharges
+        const effectiveDiscount = Math.min(discountAmount, consultationFee)
+        const netAmount = Math.max(0, grossAmount - effectiveDiscount)
         const isFreeOrPaid = netAmount === 0
         const initialStatus = isFreeOrPaid ? 'PAID' : 'DRAFT'
         const initialBalance = isFreeOrPaid ? 0 : netAmount
@@ -599,7 +625,7 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
             emergencyVisitId: visit._id,
             billType: 'EMERGENCY_CONSULTATION',
             grossAmount,
-            discountAmount,
+            discountAmount: effectiveDiscount,
             netAmount,
             paidAmount: 0,
             balanceAmount: initialBalance,
@@ -608,20 +634,38 @@ exports.generateBillFromEmergencyVisit = async (emergencyVisitId, userId, discou
             generatedAt: new Date()
         }], { session })
 
-        // 4. Create BillItem for Consultation Fee
+        // 4. Create BillItems
+        const billItems = []
         const doctorName = visit.doctorId ? ` - Dr. ${visit.doctorId.fullName}` : ''
-        await BillItem.create([{
+        billItems.push({
             billId: bill._id,
             itemType: 'CONSULTATION',
             sourceModule: 'CONSULTATION',
             description: `Emergency Consultation Fee${doctorName}`,
             referenceId: visit._id,
             quantity: 1,
-            rate: grossAmount,
-            amount: grossAmount,
-            discountAmount: discountAmount,
-            netAmount: netAmount
-        }], { session })
+            rate: consultationFee,
+            amount: consultationFee,
+            discountAmount: effectiveDiscount,
+            netAmount: consultationFee - effectiveDiscount
+        })
+
+        if (hospitalCharges > 0) {
+            billItems.push({
+                billId: bill._id,
+                itemType: 'OTHER',
+                sourceModule: 'OTHER',
+                description: 'Hospital Charge',
+                referenceId: visit._id,
+                quantity: 1,
+                rate: hospitalCharges,
+                amount: hospitalCharges,
+                discountAmount: 0,
+                netAmount: hospitalCharges
+            })
+        }
+
+        await BillItem.insertMany(billItems, { session })
 
         // 5. Update Emergency Visit reference
         if (isFreeOrPaid) {
@@ -800,15 +844,18 @@ exports.generateBillFromDentalConsultation = async (dentalAppointmentId, userId,
             return existingBill
         }
 
-        const grossAmount = appointment.consultationFee || 0
-        const netAmount = grossAmount - discountAmount
+        const consultationFee = appointment.consultationFee || 0
+        const hospitalCharges = appointment.hospitalCharges || 0
+        const grossAmount = consultationFee + hospitalCharges
+        const effectiveDiscount = Math.min(discountAmount, consultationFee)
+        const netAmount = Math.max(0, grossAmount - effectiveDiscount)
 
         const [bill] = await Bill.create([{
             patientId: appointment.patientId,
             dentalAppointmentId: appointment._id,
             billType: 'DENTAL_CONSULTATION',
             grossAmount,
-            discountAmount,
+            discountAmount: effectiveDiscount,
             netAmount,
             paidAmount: 0,
             balanceAmount: netAmount,
@@ -817,17 +864,36 @@ exports.generateBillFromDentalConsultation = async (dentalAppointmentId, userId,
             generatedAt: new Date()
         }], { session })
 
-        await BillItem.create([{
+        const billItems = []
+        billItems.push({
             billId: bill._id,
             itemType: 'CONSULTATION',
             sourceModule: 'CONSULTATION',
             description: `Dental Consultation Fee - Dr. ${appointment.doctorId?.fullName || 'N/A'}`,
+            referenceId: appointment._id,
             quantity: 1,
-            rate: grossAmount,
-            amount: grossAmount,
-            discountAmount: discountAmount,
-            netAmount: netAmount
-        }], { session })
+            rate: consultationFee,
+            amount: consultationFee,
+            discountAmount: effectiveDiscount,
+            netAmount: consultationFee - effectiveDiscount
+        })
+
+        if (hospitalCharges > 0) {
+            billItems.push({
+                billId: bill._id,
+                itemType: 'OTHER',
+                sourceModule: 'OTHER',
+                description: 'Hospital Charge',
+                referenceId: appointment._id,
+                quantity: 1,
+                rate: hospitalCharges,
+                amount: hospitalCharges,
+                discountAmount: 0,
+                netAmount: hospitalCharges
+            })
+        }
+
+        await BillItem.insertMany(billItems, { session })
 
         if (discountAmount > 0) {
             const resolvedDoctorId = await resolveDiscountDoctor(appointment.patientId, doctorId, session)

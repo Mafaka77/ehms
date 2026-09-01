@@ -44,6 +44,49 @@ new mongoose.Schema({
   remarks: {
     type: String,
     default: null
+  },
+
+  returnStatus: {
+    type: String,
+    enum: ['NONE', 'REQUESTED', 'APPROVED', 'REJECTED'],
+    default: 'NONE'
+  },
+
+  returnRequestedQuantity: {
+    type: Number,
+    default: 0
+  },
+
+  returnReason: {
+    type: String,
+    default: null
+  },
+
+  returnRequestedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
+  returnRequestedAt: {
+    type: Date,
+    default: null
+  },
+
+  returnApprovedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+
+  returnApprovedAt: {
+    type: Date,
+    default: null
+  },
+
+  returnRejectionReason: {
+    type: String,
+    default: null
   }
 
 },{

@@ -103,6 +103,7 @@ const getLocalDatetimeString = () => {
 const appointmentData = ref({
   doctorId: '',
   appointmentDate: getLocalDatetimeString(),
+  hospitalCharges: 100,
   notes: '',
   paymentStatus: 'Unpaid'
 })
@@ -143,7 +144,8 @@ const submitAppointment = async () => {
     ...appointmentData.value,
     appointmentDate: istAppointmentDate,
     patientId: selectedPatient.value._id,
-    consultationFee: selectedDoctorFee.value || 0
+    consultationFee: selectedDoctorFee.value || 0,
+    hospitalCharges: Number(appointmentData.value.hospitalCharges || 100)
   }
 
   const res = await opdStore.bookAppointment(payload)
@@ -417,17 +419,37 @@ const closeModal = () => {
           </div>
 
           <!-- Fee Display -->
-          <div v-if="selectedDoctorFee !== null" class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div v-if="selectedDoctorFee !== null" class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold text-emerald-900">Doctor Consultation Fee</p>
+                  <p class="text-[11px] text-emerald-700">As per doctor's OPD rule</p>
+                </div>
               </div>
-              <div>
-                <p class="text-sm font-semibold text-emerald-900">Consultation Fee</p>
-                <p class="text-xs text-emerald-700">As per doctor's OPD remuneration rule</p>
-              </div>
+              <span class="text-sm font-bold text-emerald-800 font-mono">₹{{ selectedDoctorFee }}</span>
             </div>
-            <span class="text-lg font-bold text-emerald-700">₹{{ selectedDoctorFee }}</span>
+
+            <div class="flex items-center justify-between pt-2 border-t border-emerald-200/60">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                </div>
+                <div>
+                  <p class="text-xs font-semibold text-emerald-900">Hospital Charge</p>
+                  <p class="text-[11px] text-emerald-700">Fixed hospital registration fee</p>
+                </div>
+              </div>
+              <span class="text-sm font-bold text-emerald-800 font-mono">₹{{ appointmentData.hospitalCharges }}</span>
+            </div>
+
+            <div class="flex items-center justify-between pt-2.5 border-t border-emerald-300">
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-950">Total Payable</span>
+              <span class="text-base font-extrabold text-emerald-700 font-mono">₹{{ (selectedDoctorFee || 0) + appointmentData.hospitalCharges }}</span>
+            </div>
           </div>
 
           <div>

@@ -250,6 +250,46 @@ exports.updateIpdOrderStatus = async (req, res) => {
     }
 }
 
+exports.requestReturnIpdMedicineItem = async (req, res) => {
+    try {
+        const { itemId, quantity, reason } = req.body
+        const result = await pharmacyService.requestReturnIpdMedicineItem(itemId, quantity, reason, req.user?._id)
+        return res.code(STATUS_CODES.OK).send({ message: 'Return request submitted to pharmacy successfully', data: result, status: STATUS_CODES.OK })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.cancelReturnRequestIpdMedicineItem = async (req, res) => {
+    try {
+        const { itemId } = req.body
+        const result = await pharmacyService.cancelReturnRequestIpdMedicineItem(itemId, req.user?._id)
+        return res.code(STATUS_CODES.OK).send({ message: 'Return request cancelled successfully', data: result, status: STATUS_CODES.OK })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.approveReturnIpdMedicineItem = async (req, res) => {
+    try {
+        const { itemId, approvedQuantity, remarks } = req.body
+        const result = await pharmacyService.approveReturnIpdMedicineItem(itemId, req.user?._id, approvedQuantity, remarks)
+        return res.code(STATUS_CODES.OK).send({ message: 'Medicine return approved and stock/charges updated successfully', data: result, status: STATUS_CODES.OK })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
+exports.rejectReturnIpdMedicineItem = async (req, res) => {
+    try {
+        const { itemId, rejectionReason } = req.body
+        const result = await pharmacyService.rejectReturnIpdMedicineItem(itemId, req.user?._id, rejectionReason)
+        return res.code(STATUS_CODES.OK).send({ message: 'Medicine return request rejected', data: result, status: STATUS_CODES.OK })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({ message: error.message, status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR })
+    }
+}
+
 exports.returnIpdMedicineItem = async (req, res) => {
     try {
         const { itemId, quantity, remarks } = req.body

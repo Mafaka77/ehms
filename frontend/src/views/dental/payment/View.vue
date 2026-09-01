@@ -71,7 +71,8 @@ const discountAmount = computed(() => {
 
 // Compute net total amount
 const netAmount = computed(() => {
-  return Math.max(0, (props.appointment.consultationFee || 0) - discountAmount.value)
+  const totalGross = (props.appointment.consultationFee || 0) + (props.appointment.hospitalCharges || 0)
+  return Math.max(0, totalGross - discountAmount.value)
 })
 
 const employeeSearchQuery = ref('')
@@ -312,9 +313,15 @@ const getPaymentStatusColor = (status) => {
                 <td class="px-4 py-3 text-center font-mono">1</td>
                 <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(appointment.consultationFee) }}</td>
               </tr>
+              <tr v-if="appointment.hospitalCharges" class="hover:bg-slate-50/50">
+                <td class="px-4 py-3 font-medium text-slate-800">Hospital Charge</td>
+                <td class="px-4 py-3 text-right font-mono">{{ formatCurrency(appointment.hospitalCharges) }}</td>
+                <td class="px-4 py-3 text-center font-mono">1</td>
+                <td class="px-4 py-3 text-right font-mono font-semibold">{{ formatCurrency(appointment.hospitalCharges) }}</td>
+              </tr>
               <tr class="bg-slate-50/50 font-bold border-t border-slate-100">
                 <td colspan="3" class="px-4 py-3 text-slate-800">Total Amount</td>
-                <td class="px-4 py-3 text-right font-mono text-indigo-600 text-sm">{{ formatCurrency(appointment.consultationFee) }}</td>
+                <td class="px-4 py-3 text-right font-mono text-indigo-600 text-sm">{{ formatCurrency((appointment.consultationFee || 0) + (appointment.hospitalCharges || 0)) }}</td>
               </tr>
             </tbody>
           </table>

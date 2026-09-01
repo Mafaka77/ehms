@@ -98,6 +98,12 @@
                 <td class="px-2 py-3 text-center font-mono">1</td>
                 <td class="px-2 py-3 text-right font-mono font-semibold">{{ formatCurrency(visit.consultationFee) }}</td>
               </tr>
+              <tr v-if="visit.hospitalCharges" class="hover:bg-slate-50/50">
+                <td class="px-2 py-3 font-medium text-slate-800">Hospital Charge</td>
+                <td class="px-2 py-3 text-right font-mono">{{ formatCurrency(visit.hospitalCharges) }}</td>
+                <td class="px-2 py-3 text-center font-mono">1</td>
+                <td class="px-2 py-3 text-right font-mono font-semibold">{{ formatCurrency(visit.hospitalCharges) }}</td>
+              </tr>
             </tbody>
           </table>
 
@@ -373,9 +379,10 @@ const totalChargesAmount = computed(() => {
 })
 
 const consultationStatus = computed(() => {
-  if (props.visit.consultationFee === 0 && !consultationBill.value) return 'Paid'
+  const totalConsultationAndHospital = (props.visit.consultationFee || 0) + (props.visit.hospitalCharges || 0)
+  if (totalConsultationAndHospital === 0 && !consultationBill.value) return 'Paid'
   if (!consultationBill.value) return 'Unbilled'
-  if (consultationBill.value.status === 'PAID' || props.visit.consultationFee === 0) return 'Paid'
+  if (consultationBill.value.status === 'PAID' || totalConsultationAndHospital === 0) return 'Paid'
   if (consultationBill.value.status === 'PARTIALLY_PAID') return 'Partial'
   return 'Billed'
 })
@@ -389,8 +396,8 @@ const dischargeStatus = computed(() => {
 })
 
 const canDischarge = computed(() => {
-  // Can discharge if consultation is paid (or 0) AND discharge bill is either fully paid or not needed (no charges / 0 amount)
-  const isConsultationPaid = consultationBill.value?.status === 'PAID' || props.visit.consultationFee === 0
+  const totalConsultationAndHospital = (props.visit.consultationFee || 0) + (props.visit.hospitalCharges || 0)
+  const isConsultationPaid = consultationBill.value?.status === 'PAID' || totalConsultationAndHospital === 0
   const isDischargePaid = patientCharges.value.length === 0 || dischargeBill.value?.status === 'PAID' || dischargeBill.value?.netAmount === 0
   return isConsultationPaid && isDischargePaid
 })

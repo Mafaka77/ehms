@@ -100,6 +100,12 @@
                 <td class="px-2 py-3 text-center font-mono">1</td>
                 <td class="px-2 py-3 text-right font-mono font-semibold">{{ formatCurrency(appointment.consultationFee) }}</td>
               </tr>
+              <tr v-if="appointment.hospitalCharges" class="hover:bg-slate-50/50">
+                <td class="px-2 py-3 font-medium text-slate-800">Hospital Charge</td>
+                <td class="px-2 py-3 text-right font-mono">{{ formatCurrency(appointment.hospitalCharges) }}</td>
+                <td class="px-2 py-3 text-center font-mono">1</td>
+                <td class="px-2 py-3 text-right font-mono font-semibold">{{ formatCurrency(appointment.hospitalCharges) }}</td>
+              </tr>
             </tbody>
           </table>
 
@@ -572,9 +578,10 @@ const unbilledChargesCount = computed(() => {
 })
 
 const consultationStatus = computed(() => {
-  if (props.appointment.consultationFee === 0 && !consultationBill.value) return 'Paid'
+  const totalConsultationAndHospital = (props.appointment.consultationFee || 0) + (props.appointment.hospitalCharges || 0)
+  if (totalConsultationAndHospital === 0 && !consultationBill.value) return 'Paid'
   if (!consultationBill.value) return 'Unbilled'
-  if (consultationBill.value.status === 'PAID' || props.appointment.consultationFee === 0) return 'Paid'
+  if (consultationBill.value.status === 'PAID' || totalConsultationAndHospital === 0) return 'Paid'
   if (consultationBill.value.status === 'PARTIALLY_PAID') return 'Partial'
   return 'Billed'
 })
@@ -591,11 +598,12 @@ const loadingConsultation = ref(false)
 const generateConsultationBill = async () => {
   loadingConsultation.value = true
   try {
+    const consultationFee = props.appointment.consultationFee || 0
     const payload = {
       opdAppointmentId: props.appointment._id,
-      discountAmount: showDiscount.value ? props.appointment.consultationFee : 0,
+      discountAmount: showDiscount.value ? consultationFee : 0,
       discountType: showDiscount.value ? (discountMode.value === 'free' ? 'Free Clinic' : 'Doctor Discount') : 'Free Clinic',
-      discountRemarks: showDiscount.value ? (discountRemarks.value || (discountMode.value === 'free' ? 'Free Clinic 100%' : `Doctor Discount` + (selectedDoctor.value ? ` - ${selectedDoctor.value.fullName}` : ''))) : ''
+      discountRemarks: showDiscount.value ? (discountRemarks.value || (discountMode.value === 'free' ? 'Free Clinic (Doctor Consultation Waived)' : `Doctor Discount` + (selectedDoctor.value ? ` - ${selectedDoctor.value.fullName}` : ''))) : ''
     }
     if (showDiscount.value && discountMode.value === 'doctor' && selectedDoctor.value) {
       payload.doctorId = selectedDoctor.value._id

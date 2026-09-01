@@ -719,7 +719,10 @@ exports.getIpdOrdersByAdmission = async (admissionId) => {
             .sort({ createdAt: -1 })
 
         const ordersWithItems = await Promise.all(orders.map(async (order) => {
-            const items = await MedicineIpdOrderItem.find({ medicineIpdOrderId: order._id }).populate('medicineId')
+            const items = await MedicineIpdOrderItem.find({ medicineIpdOrderId: order._id })
+                .populate('medicineId')
+                .populate('returnRequestedBy', 'fullName')
+                .populate('returnApprovedBy', 'fullName')
             return {
                 ...order.toObject(),
                 items
@@ -741,7 +744,10 @@ exports.getAllIpdOrders = async (query = {}) => {
         const search = query.search
 
         let filter = {}
-        if (status) {
+        if (status === 'RETURN_REQUESTED') {
+            const requestedItemOrderIds = await MedicineIpdOrderItem.distinct('medicineIpdOrderId', { returnStatus: 'REQUESTED' })
+            filter._id = { $in: requestedItemOrderIds }
+        } else if (status) {
             filter.status = status
         }
         if (search) {
@@ -770,10 +776,14 @@ exports.getAllIpdOrders = async (query = {}) => {
             .limit(limit)
 
         const ordersWithItems = await Promise.all(orders.map(async (order) => {
-            const items = await MedicineIpdOrderItem.find({ medicineIpdOrderId: order._id }).populate('medicineId')
+            const items = await MedicineIpdOrderItem.find({ medicineIpdOrderId: order._id })
+                .populate('medicineId')
+                .populate('returnRequestedBy', 'fullName')
+                .populate('returnApprovedBy', 'fullName')
             return {
                 ...order.toObject(),
-                items
+                items,
+                hasReturnRequest: items.some(i => i.returnStatus === 'REQUESTED')
             }
         }))
 
@@ -887,6 +897,170 @@ exports.updateIpdOrderStatus = async (orderId, status, userId) => {
     }
 }
 
+exports.requestReturnIpdMedicineItem = async (itemId, returnQty, reason, userId) => {
+    try {
+        const item = await MedicineIpdOrderItem.findById(itemId).populate('medicineId')
+        if (!item) {
+            const error = new Error('Medicine order item not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const maxReturnable = item.issuedQuantity - (item.returnedQuantity || 0)
+        if (returnQty <= 0 || returnQty > maxReturnable) {
+            const error = new Error(`Invalid return quantity. Max returnable: ${maxReturnable}`)
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        if (item.returnStatus === 'REQUESTED') {
+            const error = new Error('A return request is already pending for this medication item')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        item.returnStatus = 'REQUESTED'
+        item.returnRequestedQuantity = returnQty
+        item.returnReason = reason || null
+        item.returnRequestedBy = userId || null
+        item.returnRequestedAt = new Date()
+        item.returnRejectionReason = null
+
+        await item.save()
+        return item
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.cancelReturnRequestIpdMedicineItem = async (itemId, userId) => {
+    try {
+        const item = await MedicineIpdOrderItem.findById(itemId).populate('medicineId')
+        if (!item) {
+            const error = new Error('Medicine order item not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        if (item.returnStatus !== 'REQUESTED') {
+            const error = new Error('No pending return request found to cancel')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        item.returnStatus = 'NONE'
+        item.returnRequestedQuantity = 0
+        item.returnReason = null
+        item.returnRequestedBy = null
+        item.returnRequestedAt = null
+
+        await item.save()
+        return item
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.approveReturnIpdMedicineItem = async (itemId, userId, approvedQty, remarks) => {
+    try {
+        const item = await MedicineIpdOrderItem.findById(itemId).populate('medicineId')
+        if (!item) {
+            const error = new Error('Medicine order item not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        if (item.returnStatus !== 'REQUESTED') {
+            const error = new Error('Item does not have a pending return request')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        const returnQty = approvedQty !== undefined ? Number(approvedQty) : item.returnRequestedQuantity
+        const maxReturnable = item.issuedQuantity - (item.returnedQuantity || 0)
+        if (returnQty <= 0 || returnQty > maxReturnable) {
+            const error = new Error(`Cannot approve return. Max returnable quantity: ${maxReturnable}`)
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        item.returnedQuantity = (item.returnedQuantity || 0) + returnQty
+        item.quantity = item.issuedQuantity - item.returnedQuantity
+        item.amount = item.quantity * (item.rate || 0)
+        item.returnStatus = 'APPROVED'
+        item.returnApprovedBy = userId || null
+        item.returnApprovedAt = new Date()
+        item.returnRequestedQuantity = 0
+
+        const combinedRemarks = remarks || item.returnReason
+        if (combinedRemarks) {
+            item.remarks = item.remarks ? `${item.remarks} | Returned: ${combinedRemarks}` : `Returned: ${combinedRemarks}`
+        }
+
+        await item.save()
+
+        // RESTORE STOCK TO MEDICINE BATCH
+        const MedicineBatch = require('./medicine_batch.model')
+        const medId = item.medicineId?._id || item.medicineId
+        
+        let targetBatch = await MedicineBatch.findOne({ 
+            medicineId: medId, 
+            isActive: true 
+        }).sort({ expiryDate: 1 })
+
+        if (!targetBatch) {
+            targetBatch = await MedicineBatch.findOne({ medicineId: medId }).sort({ createdAt: -1 })
+        }
+
+        if (targetBatch) {
+            targetBatch.currentStock = (targetBatch.currentStock || 0) + Number(returnQty)
+            await targetBatch.save()
+        }
+
+        // Update original positive patient charge document inside PatientCharge
+        const PatientCharge = require('../common/patient_charge.model')
+        const charge = await PatientCharge.findOne({ sourceId: item._id })
+        if (charge) {
+            charge.quantity = item.quantity
+            charge.amount = charge.quantity * charge.rate
+            charge.description = `Dispensed: ${item.quantity} units of ${item.medicineId?.medicineName || 'medicine'}`
+            await charge.save()
+        }
+
+        return item
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.rejectReturnIpdMedicineItem = async (itemId, userId, rejectionReason) => {
+    try {
+        const item = await MedicineIpdOrderItem.findById(itemId).populate('medicineId')
+        if (!item) {
+            const error = new Error('Medicine order item not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        if (item.returnStatus !== 'REQUESTED') {
+            const error = new Error('Item does not have a pending return request')
+            error.status = STATUS_CODES.BAD_REQUEST
+            throw error
+        }
+
+        item.returnStatus = 'REJECTED'
+        item.returnRejectionReason = rejectionReason || 'Rejected by Pharmacist'
+        item.returnRequestedQuantity = 0
+        item.returnApprovedBy = userId || null
+        item.returnApprovedAt = new Date()
+
+        await item.save()
+        return item
+    } catch (error) {
+        throw error
+    }
+}
+
 exports.returnIpdMedicineItem = async (itemId, returnQty, remarks) => {
     try {
         const item = await MedicineIpdOrderItem.findById(itemId).populate('medicineId')
@@ -910,6 +1084,7 @@ exports.returnIpdMedicineItem = async (itemId, returnQty, remarks) => {
         // Update both quantity and amount on the order item to reflect the net remaining quantity
         item.quantity = item.issuedQuantity - item.returnedQuantity
         item.amount = item.quantity * (item.rate || 0)
+        item.returnStatus = 'APPROVED'
         await item.save()
 
         // RESTORE STOCK TO MEDICINE BATCH

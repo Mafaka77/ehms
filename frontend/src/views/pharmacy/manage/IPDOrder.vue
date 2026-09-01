@@ -10,12 +10,18 @@ const loading = ref(false)
 const orders = ref([])
 const totalPending = ref(0)
 const totalDispensed = ref(0)
+const totalReturns = ref(0)
+
+const processingReturn = ref(false)
+const showRejectReturnModal = ref(false)
+const selectedItemForReject = ref(null)
+const rejectReason = ref('')
 
 const filters = ref({
   page: 1,
   limit: 10,
   search: '',
-  status: '' // All, PENDING, ISSUED, CANCELLED
+  status: '' // All, PENDING, RETURN_REQUESTED, ISSUED, CANCELLED
 })
 
 const pagination = ref({
@@ -59,6 +65,12 @@ const fetchKpis = async () => {
   const issuedRes = await pharmacyStore.fetchIpdOrders(1, 100, '', 'ISSUED')
   if (issuedRes.success) {
     totalDispensed.value = issuedRes.pagination?.total || issuedRes.data.length
+  }
+
+  // Fetch return requests count
+  const returnRes = await pharmacyStore.fetchIpdOrders(1, 100, '', 'RETURN_REQUESTED')
+  if (returnRes.success) {
+    totalReturns.value = returnRes.pagination?.total || returnRes.data.length
   }
 }
 
@@ -125,6 +137,53 @@ const updateStatus = async (orderId, newStatus) => {
   updatingStatus.value = false
 }
 
+const approveReturnItem = async (item) => {
+  if (!confirm(`Approve return of ${item.returnRequestedQuantity} unit(s) of ${item.medicineId?.medicineName || 'this medicine'}? Stock and patient charges will be automatically adjusted.`)) return
+
+  processingReturn.value = true
+  const res = await pharmacyStore.approveReturnIpdMedicineItem(item._id, item.returnRequestedQuantity, item.returnReason)
+  if (res.success) {
+    snackbarStore.show({ message: 'Medicine return approved and inventory restored.', type: 'success' })
+    await fetchIpdOrders()
+    await fetchKpis()
+    if (selectedOrder.value) {
+      const updatedOrder = orders.value.find(o => o._id === selectedOrder.value._id)
+      if (updatedOrder) selectedOrder.value = updatedOrder
+    }
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
+  processingReturn.value = false
+}
+
+const openRejectReturnModal = (item) => {
+  selectedItemForReject.value = item
+  rejectReason.value = ''
+  showRejectReturnModal.value = true
+}
+
+const submitRejectReturn = async () => {
+  if (!selectedItemForReject.value) return
+  processingReturn.value = true
+  const res = await pharmacyStore.rejectReturnIpdMedicineItem(
+    selectedItemForReject.value._id,
+    rejectReason.value || 'Rejected by Pharmacist'
+  )
+  if (res.success) {
+    snackbarStore.show({ message: 'Medicine return request rejected.', type: 'success' })
+    showRejectReturnModal.value = false
+    await fetchIpdOrders()
+    await fetchKpis()
+    if (selectedOrder.value) {
+      const updatedOrder = orders.value.find(o => o._id === selectedOrder.value._id)
+      if (updatedOrder) selectedOrder.value = updatedOrder
+    }
+  } else {
+    snackbarStore.show({ message: res.message, type: 'error' })
+  }
+  processingReturn.value = false
+}
+
 let pollingInterval = null
 
 const pollData = async () => {
@@ -149,8 +208,8 @@ onUnmounted(() => {
 <template>
   <div class="space-y-6">
     <!-- Stats Banner -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
         <div>
           <span class="text-slate-400 text-xs font-bold tracking-wider uppercase block">Pending Requisitions</span>
           <span class="text-2xl font-extrabold text-slate-800 mt-1 block">{{ totalPending }} Orders</span>
@@ -161,7 +220,18 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm flex items-center justify-between">
+      <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
+        <div>
+          <span class="text-slate-400 text-xs font-bold tracking-wider uppercase block">Return Requests</span>
+          <span class="text-2xl font-extrabold text-amber-600 mt-1 block">{{ totalReturns }} Requests</span>
+          <span class="text-amber-600 text-xs font-semibold mt-1 block">From IPD nursing stations</span>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+        </div>
+      </div>
+
+      <div class="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex items-center justify-between">
         <div>
           <span class="text-slate-400 text-xs font-bold tracking-wider uppercase block">Issued / Dispensed</span>
           <span class="text-2xl font-extrabold text-slate-800 mt-1 block">{{ totalDispensed }} Orders</span>
@@ -189,6 +259,7 @@ onUnmounted(() => {
           >
             <option value="">All Statuses</option>
             <option value="PENDING">PENDING</option>
+            <option value="RETURN_REQUESTED">RETURN REQUESTS ({{ totalReturns }})</option>
             <option value="ISSUED">ISSUED</option>
             <option value="CANCELLED">CANCELLED</option>
           </select>
@@ -237,7 +308,12 @@ onUnmounted(() => {
             <tr v-for="order in orders" :key="order._id" class="hover:bg-slate-50/50 transition-colors">
               <td class="px-6 py-4">
                 <div class="flex flex-col gap-1 items-start">
-                  <span class="font-mono font-bold text-slate-800 text-sm">{{ order.requestNo }}</span>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-mono font-bold text-slate-800 text-sm">{{ order.requestNo }}</span>
+                    <span v-if="order.hasReturnRequest || order.items?.some(i => i.returnStatus === 'REQUESTED')" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 border border-amber-200 animate-pulse">
+                      Return Requested
+                    </span>
+                  </div>
                   <span class="px-2 py-0.5 rounded text-[9px] font-bold border" :class="getPriorityColor(order.priority)">
                     {{ order.priority }}
                   </span>
@@ -364,6 +440,14 @@ onUnmounted(() => {
             </p>
           </div>
 
+          <!-- Return Request Alert in Modal -->
+          <div v-if="selectedOrder?.items?.some(i => i.returnStatus === 'REQUESTED')" class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2.5 text-amber-900 font-semibold">
+              <svg class="w-5 h-5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+              <span>This requisition has pending medicine return requests awaiting your review and approval.</span>
+            </div>
+          </div>
+
           <!-- Items Checklist -->
           <div class="space-y-2">
             <span class="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Requested Medication Checklist</span>
@@ -375,12 +459,13 @@ onUnmounted(() => {
                     <th class="px-4 py-2.5">Medicine Name</th>
                     <th class="px-4 py-2.5">Generic / Strength</th>
                     <th class="px-4 py-2.5 text-center">Req. Qty</th>
-                    <th class="px-4 py-2.5 text-center">Issued Qty</th>
-                    <th class="px-4 py-2.5">Directions</th>
+                    <th class="px-4 py-2.5 text-center">Issued</th>
+                    <th class="px-4 py-2.5 text-center">Returned</th>
+                    <th class="px-4 py-2.5">Status / Actions</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-slate-600">
-                  <tr v-for="item in selectedOrder?.items" :key="item._id" class="hover:bg-slate-50/30">
+                  <tr v-for="item in selectedOrder?.items" :key="item._id" class="hover:bg-slate-50/30" :class="{ 'bg-amber-50/40': item.returnStatus === 'REQUESTED' }">
                     <td class="px-4 py-2.5 font-bold text-slate-800">
                       {{ item.medicineId?.medicineName }}
                     </td>
@@ -391,7 +476,56 @@ onUnmounted(() => {
                     <td class="px-4 py-2.5 text-center font-bold" :class="item.issuedQuantity > 0 ? 'text-emerald-600' : 'text-slate-400'">
                       {{ item.issuedQuantity }}
                     </td>
-                    <td class="px-4 py-2.5 text-slate-500 font-medium">{{ item.remarks || '-' }}</td>
+                    <td class="px-4 py-2.5 text-center font-bold" :class="item.returnedQuantity > 0 ? 'text-rose-600' : 'text-slate-400'">
+                      {{ item.returnedQuantity || 0 }}
+                    </td>
+                    <td class="px-4 py-2.5">
+                      <!-- Pending Return Request Action Panel -->
+                      <div v-if="item.returnStatus === 'REQUESTED'" class="space-y-1.5">
+                        <div class="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+                          <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                          Return Requested: {{ item.returnRequestedQuantity }} Qty
+                        </div>
+                        <p v-if="item.returnReason" class="text-[10px] text-slate-600 italic bg-white/80 p-1.5 rounded border border-amber-200">
+                          "{{ item.returnReason }}"
+                        </p>
+                        <p v-if="item.returnRequestedBy?.fullName" class="text-[9px] text-slate-400">
+                          By: {{ item.returnRequestedBy.fullName }}
+                        </p>
+                        <div class="flex items-center gap-1.5 pt-1">
+                          <button 
+                            @click="approveReturnItem(item)"
+                            :disabled="processingReturn"
+                            type="button"
+                            class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg text-[10px] font-bold transition-all flex items-center gap-1 shadow-xs cursor-pointer"
+                          >
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                            Approve
+                          </button>
+                          <button 
+                            @click="openRejectReturnModal(item)"
+                            :disabled="processingReturn"
+                            type="button"
+                            class="px-2 py-1 bg-white hover:bg-rose-50 border border-slate-200 text-rose-600 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+
+                      <!-- Approved Status -->
+                      <span v-else-if="item.returnStatus === 'APPROVED'" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 inline-flex items-center gap-1">
+                        ✓ Returned
+                      </span>
+
+                      <!-- Rejected Status -->
+                      <span v-else-if="item.returnStatus === 'REJECTED'" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1" :title="'Reason: ' + (item.returnRejectionReason || '')">
+                        ✕ Return Rejected
+                      </span>
+
+                      <!-- Normal Remarks -->
+                      <span v-else class="text-slate-500 font-medium">{{ item.remarks || '-' }}</span>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -438,6 +572,52 @@ onUnmounted(() => {
               Dispense Medication
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reject Return Confirmation Modal -->
+    <div 
+      v-if="showRejectReturnModal" 
+      class="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm"
+    >
+      <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden p-6 space-y-4 animate-in zoom-in-95 duration-150">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-800 text-sm">Reject Return Request</h3>
+            <p class="text-xs text-slate-400">Medicine: {{ selectedItemForReject?.medicineId?.medicineName }}</p>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-slate-600 uppercase tracking-wide">Reason for Rejection</label>
+          <textarea 
+            v-model="rejectReason"
+            rows="3"
+            placeholder="e.g. Vial already opened/compromised, return window passed..."
+            class="w-full px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-1 focus:ring-rose-500 text-slate-700 text-xs"
+          ></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button 
+            type="button"
+            @click="showRejectReturnModal = false"
+            class="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-bold rounded-xl hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            type="button"
+            @click="submitRejectReturn"
+            :disabled="processingReturn"
+            class="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+          >
+            Confirm Rejection
+          </button>
         </div>
       </div>
     </div>

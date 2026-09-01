@@ -471,6 +471,58 @@ export const usePharmacyStore = defineStore('pharmacy', {
       }
     },
 
+    async requestReturnIpdMedicineItem(itemId, quantity, reason) {
+      this.loading = true
+      try {
+        const response = await api.post('/pharmacy/ipd-orders/return-request', { itemId, quantity, reason })
+        return { success: true, data: response.data.data, message: response.data.message || 'Return request submitted successfully' }
+      } catch (err) {
+        const message = err.response?.data?.message || err.message || 'Failed to submit return request'
+        return { success: false, message }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async cancelReturnIpdMedicineItem(itemId) {
+      this.loading = true
+      try {
+        const response = await api.post('/pharmacy/ipd-orders/return-cancel', { itemId })
+        return { success: true, data: response.data.data, message: response.data.message || 'Return request cancelled' }
+      } catch (err) {
+        const message = err.response?.data?.message || err.message || 'Failed to cancel return request'
+        return { success: false, message }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async approveReturnIpdMedicineItem(itemId, approvedQuantity, remarks) {
+      this.loading = true
+      try {
+        const response = await api.post('/pharmacy/ipd-orders/return-approve', { itemId, approvedQuantity, remarks })
+        return { success: true, data: response.data.data, message: response.data.message || 'Return approved successfully' }
+      } catch (err) {
+        const message = err.response?.data?.message || err.message || 'Failed to approve return'
+        return { success: false, message }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async rejectReturnIpdMedicineItem(itemId, rejectionReason) {
+      this.loading = true
+      try {
+        const response = await api.post('/pharmacy/ipd-orders/return-reject', { itemId, rejectionReason })
+        return { success: true, data: response.data.data, message: response.data.message || 'Return request rejected' }
+      } catch (err) {
+        const message = err.response?.data?.message || err.message || 'Failed to reject return'
+        return { success: false, message }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async returnIpdMedicineItem(itemId, quantity, remarks) {
       this.loading = true
       try {
