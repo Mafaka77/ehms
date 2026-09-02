@@ -280,6 +280,13 @@ watch(() => props.admission?.bedId?._id || props.admission?.bedId, async () => {
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
                   Active Bed
                 </span>
+                <span 
+                  v-else-if="item.bedId?.status === 'RESERVED'" 
+                  class="px-2 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                  Reserved
+                </span>
               </h4>
               <p class="text-xs text-slate-500 font-medium mt-1">
                 Ward: <strong class="text-slate-700">{{ item.wardId?.name || 'N/A' }}</strong>

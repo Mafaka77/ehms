@@ -48,6 +48,7 @@ const getLocalDatetimeString = () => {
 }
 
 // -- STEP 2: REGISTER VISIT --
+const isHospitalChargeFree = ref(false)
 const visitForm = ref({
   doctorId: '',
   arrivalDateTime: getLocalDatetimeString(), // Format: YYYY-MM-DDThh:mm
@@ -59,12 +60,17 @@ const visitForm = ref({
 })
 const isRegistering = ref(false)
 
+watch(isHospitalChargeFree, (isFree) => {
+  visitForm.value.hospitalCharges = isFree ? 0 : 100
+})
+
 const resetModal = () => {
   selectedPatient.value = null
   searchQuery.value = ''
   patientStore.searchResults = []
   showNewPatientForm.value = false
   currentStep.value = 1
+  isHospitalChargeFree.value = false
   visitForm.value = {
     doctorId: '',
     arrivalDateTime: getLocalDatetimeString(),
@@ -171,7 +177,7 @@ const submitVisit = async () => {
     ...visitForm.value,
     arrivalDateTime: istArrivalDateTime,
     patientId: selectedPatient.value._id,
-    hospitalCharges: Number(visitForm.value.hospitalCharges || 100)
+    hospitalCharges: Number(visitForm.value.hospitalCharges != null ? visitForm.value.hospitalCharges : 0)
   }
 
   const res = await emergencyStore.registerVisit(payload)
@@ -347,6 +353,7 @@ const submitVisit = async () => {
               type="number"
               id="consultationFee"
               label="Emergency Rate (₹)"
+              min="0"
               required
             />
             <BaseInput 
@@ -357,6 +364,27 @@ const submitVisit = async () => {
             />
           </div>
 
+          <!-- Hospital Charge Free Switch -->
+          <div class="flex items-center justify-between p-3 bg-slate-50 border border-slate-200/70 rounded-xl">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold text-slate-700">Hospital Charge Free</span>
+              <span v-if="isHospitalChargeFree" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                ₹0 (Free)
+              </span>
+              <span v-else class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                ₹100
+              </span>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer select-none">
+              <input 
+                type="checkbox" 
+                v-model="isHospitalChargeFree" 
+                class="sr-only peer" 
+              />
+              <div class="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+            </label>
+          </div>
+
           <!-- Fee Breakdown Info -->
           <div class="bg-slate-50 border border-slate-200/60 rounded-xl p-3 text-xs space-y-1.5">
             <div class="flex justify-between text-slate-600">
@@ -365,7 +393,7 @@ const submitVisit = async () => {
             </div>
             <div class="flex justify-between text-slate-600">
               <span>Hospital Charge:</span>
-              <span class="font-mono font-semibold">₹{{ visitForm.hospitalCharges }}</span>
+              <span class="font-mono font-semibold">₹{{ visitForm.hospitalCharges ?? 0 }}</span>
             </div>
             <div class="flex justify-between text-slate-900 font-bold border-t border-slate-200 pt-1.5">
               <span>Total Registration Amount:</span>

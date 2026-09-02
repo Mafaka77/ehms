@@ -52,7 +52,7 @@ const wardOptions = computed(() => {
 const bedOptions = computed(() => {
   return (availableBeds.value || []).map(bed => ({
     value: bed._id,
-    label: `Bed ${bed.bedNo} (${bed.bedType} - ₹${bed.dailyRate}/day)`
+    label: `Bed ${bed.bedNo} (${bed.bedType} - ₹${bed.dailyRate}/day)${bed.status === 'RESERVED' ? ' [Reserved for this Patient]' : ''}`
   }))
 })
 
@@ -109,6 +109,19 @@ const transferForm = ref({
 })
 const availableBeds = ref([])
 
+const isTargetWardOT = computed(() => {
+  if (!transferForm.value.wardId) return false
+  const targetWard = (wardStore.wards || []).find(w => w._id === transferForm.value.wardId)
+  if (!targetWard) return false
+  const name = (targetWard.name || '').toLowerCase()
+  const wardType = (targetWard.wardType || '').toLowerCase()
+  return /operation theat(er|re)/i.test(name) || 
+         /operation theat(er|re)/i.test(wardType) || 
+         name.includes('operation theater') || 
+         name.includes('operation theatre') || 
+         wardType === 'operation theater'
+})
+
 const openTransferModal = async () => {
   transferForm.value = {
     wardId: '',
@@ -126,8 +139,15 @@ const onWardChange = async () => {
     availableBeds.value = []
     return
   }
-  const beds = await wardStore.fetchBeds(transferForm.value.wardId, 'AVAILABLE')
-  availableBeds.value = beds
+  const beds = await wardStore.fetchBeds(transferForm.value.wardId, '')
+  let reservedBedIds = []
+  if (admission.value?._id) {
+    const histRes = await admissionStore.fetchAdmissionBedHistory(admission.value._id)
+    if (histRes.success && histRes.data) {
+      reservedBedIds = histRes.data.map(h => typeof h.bedId === 'object' ? h.bedId?._id : h.bedId)
+    }
+  }
+  availableBeds.value = (beds || []).filter(b => b.status === 'AVAILABLE' || (b.status === 'RESERVED' && reservedBedIds.includes(b._id)))
 }
 
 watch(() => transferForm.value.wardId, () => {
@@ -931,6 +951,17 @@ onMounted(async () => {
           <p v-if="transferForm.wardId && availableBeds.length === 0" class="text-[10px] text-rose-500 font-semibold mt-1">
             No available beds in the selected ward.
           </p>
+        </div>
+
+        <!-- OT Reservation Notice -->
+        <div v-if="isTargetWardOT" class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5">
+          <svg class="w-4 h-4 text-amber-600 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div class="text-xs text-amber-800">
+            <span class="font-bold">Operation Theater Transfer:</span> 
+            The patient's current bed (<strong>Bed {{ admission?.bedId?.bedNo || '' }}</strong>) will be marked as <span class="font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded text-[10px]">RESERVED</span> so no other patient can be allotted to it.
+          </div>
         </div>
 
         <!-- Transfer Reason -->

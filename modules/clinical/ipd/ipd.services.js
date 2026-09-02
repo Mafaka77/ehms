@@ -485,6 +485,16 @@ exports.updateAdmission = async (id, data) => {
                         await existingCharge.save({ session })
                     }
                 }
+
+                // Also free any beds that were marked RESERVED for this admission
+                const allHistories = await AdmissionBedHistory.find({ admissionId: id }).session(session)
+                const histBedIds = allHistories.map(h => h.bedId)
+                if (histBedIds.length > 0) {
+                    await Bed.updateMany(
+                        { _id: { $in: histBedIds }, status: 'RESERVED' },
+                        { $set: { status: 'AVAILABLE' } }
+                    ).session(session)
+                }
             } else if (data.status === 'ADMITTED') {
                 const bed = await Bed.findById(admission.bedId).session(session)
                 if (bed) {
@@ -515,25 +525,57 @@ exports.updateAdmission = async (id, data) => {
 
         // If bed changes
         if (data.bedId && data.bedId.toString() !== admission.bedId.toString()) {
-            // Free the old bed
+            const AdmissionBedHistory = require('./admission_bed_history.model')
+            const Ward = require('./ward.model')
+
+            // Fetch new bed
+            const newBed = await Bed.findById(data.bedId).session(session)
+            if (!newBed) {
+                const error = new Error('New bed not found')
+                error.status = STATUS_CODES.NOT_FOUND
+                throw error
+            }
+
+            // Check if new bed is available OR if it was previously reserved for this specific admission
+            let isAllowedBed = newBed.status === 'AVAILABLE'
+            if (newBed.status === 'RESERVED') {
+                const previouslyReservedByThisAdmission = await AdmissionBedHistory.findOne({
+                    admissionId: id,
+                    bedId: newBed._id
+                }).session(session)
+                if (previouslyReservedByThisAdmission) {
+                    isAllowedBed = true
+                }
+            }
+
+            if (!isAllowedBed) {
+                const error = new Error(newBed.status === 'RESERVED' ? 'Selected bed is reserved for another patient' : 'New bed is not available')
+                error.status = STATUS_CODES.BAD_REQUEST
+                throw error
+            }
+
+            // Check if destination ward contains "Operation Theater" or "Operation Theatre" in name/wardType
+            const destWard = await Ward.findById(newBed.wardId).session(session)
+            const destWardName = (destWard?.name || '').toLowerCase()
+            const destWardType = (destWard?.wardType || '').toLowerCase()
+            const isDestinationOT = /operation theat(er|re)/i.test(destWardName) || 
+                                    /operation theat(er|re)/i.test(destWardType) || 
+                                    destWardName.includes('operation theater') || 
+                                    destWardName.includes('operation theatre') || 
+                                    destWardType === 'operation theater'
+
+            // Free or Reserve the old bed
             const oldBed = await Bed.findById(admission.bedId).session(session)
             if (oldBed) {
-                oldBed.status = 'AVAILABLE'
+                oldBed.status = isDestinationOT ? 'RESERVED' : 'AVAILABLE'
                 await oldBed.save({ session })
             }
 
             // Occupy the new bed
-            const newBed = await Bed.findById(data.bedId).session(session)
-            if (!newBed || newBed.status !== 'AVAILABLE') {
-                const error = new Error('New bed is not available')
-                error.status = STATUS_CODES.BAD_REQUEST
-                throw error
-            }
             newBed.status = 'OCCUPIED'
             await newBed.save({ session })
 
             // Update bed history
-            const AdmissionBedHistory = require('./admission_bed_history.model')
             const currentHistory = await AdmissionBedHistory.findOne({ admissionId: id, isCurrent: true }).session(session)
             if (currentHistory) {
                 currentHistory.toDate = new Date()
@@ -554,19 +596,37 @@ exports.updateAdmission = async (id, data) => {
                 }
             }
 
-            await AdmissionBedHistory.create([{
+            // Check if there is an existing bed history for this admission on this bed (e.g. returning to reserved bed from OT)
+            const existingBedHistory = await AdmissionBedHistory.findOne({
                 admissionId: id,
-                wardId: newBed.wardId,
                 bedId: newBed._id,
-                fromDate: new Date(),
-                toDate: null,
-                dailyRate: newBed.dailyRate,
-                totalDays: 0,
-                totalAmount: 0,
-                transferReason: data.transferReason || 'Bed transfer / reassignment',
-                isCurrent: true,
-                createdBy: data.createdBy || null
-            }], { session })
+                isCurrent: false
+            }).sort({ createdAt: -1 }).session(session)
+
+            if (existingBedHistory) {
+                existingBedHistory.toDate = null
+                existingBedHistory.isCurrent = true
+                existingBedHistory.totalDays = 0
+                existingBedHistory.totalAmount = 0
+                if (data.transferReason) {
+                    existingBedHistory.transferReason = data.transferReason
+                }
+                await existingBedHistory.save({ session })
+            } else {
+                await AdmissionBedHistory.create([{
+                    admissionId: id,
+                    wardId: newBed.wardId,
+                    bedId: newBed._id,
+                    fromDate: new Date(),
+                    toDate: null,
+                    dailyRate: newBed.dailyRate,
+                    totalDays: 0,
+                    totalAmount: 0,
+                    transferReason: data.transferReason || (isDestinationOT ? 'Transfer to Operation Theater' : 'Bed transfer / reassignment'),
+                    isCurrent: true,
+                    createdBy: data.createdBy || null
+                }], { session })
+            }
         }
 
         Object.assign(admission, data)
@@ -883,14 +943,20 @@ exports.deleteAdmission = async (id) => {
             throw error
         }
 
-        // 1. Release the occupied bed if the patient is currently admitted
-        if (admission.status === 'ADMITTED' && admission.bedId) {
-            const Bed = require('./bed.model')
-            await Bed.findByIdAndUpdate(admission.bedId, { status: 'AVAILABLE' }).session(session)
+        // 1. Release the occupied bed or any reserved beds for this admission
+        const Bed = require('./bed.model')
+        const AdmissionBedHistory = require('./admission_bed_history.model')
+        const allHistories = await AdmissionBedHistory.find({ admissionId: id }).session(session)
+        const histBedIds = allHistories.map(h => h.bedId)
+        if (admission.bedId) histBedIds.push(admission.bedId)
+        if (histBedIds.length > 0) {
+            await Bed.updateMany(
+                { _id: { $in: histBedIds }, status: { $in: ['OCCUPIED', 'RESERVED'] } },
+                { $set: { status: 'AVAILABLE' } }
+            ).session(session)
         }
 
         // 2. Require all models for deletion
-        const AdmissionBedHistory = require('./admission_bed_history.model')
         const AdmissionDoctor = require('./admission_doctor.model')
         const AdmissionNote = require('./admission_note.model')
         const DoctorVisit = require('./admission_doctor_visit.model')
