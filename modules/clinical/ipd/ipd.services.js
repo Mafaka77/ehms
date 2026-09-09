@@ -7,6 +7,7 @@ const Doctor = require('../../hr/doctor.model')
 const AdmissionNote = require('./admission_note.model')
 const AdmissionAdvance = require('./admission_advance.model')
 const DischargeSummary = require('./discharge_summary.model')
+const NewbornDischargeSummary = require('./newborn_discharge_summary')
 const STATUS_CODES = require('../../../utils/statuscode')
 
 // ==========================================
@@ -287,6 +288,8 @@ exports.createAdmission = async (data) => {
         // 4. Create admission record
         const admissionData = {
             patientId: data.patientId,
+            isNewBorn: data.isNewBorn || false,
+            mothersId: data.mothersId || null,
             admissionDate: data.admissionDate ? new Date(data.admissionDate) : new Date(),
             admissionType: data.admissionType || 'NORMAL',
             payerType: data.payerType || 'NORMAL',
@@ -326,6 +329,7 @@ exports.createAdmission = async (data) => {
         // Populate and return
         return await Admission.findById(admission._id)
             .populate('patientId')
+            .populate('mothersId')
             .populate('consultantDoctorId')
             .populate({
                 path: 'bedId',
@@ -397,6 +401,7 @@ exports.getAllAdmissions = async (query = {}) => {
         const total = await Admission.countDocuments(filter)
         const admissions = await Admission.find(filter)
             .populate('patientId')
+            .populate('mothersId')
             .populate('consultantDoctorId')
             .populate({
                 path: 'bedId',
@@ -426,6 +431,7 @@ exports.getAdmissionById = async (id) => {
     try {
         const admission = await Admission.findById(id)
             .populate('patientId')
+            .populate('mothersId')
             .populate('consultantDoctorId')
             .populate({
                 path: 'bedId',
@@ -637,6 +643,7 @@ exports.updateAdmission = async (id, data) => {
 
         return await Admission.findById(id)
             .populate('patientId')
+            .populate('mothersId')
             .populate('consultantDoctorId')
             .populate({
                 path: 'bedId',
@@ -1754,6 +1761,170 @@ exports.deleteAdmissionBedHistory = async (id) => {
 
         await AdmissionBedHistory.deleteOne({ _id: id })
         return { success: true }
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.getNewbornDischargeSummary = async (admissionId) => {
+    try {
+        let summary = await NewbornDischargeSummary.findOne({ admissionId })
+            .populate('consultantId', 'fullName doctorCode specializationId')
+            .populate('preparedBy', 'fullName employeeCode')
+            .populate('patientId', 'patientCode fullName age gender mobileNo')
+            .lean()
+
+        if (!summary) {
+            const admission = await Admission.findById(admissionId)
+                .populate('patientId')
+                .populate('consultantDoctorId')
+                .lean()
+
+            if (!admission) {
+                const error = new Error('Admission record not found')
+                error.status = STATUS_CODES.NOT_FOUND
+                throw error
+            }
+
+            return {
+                admissionId: admission._id,
+                patientId: admission.patientId?._id || admission.patientId,
+                consultantId: admission.consultantDoctorId?._id || admission.consultantDoctorId,
+                dischargeDate: admission.dischargeDate || new Date(),
+                deliveryType: 'NVD',
+                deliveryDateTime: admission.admissionDate || new Date(),
+                babyStatusAtBirth: 'LIVE',
+                sex: admission.patientId?.gender === 'Female' ? 'FEMALE' : (admission.patientId?.gender === 'Male' ? 'MALE' : null),
+                birthWeightKg: null,
+                babyCried: 'CRIED_IMMEDIATELY',
+                apgar1Min: 9,
+                apgar5Min: 10,
+                dcc: 'DONE',
+                resuscitationRequired: false,
+                resuscitationDetails: null,
+                congenitalAnomalyPresent: false,
+                congenitalAnomalyDetails: null,
+                liquorStatus: 'CLEAR',
+                birthDoseVaccines: {
+                    hepB: { given: false, date: null },
+                    bcg: { given: false, date: null },
+                    opv: { given: false, date: null }
+                },
+                developedFever: false,
+                feverDate: null,
+                sepsisScreen: 'NOT_DONE',
+                antibiotics: {
+                    given: false,
+                    route: null,
+                    days: null,
+                    details: null
+                },
+                developedIcterus: false,
+                icterusTcbTsb: null,
+                phototherapy: { given: false, date: null },
+                exchangeTransfusion: { given: false, date: null },
+                feedingProblem: false,
+                feedingProblemDueTo: null,
+                dehydration: false,
+                dehydrationCorrectedWith: null,
+                feedingType: 'EXCLUSIVE_BREASTFEEDING',
+                otherSignificantEvents: null,
+                dischargeType: 'WITH_MEDICAL_ADVICE',
+                conditionAtDischarge: {
+                    isActive: true,
+                    feedsWell: true,
+                    noFever: true,
+                    icterus: null,
+                    tcbTsbValue: null,
+                    weightKg: null,
+                    lengthCm: null,
+                    headCircumferenceCm: null
+                },
+                advice: [
+                    'Vitamin D3 400 IU drop 1ml nikhatah vawi-1 (Kum 1- thleng)',
+                    'Thla 6 chhung hnute tui chauh pek tur. Tui/ORS pek loh tur.',
+                    'Vaccine a hun taka pek zel tur.',
+                    'Kum 2 tlin hma chu phone, TV, etc engmah entir loh tur.'
+                ],
+                followUp: {
+                    reviewDate: null,
+                    reviewTime: null,
+                    reviewLocation: 'Paediatric OPD or SOS'
+                },
+                remarks: null,
+                status: 'DRAFT',
+                isNew: true
+            }
+        }
+        return summary
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.saveNewbornDischargeSummary = async (admissionId, data, userId) => {
+    try {
+        const admission = await Admission.findById(admissionId)
+        if (!admission) {
+            const error = new Error('Admission record not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const patientId = data.patientId || admission.patientId
+        const consultantId = data.consultantId || admission.consultantDoctorId
+        const preparedBy = userId || consultantId
+
+        const updateData = {
+            admissionId,
+            patientId,
+            consultantId,
+            preparedBy,
+            dischargeDate: data.dischargeDate || new Date(),
+            deliveryType: data.deliveryType || null,
+            deliveryDateTime: data.deliveryDateTime || null,
+            babyStatusAtBirth: data.babyStatusAtBirth || 'LIVE',
+            sex: data.sex || null,
+            birthWeightKg: data.birthWeightKg !== undefined ? data.birthWeightKg : null,
+            babyCried: data.babyCried || null,
+            apgar1Min: data.apgar1Min !== undefined ? data.apgar1Min : null,
+            apgar5Min: data.apgar5Min !== undefined ? data.apgar5Min : null,
+            dcc: data.dcc || null,
+            resuscitationRequired: !!data.resuscitationRequired,
+            resuscitationDetails: data.resuscitationDetails || null,
+            congenitalAnomalyPresent: !!data.congenitalAnomalyPresent,
+            congenitalAnomalyDetails: data.congenitalAnomalyDetails || null,
+            liquorStatus: data.liquorStatus || null,
+            birthDoseVaccines: data.birthDoseVaccines || {},
+            developedFever: !!data.developedFever,
+            feverDate: data.feverDate || null,
+            sepsisScreen: data.sepsisScreen || null,
+            antibiotics: data.antibiotics || {},
+            developedIcterus: !!data.developedIcterus,
+            icterusTcbTsb: data.icterusTcbTsb || null,
+            phototherapy: data.phototherapy || {},
+            exchangeTransfusion: data.exchangeTransfusion || {},
+            feedingProblem: !!data.feedingProblem,
+            feedingProblemDueTo: data.feedingProblemDueTo || null,
+            dehydration: !!data.dehydration,
+            dehydrationCorrectedWith: data.dehydrationCorrectedWith || null,
+            feedingType: data.feedingType || 'EXCLUSIVE_BREASTFEEDING',
+            otherSignificantEvents: data.otherSignificantEvents || null,
+            dischargeType: data.dischargeType || 'WITH_MEDICAL_ADVICE',
+            conditionAtDischarge: data.conditionAtDischarge || {},
+            advice: Array.isArray(data.advice) ? data.advice : [],
+            followUp: data.followUp || {},
+            remarks: data.remarks || null,
+            status: data.status || 'DRAFT'
+        }
+
+        const record = await NewbornDischargeSummary.findOneAndUpdate(
+            { admissionId },
+            updateData,
+            { new: true, upsert: true, runValidators: true }
+        )
+
+        return record
     } catch (error) {
         throw error
     }

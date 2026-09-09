@@ -828,6 +828,40 @@ exports.saveDischargeSummary = async (req, res) => {
     }
 }
 
+exports.getNewbornDischargeSummary = async (req, res) => {
+    try {
+        const result = await ipdService.getNewbornDischargeSummary(req.params.id)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            data: result
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to fetch newborn discharge summary',
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.saveNewbornDischargeSummary = async (req, res) => {
+    try {
+        const userId = req.user?._id || req.user?.id
+        const result = await ipdService.saveNewbornDischargeSummary(req.params.id, req.body, userId)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            message: 'Newborn discharge summary saved successfully',
+            data: result
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to save newborn discharge summary',
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
 exports.syncAdmissionDates = async (req, res) => {
     try {
         const result = await ipdService.syncAdmissionDates()

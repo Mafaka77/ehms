@@ -130,13 +130,26 @@ const handleExportPdf = async () => {
       modeBreakdown[mode] = (modeBreakdown[mode] || 0) + amt
     })
 
+    const formatFilterDateTime = (val) => {
+      if (!val) return ''
+      const d = new Date(val)
+      if (isNaN(d.getTime())) return val
+      return d.toLocaleString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
     let dateRangeText = 'All Time'
     if (filterStartDate.value && filterEndDate.value) {
-      dateRangeText = `${filterStartDate.value} to ${filterEndDate.value}`
+      dateRangeText = `${formatFilterDateTime(filterStartDate.value)} to ${formatFilterDateTime(filterEndDate.value)}`
     } else if (filterStartDate.value) {
-      dateRangeText = `From ${filterStartDate.value}`
+      dateRangeText = `From ${formatFilterDateTime(filterStartDate.value)}`
     } else if (filterEndDate.value) {
-      dateRangeText = `Up to ${filterEndDate.value}`
+      dateRangeText = `Up to ${formatFilterDateTime(filterEndDate.value)}`
     }
 
     const modeText = filterPaymentMethod.value || 'All Payment Modes'
@@ -609,20 +622,20 @@ const formatDate = (dateStr) => {
           </div>
 
           <!-- Date Range & Payment Method Filters Grid -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3 pt-2">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
             <div>
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">From Date</label>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Start Date & Time</label>
               <input 
                 v-model="filterStartDate"
-                type="date"
+                type="datetime-local"
                 class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
               />
             </div>
             <div>
-              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">To Date</label>
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">End Date & Time</label>
               <input 
                 v-model="filterEndDate"
-                type="date"
+                type="datetime-local"
                 class="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"
               />
             </div>

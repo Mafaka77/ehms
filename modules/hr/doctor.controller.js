@@ -56,10 +56,15 @@ exports.getDoctorById = async (req, res) => {
 
 exports.updateDoctor = async (req, res) => {
     try {
-        const doctor = await doctorService.updateDoctor(req.params.id, req.body);
+        const result = await doctorService.updateDoctor(req.params.id, req.body);
+        const doctor = result.doctor || result;
+        const message = result.autoUserCreated
+            ? 'Doctor updated successfully. A doctor login account has been automatically created (default password: mobile number).'
+            : 'Doctor updated successfully';
         return res.code(STATUS_CODES.OK).send({
-            message: 'Doctor updated successfully',
+            message: message,
             data: doctor,
+            autoUserCreated: result.autoUserCreated,
             status: STATUS_CODES.OK
         });
     } catch (error) {

@@ -1,6 +1,5 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import api from '../../../axios/api'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import InvoiceModal from '../payment/Invoice.vue'
@@ -29,12 +28,52 @@ const showBillModal = ref(false)
 const generatingBill = ref(false)
 const selectedChargeIds = ref([])
 
+const isAllChargesSelected = computed(() => {
+  return unbilledCharges.value.length > 0 && selectedChargeIds.value.length === unbilledCharges.value.length
+})
+
+const selectAllCharges = () => {
+  selectedChargeIds.value = unbilledCharges.value.map(c => c._id)
+}
+
+const unselectAllCharges = () => {
+  selectedChargeIds.value = []
+}
+
+const toggleSelectAllCharges = () => {
+  if (isAllChargesSelected.value) {
+    unselectAllCharges()
+  } else {
+    selectAllCharges()
+  }
+}
+
 // Edit Modal States
 const showEditBillModal = ref(false)
 const updatingBill = ref(false)
 const editingBill = ref(null)
 const editAvailableCharges = ref([])
 const selectedEditChargeIds = ref([])
+
+const isAllEditChargesSelected = computed(() => {
+  return editAvailableCharges.value.length > 0 && selectedEditChargeIds.value.length === editAvailableCharges.value.length
+})
+
+const selectAllEditCharges = () => {
+  selectedEditChargeIds.value = editAvailableCharges.value.map(c => c._id)
+}
+
+const unselectAllEditCharges = () => {
+  selectedEditChargeIds.value = []
+}
+
+const toggleSelectAllEditCharges = () => {
+  if (isAllEditChargesSelected.value) {
+    unselectAllEditCharges()
+  } else {
+    selectAllEditCharges()
+  }
+}
 
 // Invoice Preview Modal States
 const showInvoiceModal = ref(false)
@@ -157,13 +196,12 @@ const handleDeleteBill = async (bill) => {
 
 // View Invoice Logic
 const handleViewInvoice = async (bill) => {
-  try {
-    const res = await api.get(`/billing/bills/${bill._id}`)
-    invoiceBillDetails.value = res.data.data
+  const res = await admissionStore.fetchBillById(bill._id)
+  if (res.success) {
+    invoiceBillDetails.value = res.data
     showInvoiceModal.value = true
-  } catch (error) {
-    console.error('Error fetching invoice details:', error)
-    snackbarStore.show({ message: 'Failed to load invoice details.', type: 'error' })
+  } else {
+    snackbarStore.show({ message: res.message || 'Failed to load invoice details.', type: 'error' })
   }
 }
 
@@ -398,16 +436,31 @@ onMounted(() => {
           <p class="text-slate-500 text-sm">No unbilled charges available.</p>
         </div>
         <div v-else class="space-y-3">
+          <!-- Selection Controls Bar -->
+          <div class="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 bg-slate-50/60 p-2.5 rounded-xl">
+            <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 text-xs select-none">
+              <input 
+                type="checkbox" 
+                :checked="isAllChargesSelected" 
+                @change="toggleSelectAllCharges"
+                class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+              >
+              <span>{{ isAllChargesSelected ? 'Unselect All' : 'Select All' }}</span>
+              <span class="text-slate-400 font-normal">({{ selectedChargeIds.length }} of {{ unbilledCharges.length }} selected)</span>
+            </label>
+          </div>
+
           <label 
             v-for="charge in unbilledCharges" 
             :key="charge._id"
-            class="flex items-start gap-3 p-3 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors"
+            class="flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-colors"
+            :class="selectedChargeIds.includes(charge._id) ? 'border-indigo-300 bg-indigo-50/20' : 'border-slate-200 hover:bg-slate-50'"
           >
             <input 
               type="checkbox" 
               :value="charge._id" 
               v-model="selectedChargeIds"
-              class="mt-1 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+              class="mt-1 w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
             >
             <div class="flex-1">
               <div class="flex justify-between">
@@ -468,11 +521,27 @@ onMounted(() => {
 
       <div class="p-6 overflow-y-auto flex-1 space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Included Charges</label>
+          <div class="flex items-center justify-between mb-2">
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide">Included Charges</label>
+          </div>
           <div v-if="editAvailableCharges.length === 0" class="text-center py-6 text-slate-500 text-sm">
             No charges available.
           </div>
           <div v-else class="space-y-3">
+            <!-- Selection Controls Bar for Edit Modal -->
+            <div class="flex items-center justify-between pb-2 mb-1 border-b border-slate-100 bg-slate-50/60 p-2.5 rounded-xl">
+              <label class="flex items-center gap-2 cursor-pointer font-bold text-slate-700 text-xs select-none">
+                <input 
+                  type="checkbox" 
+                  :checked="isAllEditChargesSelected" 
+                  @change="toggleSelectAllEditCharges"
+                  class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                >
+                <span>{{ isAllEditChargesSelected ? 'Unselect All' : 'Select All' }}</span>
+                <span class="text-slate-400 font-normal">({{ selectedEditChargeIds.length }} of {{ editAvailableCharges.length }} selected)</span>
+              </label>
+            </div>
+
             <label 
               v-for="charge in editAvailableCharges" 
               :key="charge._id"

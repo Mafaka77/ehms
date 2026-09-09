@@ -56,11 +56,60 @@ const admissionForm = ref({
   consultantDoctorId: '',
   wardId: '',
   bedId: '',
+  isNewBorn: false,
+  mothersId: null,
   admissionType: 'NORMAL',
   payerType: 'NORMAL',
   admissionDate: getLocalDatetimeString(),
   diagnosis: '',
   remarks: ''
+})
+
+// Mother Search & Selection State (for Newborn Admissions)
+const motherSearchQuery = ref('')
+const motherSearchResults = ref([])
+const isSearchingMother = ref(false)
+const searchMotherTimeout = ref(null)
+const selectedMother = ref(null)
+
+const handleMotherSearch = () => {
+  if (searchMotherTimeout.value) clearTimeout(searchMotherTimeout.value)
+  if (!motherSearchQuery.value || motherSearchQuery.value.trim().length < 2) {
+    motherSearchResults.value = []
+    return
+  }
+  isSearchingMother.value = true
+  searchMotherTimeout.value = setTimeout(async () => {
+    try {
+      const res = await patientStore.searchPatients(motherSearchQuery.value.trim())
+      motherSearchResults.value = res.data || []
+    } catch (err) {
+      console.error('Failed to search mother patient:', err)
+      motherSearchResults.value = []
+    } finally {
+      isSearchingMother.value = false
+    }
+  }, 350)
+}
+
+const selectMother = (mother) => {
+  selectedMother.value = mother
+  admissionForm.value.mothersId = mother._id
+  motherSearchQuery.value = ''
+  motherSearchResults.value = []
+}
+
+const removeMother = () => {
+  selectedMother.value = null
+  admissionForm.value.mothersId = null
+  motherSearchQuery.value = ''
+  motherSearchResults.value = []
+}
+
+watch(() => admissionForm.value.isNewBorn, (val) => {
+  if (!val) {
+    removeMother()
+  }
 })
 
 const payerTypeOptions = [
@@ -197,12 +246,15 @@ const openAdmitModal = () => {
     consultantDoctorId: '',
     wardId: '',
     bedId: '',
+    isNewBorn: false,
+    mothersId: null,
     admissionType: 'NORMAL',
     payerType: 'NORMAL',
     admissionDate: getLocalDatetimeString(),
     diagnosis: '',
     remarks: ''
   }
+  removeMother()
   showAdmitModal.value = true
 }
 
@@ -234,6 +286,8 @@ const submitAdmission = async () => {
   const payload = {
     patientId: selectedPatient.value._id,
     ...admissionForm.value,
+    isNewBorn: !!admissionForm.value.isNewBorn,
+    mothersId: admissionForm.value.isNewBorn ? (admissionForm.value.mothersId || null) : null,
     admissionDate: admissionDateUTC
   }
 
@@ -558,8 +612,16 @@ const doctorOptions = computed(() => {
                     {{ (adm.patientId?.fullName || 'P')[0] }}
                   </div>
                   <div>
-                    <p class="font-bold text-slate-800 leading-snug">{{ adm.patientId?.fullName || 'N/A' }}</p>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <p class="font-bold text-slate-800 leading-snug">{{ adm.patientId?.fullName || 'N/A' }}</p>
+                      <span v-if="adm.isNewBorn" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-pink-50 text-pink-700 border border-pink-200 uppercase tracking-wider">
+                        Newborn
+                      </span>
+                    </div>
                     <p class="text-[11px] text-slate-400 font-mono mt-0.5">{{ adm.patientId?.patientCode || '-' }} • {{ adm.patientId?.gender || '-' }}, {{ adm.patientId?.age || '?' }}y</p>
+                    <p v-if="adm.isNewBorn && adm.mothersId" class="text-[10px] text-pink-600 font-medium mt-0.5">
+                      Mother: <span class="font-semibold">{{ adm.mothersId?.fullName }}</span> <span class="text-slate-400 font-mono">({{ adm.mothersId?.patientCode || '-' }})</span>
+                    </p>
                   </div>
                 </div>
               </td>
@@ -815,6 +877,99 @@ const doctorOptions = computed(() => {
 
             <!-- Admission Details Form -->
             <form @submit.prevent="submitAdmission" class="space-y-4">
+              <!-- Newborn Admission Option -->
+              <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
+                <div class="flex items-center justify-between">
+                  <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input 
+                      type="checkbox" 
+                      id="isNewBorn" 
+                      v-model="admissionForm.isNewBorn"
+                      class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span class="text-xs font-bold text-slate-800">
+                      New Born Baby Admission
+                    </span>
+                  </label>
+                  <span v-if="admissionForm.isNewBorn" class="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                    Newborn
+                  </span>
+                </div>
+
+                <!-- Mother Selection (if isNewBorn is checked) -->
+                <div v-if="admissionForm.isNewBorn" class="pt-2 border-t border-slate-200/60 space-y-2">
+                  <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                    Mother's Patient Profile
+                  </label>
+
+                  <!-- Selected Mother Info -->
+                  <div v-if="selectedMother" class="flex items-center justify-between p-2.5 bg-pink-50/70 border border-pink-200 rounded-lg">
+                    <div class="flex items-center gap-2.5">
+                      <div class="w-7 h-7 rounded-full bg-pink-100 text-pink-700 font-bold flex items-center justify-center text-xs shrink-0 border border-pink-200">
+                        ♀
+                      </div>
+                      <div>
+                        <p class="text-xs font-bold text-slate-800">{{ selectedMother.fullName }}</p>
+                        <p class="text-[10px] text-slate-500 font-mono">{{ selectedMother.patientCode }} • {{ selectedMother.mobileNo || 'No phone' }}</p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button"
+                      @click="removeMother"
+                      class="text-rose-600 hover:text-rose-800 text-[11px] font-semibold hover:underline cursor-pointer"
+                    >
+                      Change Mother
+                    </button>
+                  </div>
+
+                  <!-- Search Mother Input -->
+                  <div v-else class="relative">
+                    <div class="relative">
+                      <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg class="w-4 h-4 text-slate-400" :class="{ 'animate-pulse text-indigo-500': isSearchingMother }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </span>
+                      <input 
+                        v-model="motherSearchQuery"
+                        @input="handleMotherSearch"
+                        type="text" 
+                        placeholder="Search mother by name, patient code, or mobile no..." 
+                        class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                      />
+                    </div>
+
+                    <!-- Mother Search Results Dropdown -->
+                    <div v-if="motherSearchResults.length > 0" class="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      <div class="bg-slate-50 px-3 py-1.5 border-b border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
+                        <span>Matching Patients</span>
+                        <span>{{ motherSearchResults.length }} found</span>
+                      </div>
+                      <ul class="divide-y divide-slate-100">
+                        <li 
+                          v-for="m in motherSearchResults" 
+                          :key="m._id"
+                          @click="selectMother(m)"
+                          class="px-3 py-2 hover:bg-pink-50/60 cursor-pointer flex items-center justify-between group transition-colors"
+                        >
+                          <div>
+                            <p class="text-xs font-bold text-slate-800">{{ m.fullName }} <span class="text-[10px] font-normal text-slate-500">({{ m.gender }}, {{ m.age || '?' }}y)</span></p>
+                            <p class="text-[10px] text-slate-400 font-mono">{{ m.patientCode }} • {{ m.mobileNo }}</p>
+                          </div>
+                          <button type="button" class="text-indigo-600 group-hover:text-indigo-700 bg-indigo-50 group-hover:bg-indigo-100 px-2.5 py-1 rounded text-[11px] font-bold">
+                            Select
+                          </button>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <p v-if="motherSearchQuery.trim().length >= 2 && !isSearchingMother && motherSearchResults.length === 0" class="text-[11px] text-slate-400 mt-1 pl-1">
+                      No patient found matching "{{ motherSearchQuery }}"
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <!-- Consultant Doctor Searchable select -->
               <div>
                 <SearchableSelect

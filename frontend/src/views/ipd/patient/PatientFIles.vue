@@ -2,7 +2,6 @@
 import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
-import api from '../../../axios/api'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -170,12 +169,9 @@ const deleteFile = async (fileId) => {
 
 // Download File Securely
 const downloadFile = async (file) => {
-  try {
-    const response = await api.get(`/ipd/admission/files/${file._id}/download`, {
-      responseType: 'blob'
-    })
-    
-    const url = window.URL.createObjectURL(new Blob([response.data]))
+  const res = await admissionStore.downloadAdmissionFile(file._id)
+  if (res.success && res.data) {
+    const url = window.URL.createObjectURL(new Blob([res.data]))
     const link = document.createElement('a')
     link.href = url
     link.setAttribute('download', file.fileName)
@@ -185,9 +181,8 @@ const downloadFile = async (file) => {
     // Clean up
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('Error downloading file:', error)
-    snackbarStore.show({ message: 'Failed to download document.', type: 'error' })
+  } else {
+    snackbarStore.show({ message: res.message || 'Failed to download document.', type: 'error' })
   }
 }
 

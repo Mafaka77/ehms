@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { DateTime } from 'luxon'
 import { useIpdAdmissionStore } from '../../../stores/ipdAdmissionStore'
+import { usePatientStore } from '../../../stores/patientStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
 import { useAuthStore } from '../../../stores/authStore'
 import PharmacyOrder from './PharmacyOrder.vue'
@@ -10,6 +11,7 @@ import BedHistory from './BedHistory.vue'
 import PatientCharge from './PatientCharge.vue'
 
 import DischargeSummary from './DischargeSummary.vue'
+import NewBornDischargeSummary from './NewBornDischargeSummary.vue'
 import Test from './Test.vue'
 import Transactions from './Transactions.vue'
 import { useIpdWardStore } from '../../../stores/ipdWardStore'
@@ -27,6 +29,7 @@ const props = defineProps({
 
 const router = useRouter()
 const admissionStore = useIpdAdmissionStore()
+const patientStore = usePatientStore()
 const snackbarStore = useSnackbarStore()
 const wardStore = useIpdWardStore()
 const doctorStore = useDoctorStore()
@@ -59,6 +62,7 @@ const bedOptions = computed(() => {
 const loading = ref(true)
 const admission = ref(null)
 const activeTab = ref('charges') // charges, pharmacy, doctor_charges, files, bed_history, transactions
+const isNewborn = ref(false)
 const transactionsRef = ref(null)
 
 // Change Consultant Doctor Modal States
@@ -222,6 +226,9 @@ const fetchAdmissionDetails = async () => {
   const res = await admissionStore.getAdmissionById(props.id)
   if (res.success) {
     admission.value = res.data
+    if (res.data?.isNewBorn) {
+      isNewborn.value = true
+    }
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
   }
@@ -292,7 +299,56 @@ const editAdmissionForm = ref({
   admissionType: 'NORMAL',
   payerType: 'NORMAL',
   diagnosis: '',
-  remarks: ''
+  remarks: '',
+  isNewBorn: false,
+  mothersId: null
+})
+
+// Mother Search & Selection for Edit Admission
+const editMotherSearchQuery = ref('')
+const editMotherSearchResults = ref([])
+const isSearchingEditMother = ref(false)
+const searchEditMotherTimeout = ref(null)
+const selectedEditMother = ref(null)
+
+const handleEditMotherSearch = () => {
+  if (searchEditMotherTimeout.value) clearTimeout(searchEditMotherTimeout.value)
+  if (!editMotherSearchQuery.value || editMotherSearchQuery.value.trim().length < 2) {
+    editMotherSearchResults.value = []
+    return
+  }
+  isSearchingEditMother.value = true
+  searchEditMotherTimeout.value = setTimeout(async () => {
+    try {
+      const res = await patientStore.searchPatients(editMotherSearchQuery.value.trim())
+      editMotherSearchResults.value = res.data || []
+    } catch (err) {
+      console.error('Failed to search mother patient:', err)
+      editMotherSearchResults.value = []
+    } finally {
+      isSearchingEditMother.value = false
+    }
+  }, 350)
+}
+
+const selectEditMother = (mother) => {
+  selectedEditMother.value = mother
+  editAdmissionForm.value.mothersId = mother._id
+  editMotherSearchQuery.value = ''
+  editMotherSearchResults.value = []
+}
+
+const removeEditMother = () => {
+  selectedEditMother.value = null
+  editAdmissionForm.value.mothersId = null
+  editMotherSearchQuery.value = ''
+  editMotherSearchResults.value = []
+}
+
+watch(() => editAdmissionForm.value.isNewBorn, (val) => {
+  if (!val) {
+    removeEditMother()
+  }
 })
 
 const openEditAdmissionModal = () => {
@@ -306,8 +362,21 @@ const openEditAdmissionModal = () => {
     admissionType: admission.value.admissionType || 'NORMAL',
     payerType: admission.value.payerType || 'NORMAL',
     diagnosis: admission.value.diagnosis || '',
-    remarks: admission.value.remarks || ''
+    remarks: admission.value.remarks || '',
+    isNewBorn: !!admission.value.isNewBorn,
+    mothersId: admission.value.mothersId?._id || admission.value.mothersId || null
   }
+
+  if (admission.value.isNewBorn && admission.value.mothersId) {
+    selectedEditMother.value = typeof admission.value.mothersId === 'object' 
+      ? admission.value.mothersId 
+      : { _id: admission.value.mothersId, fullName: 'Linked Mother' }
+  } else {
+    selectedEditMother.value = null
+  }
+  editMotherSearchQuery.value = ''
+  editMotherSearchResults.value = []
+
   showEditAdmissionModal.value = true
 }
 
@@ -319,6 +388,8 @@ const submitEditAdmission = async () => {
 
   const payload = {
     ...editAdmissionForm.value,
+    isNewBorn: !!editAdmissionForm.value.isNewBorn,
+    mothersId: editAdmissionForm.value.isNewBorn ? (editAdmissionForm.value.mothersId || null) : null,
     admissionDate: utcAdmissionDate
   }
   const res = await admissionStore.updateAdmission(admission.value._id, payload)
@@ -674,13 +745,21 @@ onMounted(async () => {
               {{ admission.patientId?.fullName?.charAt(0) || 'P' }}
             </div>
             <div>
-              <h3 class="font-bold text-slate-900 leading-tight">{{ admission.patientId?.fullName || 'N/A' }}</h3>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <h3 class="font-bold text-slate-900 leading-tight">{{ admission.patientId?.fullName || 'N/A' }}</h3>
+                <span v-if="admission.isNewBorn" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-pink-50 text-pink-700 border border-pink-200 uppercase tracking-wider">
+                  Newborn
+                </span>
+              </div>
               <p class="text-slate-400 font-mono text-xs mt-0.5">{{ admission.patientId?.patientCode || '-' }}</p>
             </div>
           </div>
           <div class="mt-4 space-y-1 text-xs text-slate-500">
             <p><span class="font-semibold text-slate-700">Gender / Age:</span> {{ admission.patientId?.gender || 'Unknown' }}, {{ admission.patientId?.age || '?' }} Years</p>
             <p><span class="font-semibold text-slate-700">Mobile:</span> {{ admission.patientId?.mobileNo || '-' }}</p>
+            <p v-if="admission.isNewBorn && admission.mothersId" class="text-pink-700 bg-pink-50/70 border border-pink-200/80 rounded-lg p-1.5 mt-1 text-[11px]">
+              <span class="font-bold">Mother:</span> {{ admission.mothersId?.fullName }} <span class="text-slate-500 font-mono">({{ admission.mothersId?.patientCode || '-' }})</span>
+            </p>
           </div>
           <div class="mt-3 flex items-center gap-2">
             <button 
@@ -719,6 +798,16 @@ onMounted(async () => {
               </span>
             </p>
             <p><span class="font-semibold text-slate-500">Payer Type:</span> <strong class="text-slate-800 font-bold ml-1">{{ getPayerTypeLabel(admission.payerType) }}</strong></p>
+            <p v-if="admission.isNewBorn" class="flex items-center gap-1.5 pt-0.5">
+              <span class="font-semibold text-slate-500">Category:</span>
+              <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                Newborn Baby
+              </span>
+            </p>
+            <p v-if="admission.isNewBorn && admission.mothersId">
+              <span class="font-semibold text-slate-500">Mother:</span> 
+              <strong class="text-pink-700 font-bold ml-1">{{ admission.mothersId?.fullName }}</strong>
+            </p>
           </div>
           <div class="mt-3 flex items-center gap-2">
             <button 
@@ -877,7 +966,19 @@ onMounted(async () => {
 
         <!-- Tab: Discharge Summary -->
         <div v-else-if="activeTab === 'discharge_summary'" class="space-y-4 animate-in fade-in duration-200">
-          <DischargeSummary :admissionId="admission._id" :admission="admission" />
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <label class="inline-flex items-center gap-2.5 cursor-pointer select-none px-3.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/70 transition-colors">
+              <input 
+                type="checkbox" 
+                v-model="isNewborn" 
+                class="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+              />
+              <span class="text-sm font-semibold text-slate-700">New Born</span>
+            </label>
+          </div>
+
+          <NewBornDischargeSummary v-if="isNewborn" :admissionId="admission._id" :admission="admission" />
+          <DischargeSummary v-else :admissionId="admission._id" :admission="admission" />
         </div>
 
         <!-- Tab: Test & Diagnostics -->
@@ -1170,6 +1271,99 @@ onMounted(async () => {
 
         <!-- Modal Body Form -->
         <form @submit.prevent="submitEditAdmission" class="p-6 overflow-y-auto space-y-4 flex-1">
+          <!-- Newborn Admission Option -->
+          <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
+            <div class="flex items-center justify-between">
+              <label class="flex items-center gap-2.5 cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  id="editIsNewBorn" 
+                  v-model="editAdmissionForm.isNewBorn"
+                  class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span class="text-xs font-bold text-slate-800">
+                  New Born Baby Admission
+                </span>
+              </label>
+              <span v-if="editAdmissionForm.isNewBorn" class="px-2 py-0.5 rounded text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
+                Newborn
+              </span>
+            </div>
+
+            <!-- Mother Selection (if isNewBorn is checked) -->
+            <div v-if="editAdmissionForm.isNewBorn" class="pt-2 border-t border-slate-200/60 space-y-2">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                Mother's Patient Profile
+              </label>
+
+              <!-- Selected Mother Info -->
+              <div v-if="selectedEditMother" class="flex items-center justify-between p-2.5 bg-pink-50/70 border border-pink-200 rounded-lg">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-7 h-7 rounded-full bg-pink-100 text-pink-700 font-bold flex items-center justify-center text-xs shrink-0 border border-pink-200">
+                    ♀
+                  </div>
+                  <div>
+                    <p class="text-xs font-bold text-slate-800">{{ selectedEditMother.fullName }}</p>
+                    <p class="text-[10px] text-slate-500 font-mono">{{ selectedEditMother.patientCode || '-' }} • {{ selectedEditMother.mobileNo || 'No phone' }}</p>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  @click="removeEditMother"
+                  class="text-rose-600 hover:text-rose-800 text-[11px] font-semibold hover:underline cursor-pointer"
+                >
+                  Change Mother
+                </button>
+              </div>
+
+              <!-- Search Mother Input -->
+              <div v-else class="relative">
+                <div class="relative">
+                  <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="w-4 h-4 text-slate-400" :class="{ 'animate-pulse text-indigo-500': isSearchingEditMother }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </span>
+                  <input 
+                    v-model="editMotherSearchQuery"
+                    @input="handleEditMotherSearch"
+                    type="text" 
+                    placeholder="Search mother by name, patient code, or mobile no..." 
+                    class="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 transition-all"
+                  />
+                </div>
+
+                <!-- Mother Search Results Dropdown -->
+                <div v-if="editMotherSearchResults.length > 0" class="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                  <div class="bg-slate-50 px-3 py-1.5 border-b border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase">
+                    <span>Matching Patients</span>
+                    <span>{{ editMotherSearchResults.length }} found</span>
+                  </div>
+                  <ul class="divide-y divide-slate-100">
+                    <li 
+                      v-for="m in editMotherSearchResults" 
+                      :key="m._id"
+                      @click="selectEditMother(m)"
+                      class="px-3 py-2 hover:bg-pink-50/60 cursor-pointer flex items-center justify-between group transition-colors"
+                    >
+                      <div>
+                        <p class="text-xs font-bold text-slate-800">{{ m.fullName }} <span class="text-[10px] font-normal text-slate-500">({{ m.gender }}, {{ m.age || '?' }}y)</span></p>
+                        <p class="text-[10px] text-slate-400 font-mono">{{ m.patientCode }} • {{ m.mobileNo }}</p>
+                      </div>
+                      <button type="button" class="text-indigo-600 group-hover:text-indigo-700 bg-indigo-50 group-hover:bg-indigo-100 px-2.5 py-1 rounded text-[11px] font-bold">
+                        Select
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+
+                <p v-if="editMotherSearchQuery.trim().length >= 2 && !isSearchingEditMother && editMotherSearchResults.length === 0" class="text-[11px] text-slate-400 mt-1 pl-1">
+                  No patient found matching "{{ editMotherSearchQuery }}"
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Admission Date & Time -->
           <div class="space-y-1">
             <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Admission Date & Time</label>

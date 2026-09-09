@@ -93,7 +93,8 @@ const form = ref({
   departmentId: '',
   designationId: '',
   basicSalary: 0,
-  joiningDate: ''
+  joiningDate: '',
+  createLoginAccount: false
 })
 
 const handleBack = () => {
@@ -115,6 +116,9 @@ const loadData = async () => {
       const res = await doctorStore.fetchDoctorById(doctorId)
       if (res.success && res.data) {
         const d = res.data
+        const deptId = d.employeeId?.departmentId?._id || d.employeeId?.departmentId || ''
+        const desigId = d.employeeId?.designationId?._id || d.employeeId?.designationId || ''
+
         form.value = {
           doctorCode: d.doctorCode || '',
           fullName: d.fullName || '',
@@ -126,13 +130,22 @@ const loadData = async () => {
           specializationId: d.specializationId?._id || d.specializationId || '',
           doctorType: d.doctorType || 'CONSULTANT',
           consultationFee: d.consultationFee || 0,
-          departmentId: d.employeeId?.departmentId || '',
-          designationId: d.employeeId?.designationId || '',
+          departmentId: deptId,
+          designationId: desigId,
           basicSalary: d.employeeId?.basicSalary || 0,
-          joiningDate: d.employeeId?.joiningDate ? d.employeeId.joiningDate.split('T')[0] : ''
+          joiningDate: d.employeeId?.joiningDate ? d.employeeId.joiningDate.split('T')[0] : '',
+          createLoginAccount: false
         }
         
         if (d.specializationId) specSearch.value = d.specializationId.name || ''
+        if (deptId) {
+          const dept = deptStore.departments.find(dep => dep._id === deptId)
+          if (dept) deptSearch.value = dept.name
+        }
+        if (desigId) {
+          const desig = desigStore.designations.find(deg => deg._id === desigId)
+          if (desig) desigSearch.value = desig.designationName
+        }
       } else {
         snackbarStore.show({ message: 'Failed to fetch doctor details', type: 'error' })
         router.push('/doctors')
@@ -152,7 +165,7 @@ const handleSubmit = async () => {
     const doctorId = route.params.id
     const response = await doctorStore.updateDoctor(doctorId, form.value)
     if (response.success) {
-      snackbarStore.show({ message: 'Doctor updated successfully!', type: 'success' })
+      snackbarStore.show({ message: response.message || 'Doctor updated successfully!', type: 'success' })
       handleBack()
     } else {
       snackbarStore.show({ message: response.message || 'Failed to update doctor', type: 'error' })
@@ -222,6 +235,23 @@ onMounted(() => {
                 <div class="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-slate-400">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
                 </div>
+              </div>
+            </div>
+
+            <!-- Dashboard Access -->
+            <div class="md:col-span-2 flex items-center gap-3 p-4 bg-slate-50 border border-slate-100 rounded-xl mt-2">
+              <input 
+                type="checkbox" 
+                id="createLoginAccount"
+                v-model="form.createLoginAccount"
+                :disabled="savingData"
+                class="w-5 h-5 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 focus:ring-offset-0 transition-all cursor-pointer"
+              />
+              <div class="flex flex-col">
+                <label for="createLoginAccount" class="text-sm font-bold text-slate-800 cursor-pointer">
+                  Enable Dashboard Access
+                </label>
+                <span class="text-xs text-slate-500">A doctor login account will be automatically created (default password: mobile number) if not already existing.</span>
               </div>
             </div>
 

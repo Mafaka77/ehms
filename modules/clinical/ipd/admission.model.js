@@ -15,6 +15,17 @@ const admissionSchema = new mongoose.Schema({
     required: true
   },
 
+  isNewBorn: {
+    type: Boolean,
+    default: false
+  },
+
+  mothersId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Patient',
+    default: null
+  },
+
   admissionDate: {
     type: Date,
     required: true,

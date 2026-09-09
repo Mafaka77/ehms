@@ -571,8 +571,11 @@ exports.getAllSales = async (query = {}) => {
                     filter.createdAt.$lte = new Date(y, m - 1, d, 23, 59, 59, 999)
                 } else {
                     const end = new Date(query.endDate)
-                    end.setHours(23, 59, 59, 999)
-                    filter.createdAt.$lte = end
+                    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(eStr)) {
+                        filter.createdAt.$lte = new Date(end.getTime() + 59999)
+                    } else {
+                        filter.createdAt.$lte = end
+                    }
                 }
             }
         }

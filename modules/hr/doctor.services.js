@@ -13,8 +13,8 @@ exports.createDoctor = async (data) => {
                 fullName: data.fullName,
                 mobile: data.mobileNo,
                 email: data.email,
-                departmentId: data.departmentId,
-                designationId: data.designationId,
+                departmentId: data.departmentId || undefined,
+                designationId: data.designationId || undefined,
                 basicSalary: data.basicSalary || 0,
                 employmentType: 'Permanent',
                 joiningDate: data.joiningDate || new Date()
@@ -49,9 +49,9 @@ exports.createDoctor = async (data) => {
 
         const doctor = await Doctor.create(doctorData);
 
-        // Auto-create User account if requested
+        // Auto-create User account if permanent doctor or explicitly requested
         let autoUserCreated = false;
-        if (data.createLoginAccount && data.email && data.mobileNo) {
+        if ((data.createLoginAccount || data.doctorType === 'PERMANENT') && data.email && data.mobileNo) {
             try {
                 const User = require('../auth/user.model');
                 const Role = require('../auth/role.model');
@@ -155,8 +155,15 @@ exports.getDoctorById = async (id) => {
 
 exports.updateDoctor = async (id, data) => {
     try {
+        const existingDoctor = await Doctor.findById(id);
+        if (!existingDoctor) {
+            const error = new Error('Doctor not found');
+            error.status = STATUS_CODES.NOT_FOUND;
+            throw error;
+        }
+
         const updateData = { ...data };
-        delete updateData.employeeId; // prevent changing the employee link
+        delete updateData.employeeId; // prevent direct overwrite
 
         if (updateData.doctorCode) {
             updateData.doctorCode = updateData.doctorCode.trim();
@@ -168,19 +175,85 @@ exports.updateDoctor = async (id, data) => {
             }
         }
 
+        // If updated to PERMANENT, create or update the Employee record
+        let employeeId = existingDoctor.employeeId;
+        if (data.doctorType === 'PERMANENT') {
+            const employeeData = {
+                fullName: data.fullName || existingDoctor.fullName,
+                mobile: data.mobileNo || existingDoctor.mobileNo,
+                email: data.email || existingDoctor.email,
+                departmentId: data.departmentId || undefined,
+                designationId: data.designationId || undefined,
+                basicSalary: data.basicSalary !== undefined ? data.basicSalary : 0,
+                employmentType: 'Permanent',
+                joiningDate: data.joiningDate || new Date()
+            };
+
+            if (employeeId) {
+                await Employee.findByIdAndUpdate(employeeId, employeeData, { new: true });
+            } else {
+                const newEmployee = await Employee.create(employeeData);
+                employeeId = newEmployee._id;
+                updateData.employeeId = employeeId;
+            }
+        }
+
         const doctor = await Doctor.findByIdAndUpdate(
             id,
             updateData,
             { new: true, runValidators: true }
         ).populate('specializationId', 'name').populate('employeeId');
 
-        if (!doctor) {
-            const error = new Error('Doctor not found');
-            error.status = STATUS_CODES.NOT_FOUND;
-            throw error;
+        // Auto-create / sync User account for authentication if permanent doctor or requested
+        let autoUserCreated = false;
+        const targetEmail = doctor.email;
+        const targetMobile = doctor.mobileNo;
+
+        if ((data.doctorType === 'PERMANENT' || data.createLoginAccount) && targetEmail && targetMobile) {
+            try {
+                const User = require('../auth/user.model');
+                const Role = require('../auth/role.model');
+                const bcrypt = require('bcrypt');
+
+                const doctorRole = await Role.findOne({ name: { $regex: 'doctor|doc', $options: 'i' } });
+                if (!doctorRole) {
+                    console.warn('[Doctor] No Doctor role found in DB — skipping auto user creation');
+                } else {
+                    const existingUser = await User.findOne({ email: targetEmail });
+                    if (!existingUser) {
+                        const hashedPassword = await bcrypt.hash(String(targetMobile), 10);
+                        await User.create({
+                            fullName: doctor.fullName,
+                            email: doctor.email,
+                            password: hashedPassword,
+                            role: doctorRole._id,
+                            roles: [doctorRole._id]
+                        });
+                        autoUserCreated = true;
+                        console.info(`[Doctor] Auto-created doctor User for ${targetEmail} on update`);
+                    } else {
+                        let needsSave = false;
+                        if (doctor.fullName && existingUser.fullName !== doctor.fullName) {
+                            existingUser.fullName = doctor.fullName;
+                            needsSave = true;
+                        }
+                        if (!existingUser.roles || !existingUser.roles.some(r => r.toString() === doctorRole._id.toString())) {
+                            if (!existingUser.roles) existingUser.roles = [];
+                            existingUser.roles.push(doctorRole._id);
+                            if (!existingUser.role) existingUser.role = doctorRole._id;
+                            needsSave = true;
+                        }
+                        if (needsSave) {
+                            await existingUser.save();
+                        }
+                    }
+                }
+            } catch (userErr) {
+                console.error('[Doctor] Failed to auto-create/sync doctor User on update:', userErr.message);
+            }
         }
 
-        return doctor;
+        return { doctor, autoUserCreated };
     } catch (error) {
         throw error;
     }

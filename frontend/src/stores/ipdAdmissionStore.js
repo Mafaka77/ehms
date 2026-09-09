@@ -352,6 +352,21 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async fetchBillById(billId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get(`/billing/bills/${billId}`)
+        return { success: true, data: response.data.data }
+      } catch (err) {
+        console.error('Error fetching bill:', err)
+        this.error = err.response?.data?.message || 'Failed to fetch bill'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
     async fetchChargeCategories() {
       this.loading = true
       this.error = null
@@ -578,6 +593,18 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       }
     },
 
+    async downloadAdmissionFile(fileId) {
+      try {
+        const response = await api.get(`/ipd/admission/files/${fileId}/download`, {
+          responseType: 'blob'
+        })
+        return { success: true, data: response.data }
+      } catch (err) {
+        console.error('Error downloading file:', err)
+        return { success: false, message: err.response?.data?.message || 'Failed to download file' }
+      }
+    },
+
     async fetchAdmissionNotes(admissionId) {
       this.loading = true
       this.error = null
@@ -632,6 +659,36 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       } catch (err) {
         console.error('Error saving discharge summary:', err)
         this.error = err.response?.data?.message || 'Failed to save discharge summary'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async fetchNewbornDischargeSummary(admissionId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get(`/ipd/admission/${admissionId}/newborn-discharge-summary`)
+        return { success: true, data: response.data.data }
+      } catch (err) {
+        console.error('Error fetching newborn discharge summary:', err)
+        this.error = err.response?.data?.message || 'Failed to fetch newborn discharge summary'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async saveNewbornDischargeSummary(admissionId, data) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post(`/ipd/admission/${admissionId}/newborn-discharge-summary`, data)
+        return { success: true, data: response.data.data, message: response.data.message || 'Newborn discharge summary saved successfully' }
+      } catch (err) {
+        console.error('Error saving newborn discharge summary:', err)
+        this.error = err.response?.data?.message || 'Failed to save newborn discharge summary'
         return { success: false, message: this.error }
       } finally {
         this.loading = false
