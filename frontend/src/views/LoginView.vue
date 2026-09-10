@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
 import { useSnackbarStore } from '../stores/snackbarStore'
+import { useNotificationStore } from '../stores/notificationStore'
 
 const email = ref('')
 const password = ref('')
@@ -10,6 +11,7 @@ const isLoading = ref(false)
 
 const authStore = useAuthStore()
 const snackbarStore = useSnackbarStore()
+const notifStore = useNotificationStore()
 const router = useRouter()
 
 const handleLogin = async () => {
@@ -24,6 +26,8 @@ const handleLogin = async () => {
       message: 'Login successful! Welcome back.',
       type: 'success'
     })
+    // Register notification token for newly logged-in user
+    notifStore.requestPermissionAndToken().catch(() => {})
     router.push('/dashboard')
   } else {
     snackbarStore.show({

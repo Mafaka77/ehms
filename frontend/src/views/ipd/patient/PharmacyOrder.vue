@@ -1,8 +1,9 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
 import { useDoctorStore } from '../../../stores/doctorStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useNotificationStore } from '../../../stores/notificationStore'
 
 const props = defineProps({
   admissionId: {
@@ -18,6 +19,17 @@ const props = defineProps({
 const pharmacyStore = usePharmacyStore()
 const doctorStore = useDoctorStore()
 const snackbarStore = useSnackbarStore()
+const notifStore = useNotificationStore()
+
+// Auto-refresh when pharmacy dispenses or cancels the order
+watch(() => notifStore.notifications.length, (newLen, oldLen) => {
+  if (newLen > oldLen) {
+    const latest = notifStore.notifications[0]
+    if (latest?.type === 'PHARMACY_DISPENSED' || latest?.type === 'PHARMACY_CANCELLED') {
+      fetchOrders()
+    }
+  }
+})
 
 const loading = ref(false)
 const orders = ref([])

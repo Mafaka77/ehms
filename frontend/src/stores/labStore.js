@@ -10,6 +10,7 @@ export const useLabStore = defineStore('lab', {
         tests: [],
         testParameters: [],
         orders: [],
+        pendingIpdOrdersCount: 0,
         stats: {
             totalTests: 0,
             pendingOrders: 0,
@@ -359,6 +360,24 @@ export const useLabStore = defineStore('lab', {
                 this.error = error.response?.data?.message || 'Failed to fetch orders';
             } finally {
                 this.loading = false;
+            }
+        },
+
+        async fetchPendingIpdOrdersCount() {
+            try {
+                const response = await api.get('/lab/order', {
+                    params: {
+                        admissionId: 'not-null',
+                        status: 'ORDERED',
+                        page: 1,
+                        limit: 1
+                    }
+                });
+                this.pendingIpdOrdersCount = response.data?.pagination?.total || 0;
+                return this.pendingIpdOrdersCount;
+            } catch (err) {
+                console.warn('Error fetching pending IPD lab count:', err.message);
+                return 0;
             }
         },
 

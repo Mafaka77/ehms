@@ -1,9 +1,12 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useAuthStore } from '../stores/authStore'
+import { useNotificationStore } from '../stores/notificationStore'
 import AdminSidebar from '../components/AdminSidebar.vue'
+import NotificationBell from '../components/NotificationBell.vue'
 
 const authStore = useAuthStore()
+const notifStore = useNotificationStore()
 const isMobileMenuOpen = ref(false)
 const isSidebarCollapsed = ref(false)
 
@@ -16,8 +19,57 @@ const userRoleName = computed(() => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-slate-50 flex font-sans">
+  <div class="min-h-screen bg-slate-50 flex font-sans relative">
     
+    <!-- Real-time Foreground Notification Toast Banner -->
+    <transition
+      enter-active-class="transform ease-out duration-300 transition"
+      enter-from-class="translate-y-[-20px] opacity-0 scale-95"
+      enter-to-class="translate-y-0 opacity-100 scale-100"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 scale-100"
+      leave-to-class="opacity-0 scale-90"
+    >
+      <div
+        v-if="notifStore.activeToast"
+        class="fixed top-5 right-5 z-50 max-w-sm w-full bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-indigo-100 p-4 flex items-start gap-3.5 ring-1 ring-black/5"
+      >
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center text-lg shrink-0 shadow-md">
+          🔔
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-bold text-slate-800 truncate">
+              {{ notifStore.activeToast.title }}
+            </h4>
+            <span class="text-[10px] text-slate-400 font-medium ml-2">Just now</span>
+          </div>
+          <p class="text-xs text-slate-600 mt-0.5 leading-relaxed">
+            {{ notifStore.activeToast.body }}
+          </p>
+          <div class="flex items-center gap-3 mt-2">
+            <button
+              @click="notifStore.markAsRead(notifStore.activeToast.id); notifStore.dismissToast()"
+              class="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+              </svg>
+              Mark as read
+            </button>
+          </div>
+        </div>
+        <button
+          @click="notifStore.dismissToast"
+          class="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    </transition>
+
     <!-- Mobile Sidebar Backdrop -->
     <div 
       v-if="isMobileMenuOpen" 
@@ -72,14 +124,8 @@ const userRoleName = computed(() => {
         <!-- Right Side Nav -->
         <div class="flex items-center space-x-5">
           
-          <!-- Notifications -->
-          <button class="relative p-2.5 rounded-full text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition-colors">
-            <span class="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
-            <span class="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full"></span>
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-            </svg>
-          </button>
+          <!-- Notifications Bell Dropdown -->
+          <NotificationBell />
 
           <!-- Divider -->
           <div class="h-8 w-px bg-slate-200"></div>

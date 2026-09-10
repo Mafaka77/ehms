@@ -2,9 +2,11 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useNotificationStore } from '../../../stores/notificationStore'
 
 const pharmacyStore = usePharmacyStore()
 const snackbarStore = useSnackbarStore()
+const notifStore = useNotificationStore()
 
 const loading = ref(false)
 const orders = ref([])
@@ -81,6 +83,17 @@ watch(() => [filters.value.status, filters.value.search], () => {
 
 watch(() => filters.value.page, () => {
   fetchIpdOrders()
+})
+
+// Auto-refresh orders and KPIs in real-time when new notification arrives
+watch(() => notifStore.notifications.length, (newLen, oldLen) => {
+  if (newLen > oldLen) {
+    const latest = notifStore.notifications[0]
+    if (latest?.type === 'PHARMACY_ORDER' || !latest?.type) {
+      fetchIpdOrders(true) // silent refresh without full-page spinner
+      fetchKpis()
+    }
+  }
 })
 
 const formatDate = (dateString) => {

@@ -60,6 +60,7 @@ const admissionForm = ref({
   mothersId: null,
   admissionType: 'NORMAL',
   payerType: 'NORMAL',
+  payerTypeDetails: '',
   admissionDate: getLocalDatetimeString(),
   diagnosis: '',
   remarks: ''
@@ -250,6 +251,7 @@ const openAdmitModal = () => {
     mothersId: null,
     admissionType: 'NORMAL',
     payerType: 'NORMAL',
+    payerTypeDetails: '',
     admissionDate: getLocalDatetimeString(),
     diagnosis: '',
     remarks: ''
@@ -600,6 +602,9 @@ const doctorOptions = computed(() => {
                     :class="getPayerTypeColor(adm.payerType)"
                   >
                     {{ getPayerTypeLabel(adm.payerType) }}
+                  </span>
+                  <span v-if="adm.payerTypeDetails" class="text-[10px] text-slate-500 font-medium truncate max-w-[130px]" :title="adm.payerTypeDetails">
+                    ({{ adm.payerTypeDetails }})
                   </span>
                 </div>
                 <span class="text-slate-400 text-[11px] mt-0.5 block">{{ formatDate(adm.admissionDate) }}</span>
@@ -1037,6 +1042,15 @@ const doctorOptions = computed(() => {
                   label="Admission Date & Time"
                   :max="getLocalDatetimeString()"
                   required
+                />
+              </div>
+
+              <div>
+                <BaseInput 
+                  v-model="admissionForm.payerTypeDetails"
+                  id="payerTypeDetails"
+                  label="Payer Type Details"
+                  placeholder="e.g. Card No., Policy / Insurance No., Scheme info..."
                 />
               </div>
 

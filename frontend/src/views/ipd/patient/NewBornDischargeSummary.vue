@@ -103,6 +103,7 @@ const form = ref({
 
   // Other Events
   otherSignificantEvents: '',
+  diagnosis: '',
 
   // Discharge Status & Condition
   dischargeType: 'WITH_MEDICAL_ADVICE',
@@ -207,6 +208,7 @@ const loadSummary = async () => {
       form.value.feedingType = d.feedingType || 'EXCLUSIVE_BREASTFEEDING'
 
       form.value.otherSignificantEvents = d.otherSignificantEvents || ''
+      form.value.diagnosis = d.diagnosis || ''
       form.value.dischargeType = d.dischargeType || 'WITH_MEDICAL_ADVICE'
       form.value.dischargeDate = d.dischargeDate ? getNowDateTimeString(d.dischargeDate) : getNowDateTimeString()
 
@@ -701,6 +703,12 @@ const printSummary = () => {
                       <td class="td-val" colspan="3">${f.otherSignificantEvents}</td>
                     </tr>
                     ` : ''}
+                    ${f.diagnosis ? `
+                    <tr>
+                      <td class="td-lbl">Diagnosis:</td>
+                      <td class="td-val" colspan="3">${f.diagnosis}</td>
+                    </tr>
+                    ` : ''}
                   </table>
                 </div>
 
@@ -1125,6 +1133,11 @@ const printSummary = () => {
               <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Other Significant Events</label>
               <textarea v-model="form.otherSignificantEvents" rows="2" placeholder="Record any other events, vitals fluctuation or clinical notes during stay..." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"></textarea>
             </div>
+
+            <div class="pt-2">
+              <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Diagnosis</label>
+              <textarea v-model="form.diagnosis" rows="2" placeholder="Record final diagnosis / clinical findings..." class="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-100 focus:border-teal-500"></textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -1414,6 +1427,10 @@ const printSummary = () => {
                     <tr v-if="form.otherSignificantEvents">
                       <td style="padding: 3px 5px; font-weight: 700; color: #475569; font-size: 10px; border-bottom: 1px solid #f1f5f9;">Other Events:</td>
                       <td style="padding: 3px 5px; font-weight: 600; color: #0f172a; font-size: 10px; border-bottom: 1px solid #f1f5f9;" colspan="3">{{ form.otherSignificantEvents }}</td>
+                    </tr>
+                    <tr v-if="form.diagnosis">
+                      <td style="padding: 3px 5px; font-weight: 700; color: #475569; font-size: 10px; border-bottom: 1px solid #f1f5f9;">Diagnosis:</td>
+                      <td style="padding: 3px 5px; font-weight: 600; color: #0f172a; font-size: 10px; border-bottom: 1px solid #f1f5f9;" colspan="3">{{ form.diagnosis }}</td>
                     </tr>
                   </table>
                 </div>

@@ -88,7 +88,11 @@ const admissionSchema = new mongoose.Schema({
     'NORMAL'
   ],
   default: 'NORMAL'
-}
+},
+payerTypeDetails:{
+  type:String,
+  default:null,
+},
 
 },{
   timestamps:true

@@ -2,11 +2,13 @@
 import { ref, onMounted, watch } from 'vue'
 import { useLabStore } from '../../../stores/labStore'
 import { useAuthStore } from '../../../stores/authStore'
+import { useNotificationStore } from '../../../stores/notificationStore'
 import OutpatientOrders from './OutpatientOrders.vue'
 import IPDOrders from './IPDOrders.vue'
 
 const labStore = useLabStore()
 const authStore = useAuthStore()
+const notifStore = useNotificationStore()
 
 const activeTab = ref(
   authStore.hasPermission('lab.opd.orders')
@@ -31,11 +33,25 @@ watch(
 )
 
 const fetchStats = async () => {
-  await labStore.fetchStats()
+  await Promise.all([
+    labStore.fetchStats(),
+    labStore.fetchPendingIpdOrdersCount()
+  ])
 }
 
 onMounted(async () => {
   await fetchStats()
+})
+
+watch(activeTab, (newTab) => {
+  if (newTab === 'ipd') {
+    labStore.fetchPendingIpdOrdersCount()
+  }
+})
+
+// Auto-refresh stats and IPD pending badge in real-time when new notification arrives
+watch(() => notifStore.notifications.length, () => {
+  fetchStats()
 })
 </script>
 
@@ -109,9 +125,16 @@ onMounted(async () => {
       <button 
         v-if="authStore.hasPermission('lab.ipd.orders')"
         @click="activeTab = 'ipd'"
-        :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none cursor-pointer', activeTab === 'ipd' ? 'border-indigo-600 text-indigo-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
+        :class="['px-5 py-3 text-sm font-semibold border-b-2 transition-all duration-200 outline-none cursor-pointer flex items-center gap-2', activeTab === 'ipd' ? 'border-indigo-600 text-indigo-650 font-bold' : 'border-transparent text-slate-450 hover:text-slate-700']"
       >
-        IPD Orders
+        <span>IPD Orders</span>
+        <span 
+          v-if="labStore.pendingIpdOrdersCount > 0"
+          class="px-2 py-0.5 text-[10px] font-bold bg-rose-500 text-white rounded-full leading-none flex items-center justify-center min-w-[18px] h-[18px] relative"
+        >
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+          <span class="relative">{{ labStore.pendingIpdOrdersCount }}</span>
+        </span>
       </button>
     </div>
 

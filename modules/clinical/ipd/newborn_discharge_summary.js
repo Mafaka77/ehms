@@ -322,6 +322,10 @@ const newbornDischargeSummarySchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  diagnosis:{
+    type:String,
+    default:null
+  },
 
   status: {
     type: String,

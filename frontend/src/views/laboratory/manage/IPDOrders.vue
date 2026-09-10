@@ -2,12 +2,24 @@
 import { ref, onMounted, watch } from 'vue'
 import { useLabStore } from '../../../stores/labStore'
 import { useSnackbarStore } from '../../../stores/snackbarStore'
+import { useNotificationStore } from '../../../stores/notificationStore'
 import ResultsModal from './ResultsModal.vue'
 import ReportModal from './ReportModal.vue'
 
 const emit = defineEmits(['saved'])
 const labStore = useLabStore()
 const snackbarStore = useSnackbarStore()
+const notifStore = useNotificationStore()
+
+// Auto-refresh IPD lab orders in real-time when new notification arrives
+watch(() => notifStore.notifications.length, (newLen, oldLen) => {
+  if (newLen > oldLen) {
+    const latest = notifStore.notifications[0]
+    if (latest?.type === 'LAB_ORDER' || !latest?.type) {
+      fetchOrders()
+    }
+  }
+})
 
 const currentPage = ref(1)
 const limit = ref(9) // 9 per page fits nicely in a 3-column grid
@@ -64,6 +76,7 @@ const onResultsSaved = async () => {
 
 const fetchOrders = async () => {
   await labStore.fetchOrders(currentPage.value, limit.value, searchQuery.value, '', { admissionId: 'not-null' })
+  labStore.fetchPendingIpdOrdersCount()
 }
 
 const updateOrderStatus = async (orderId, newStatus) => {

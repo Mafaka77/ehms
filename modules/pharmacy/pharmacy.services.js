@@ -13,6 +13,9 @@ const PharmacyIndentItem = require('./pharmacy_indent_item.model')
 const Admission = require('../clinical/ipd/admission.model')
 const nursingServices = require('../nursing/nursing.services')
 const User = require('../auth/user.model')
+const Role = require('../auth/role.model')
+const Notification = require('../notification/notification.model')
+const { sendMulticast } = require('../../config/firebase')
 const Doctor = require('../hr/doctor.model')
 const Employee = require('../hr/employee.model')
 
@@ -625,7 +628,7 @@ exports.getSaleById = async (id) => {
 
 exports.createIpdOrder = async (userId, data) => {
     try {
-        const admission = await Admission.findById(data.admissionId).populate('bedId')
+        const admission = await Admission.findById(data.admissionId).populate('bedId').populate('patientId')
         if (!admission) {
             const error = new Error('Admission record not found')
             error.status = STATUS_CODES.NOT_FOUND
@@ -705,6 +708,66 @@ exports.createIpdOrder = async (userId, data) => {
 
         // populate medicine details
         const populatedItems = await MedicineIpdOrderItem.find({ medicineIpdOrderId: order._id }).populate('medicineId')
+
+        // Dispatch notification to PharmacyManager & Pharmacist users
+        try {
+            const pharmacyRoles = await Role.find({
+                name: { $in: ['PharmacyManager', 'Pharmacist', 'SuperAdmin', 'HospitalAdmin', 'Admin'] }
+            })
+            const roleIds = pharmacyRoles.map(r => r._id)
+
+            const pharmacyStaff = await User.find({
+                $or: [
+                    { role: { $in: roleIds } },
+                    { roles: { $in: roleIds } }
+                ]
+            }).select('_id fcmTokens fullName email')
+
+            const patientName = admission.patientId?.fullName || admission.patientId?.name || 'IPD Patient'
+            const bedNumber = admission.bedId?.bedNumber ? ` (Bed: ${admission.bedId.bedNumber})` : ''
+            const notifTitle = `💊 New IPD Pharmacy Order [${order.priority}]`
+            const notifBody = `Order for ${patientName}${bedNumber} with ${populatedItems.length} item(s) awaiting dispensing.`
+
+            // 1. Create DB Notification record
+            const dbNotif = await Notification.create({
+                title: notifTitle,
+                body: notifBody,
+                type: 'PHARMACY_ORDER',
+                department: 'pharmacy',
+                targetRoles: ['PharmacyManager', 'Pharmacist'],
+                data: {
+                    type: 'PHARMACY_ORDER',
+                    orderId: String(order._id),
+                    admissionId: String(data.admissionId),
+                    priority: String(order.priority),
+                    itemCount: String(populatedItems.length),
+                    url: '/pharmacy/manage'
+                }
+            })
+
+            // 2. Gather FCM device tokens for real-time push
+            const allTokens = pharmacyStaff.flatMap(u => u.fcmTokens || []).filter(Boolean)
+            const uniqueTokens = [...new Set(allTokens)]
+
+            if (uniqueTokens.length > 0) {
+                await sendMulticast({
+                    tokens: uniqueTokens,
+                    notification: {
+                        title: notifTitle,
+                        body: notifBody
+                    },
+                    data: {
+                        type: 'PHARMACY_ORDER',
+                        orderId: String(order._id),
+                        admissionId: String(data.admissionId),
+                        priority: String(order.priority),
+                        notificationId: String(dbNotif._id)
+                    }
+                })
+            }
+        } catch (notifErr) {
+            console.warn('Failed to send IPD pharmacy order notification:', notifErr.message)
+        }
 
         return { order, items: populatedItems }
     } catch (error) {
@@ -893,6 +956,60 @@ exports.updateIpdOrderStatus = async (orderId, status, userId) => {
 
         order.status = status
         await order.save()
+
+        // Send notification to the original requester (Nurse / Doctor)
+        if (status === 'ISSUED' || status === 'CANCELLED') {
+            try {
+                if (order.requestedBy) {
+                    const requesterUser = await User.findById(order.requestedBy).select('_id fcmTokens fullName email')
+                    const admission = await Admission.findById(order.admissionId).populate('patientId').populate('bedId')
+                    const patientName = admission?.patientId?.fullName || admission?.patientId?.name || 'IPD Patient'
+                    const bedNumber = admission?.bedId?.bedNumber ? ` (Bed: ${admission.bedId.bedNumber})` : ''
+
+                    const notifTitle = status === 'ISSUED' 
+                        ? '📦 Medication Dispensed by Pharmacy' 
+                        : '❌ IPD Pharmacy Order Cancelled'
+                    const notifBody = status === 'ISSUED'
+                        ? `Prescription order for ${patientName}${bedNumber} has been dispensed by the pharmacy and is ready for patient administration.`
+                        : `Prescription order for ${patientName}${bedNumber} was cancelled by the pharmacy.`
+
+                    // 1. Create DB Notification record specifically for the requester
+                    const dbNotif = await Notification.create({
+                        title: notifTitle,
+                        body: notifBody,
+                        type: status === 'ISSUED' ? 'PHARMACY_DISPENSED' : 'PHARMACY_CANCELLED',
+                        department: 'nursing',
+                        recipient: requesterUser?._id || order.requestedBy,
+                        data: {
+                            type: status === 'ISSUED' ? 'PHARMACY_DISPENSED' : 'PHARMACY_CANCELLED',
+                            orderId: String(order._id),
+                            admissionId: String(order.admissionId),
+                            status: status,
+                            url: `/ipd/patients/${order.admissionId}`
+                        }
+                    })
+
+                    // 2. Send real-time FCM Push Notification to requester's device
+                    if (requesterUser?.fcmTokens && requesterUser.fcmTokens.length > 0) {
+                        await sendMulticast({
+                            tokens: requesterUser.fcmTokens,
+                            notification: {
+                                title: notifTitle,
+                                body: notifBody
+                            },
+                            data: {
+                                type: status === 'ISSUED' ? 'PHARMACY_DISPENSED' : 'PHARMACY_CANCELLED',
+                                orderId: String(order._id),
+                                admissionId: String(order.admissionId),
+                                notificationId: String(dbNotif._id)
+                            }
+                        })
+                    }
+                }
+            } catch (notifErr) {
+                console.warn('Failed to send medication dispensed notification to requester:', notifErr.message)
+            }
+        }
 
         return order
     } catch (error) {

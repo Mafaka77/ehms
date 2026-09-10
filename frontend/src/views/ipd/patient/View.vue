@@ -298,6 +298,7 @@ const editAdmissionForm = ref({
   admissionDate: '',
   admissionType: 'NORMAL',
   payerType: 'NORMAL',
+  payerTypeDetails: '',
   diagnosis: '',
   remarks: '',
   isNewBorn: false,
@@ -361,6 +362,7 @@ const openEditAdmissionModal = () => {
     admissionDate: formattedDate,
     admissionType: admission.value.admissionType || 'NORMAL',
     payerType: admission.value.payerType || 'NORMAL',
+    payerTypeDetails: admission.value.payerTypeDetails || '',
     diagnosis: admission.value.diagnosis || '',
     remarks: admission.value.remarks || '',
     isNewBorn: !!admission.value.isNewBorn,
@@ -798,6 +800,7 @@ onMounted(async () => {
               </span>
             </p>
             <p><span class="font-semibold text-slate-500">Payer Type:</span> <strong class="text-slate-800 font-bold ml-1">{{ getPayerTypeLabel(admission.payerType) }}</strong></p>
+            <p v-if="admission.payerTypeDetails"><span class="font-semibold text-slate-500">Payer Details:</span> <span class="text-slate-700 font-medium ml-1">{{ admission.payerTypeDetails }}</span></p>
             <p v-if="admission.isNewBorn" class="flex items-center gap-1.5 pt-0.5">
               <span class="font-semibold text-slate-500">Category:</span>
               <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">
@@ -1404,6 +1407,17 @@ onMounted(async () => {
                 <option value="HEALTH_INSURANCE">HEALTH INSURANCE</option>
               </select>
             </div>
+          </div>
+
+          <!-- Payer Type Details -->
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Payer Type Details</label>
+            <input 
+              v-model="editAdmissionForm.payerTypeDetails"
+              type="text"
+              placeholder="e.g. Card No., Policy / Insurance No., Scheme info..."
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-slate-700 font-medium text-xs transition-all"
+            />
           </div>
 
           <!-- Diagnosis -->

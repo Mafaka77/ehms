@@ -6,9 +6,11 @@ import IPDOrder from './IPDOrder.vue'
 import Indent from './Indent.vue'
 import { usePharmacyStore } from '../../../stores/pharmacyStore'
 import { useAuthStore } from '../../../stores/authStore'
+import { useNotificationStore } from '../../../stores/notificationStore'
 
 const pharmacyStore = usePharmacyStore()
 const authStore = useAuthStore()
+const notifStore = useNotificationStore()
 const activeTab = ref(authStore.hasPermission('pharmacy.sale') ? 'sales' : (['Admin', 'SuperAdmin', 'HospitalAdmin', 'Pharmacist','PharmacyManager'].includes(authStore.user?.roleName || authStore.user?.role?.name) ? 'stock' : 'indent'))
 
 const refreshPendingCount = async () => {
@@ -25,6 +27,11 @@ watch(activeTab, (newTab) => {
   if (newTab === 'orders' || newTab === 'sales') {
     refreshPendingCount()
   }
+})
+
+// Auto-refresh badge count in real-time when new notification arrives
+watch(() => notifStore.notifications.length, () => {
+  refreshPendingCount()
 })
 </script>
 

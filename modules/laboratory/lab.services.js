@@ -7,6 +7,10 @@ const LabInstrument = require('./lab_instrument.model')
 const LabOrder = require('./lab_order.model')
 const LabOrderItem = require('./lab_order_item.model')
 const Employee = require('../hr/employee.model')
+const User = require('../auth/user.model')
+const Role = require('../auth/role.model')
+const Notification = require('../notification/notification.model')
+const { sendMulticast } = require('../../config/firebase')
 const STATUS_CODES = require('../../utils/statuscode')
 
 // --- Lab Category Services ---
@@ -480,6 +484,79 @@ exports.createLabOrder = async (data, userId = null) => {
 
         await session.commitTransaction();
         session.endSession();
+
+        // Dispatch notification to LabTechnician & LabManager users
+        try {
+            const Patient = require('../patients/patient.model');
+            const patient = await Patient.findById(data.patientId);
+            const patientName = patient?.fullName || patient?.name || 'Patient';
+
+            let bedNumber = '';
+            if (data.admissionId) {
+                const Admission = require('../clinical/ipd/admission.model');
+                const admission = await Admission.findById(data.admissionId).populate('bedId');
+                if (admission?.bedId?.bedNumber) {
+                    bedNumber = ` (Bed: ${admission.bedId.bedNumber})`;
+                }
+            }
+
+            const notifTitle = `🧪 New ${data.admissionId ? 'IPD ' : ''}Lab Order [${order[0].priority || 'ROUTINE'}]`;
+            const notifBody = `New lab requisition for ${patientName}${bedNumber} with ${insertedItems.length} test(s) awaiting processing.`;
+
+            // 1. Create DB Notification record
+            const dbNotif = await Notification.create({
+                title: notifTitle,
+                body: notifBody,
+                type: 'LAB_ORDER',
+                department: 'laboratory',
+                targetRoles: ['LabManager', 'LabTechnician'],
+                recipient: null,
+                data: {
+                    type: 'LAB_ORDER',
+                    orderId: String(order[0]._id),
+                    admissionId: String(data.admissionId || ''),
+                    patientId: String(data.patientId || ''),
+                    priority: String(order[0].priority || 'ROUTINE'),
+                    referral: String(data.referral || 'IPD'),
+                    url: '/laboratory/manage'
+                }
+            });
+
+            // 2. Dispatch real-time FCM Push Notification to LabStaff device tokens
+            const labRoles = await Role.find({
+                name: { $in: ['LabManager', 'LabTechnician', 'SuperAdmin', 'HospitalAdmin', 'Admin'] }
+            });
+            const roleIds = labRoles.map(r => r._id);
+            const labStaff = await User.find({
+                $or: [
+                    { role: { $in: roleIds } },
+                    { roles: { $in: roleIds } }
+                ]
+            }).select('_id fcmTokens fullName email');
+
+            const allTokens = labStaff.flatMap(u => u.fcmTokens || []).filter(Boolean);
+            const uniqueTokens = [...new Set(allTokens)];
+
+            if (uniqueTokens.length > 0) {
+                await sendMulticast({
+                    tokens: uniqueTokens,
+                    notification: {
+                        title: notifTitle,
+                        body: notifBody
+                    },
+                    data: {
+                        type: 'LAB_ORDER',
+                        orderId: String(order[0]._id),
+                        admissionId: String(data.admissionId || ''),
+                        priority: String(order[0].priority || 'ROUTINE'),
+                        notificationId: String(dbNotif._id)
+                    }
+                });
+            }
+        } catch (notifErr) {
+            console.warn('Failed to send Lab Order notification:', notifErr.message);
+        }
+
         return order[0];
     } catch (error) {
         await session.abortTransaction();
@@ -532,6 +609,19 @@ exports.getAllLabOrders = async (query = {}) => {
         }
         if (query.patientId) {
             filter.patientId = query.patientId
+        }
+        if (query.status) {
+            if (typeof query.status === 'string' && query.status.includes(',')) {
+                filter.status = { $in: query.status.split(',').map(s => s.trim()) }
+            } else {
+                filter.status = query.status
+            }
+        }
+        if (query.referral) {
+            filter.referral = query.referral
+        }
+        if (query.priority) {
+            filter.priority = query.priority
         }
 
         if (query.startDate || query.endDate) {

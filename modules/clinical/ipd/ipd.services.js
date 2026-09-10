@@ -293,6 +293,7 @@ exports.createAdmission = async (data) => {
             admissionDate: data.admissionDate ? new Date(data.admissionDate) : new Date(),
             admissionType: data.admissionType || 'NORMAL',
             payerType: data.payerType || 'NORMAL',
+            payerTypeDetails: data.payerTypeDetails || null,
             consultantDoctorId: data.consultantDoctorId,
             bedId: data.bedId,
             diagnosis: data.diagnosis || null,
@@ -1829,6 +1830,7 @@ exports.getNewbornDischargeSummary = async (admissionId) => {
                 dehydrationCorrectedWith: null,
                 feedingType: 'EXCLUSIVE_BREASTFEEDING',
                 otherSignificantEvents: null,
+                diagnosis: null,
                 dischargeType: 'WITH_MEDICAL_ADVICE',
                 conditionAtDischarge: {
                     isActive: true,
@@ -1910,6 +1912,7 @@ exports.saveNewbornDischargeSummary = async (admissionId, data, userId) => {
             dehydrationCorrectedWith: data.dehydrationCorrectedWith || null,
             feedingType: data.feedingType || 'EXCLUSIVE_BREASTFEEDING',
             otherSignificantEvents: data.otherSignificantEvents || null,
+            diagnosis: data.diagnosis || null,
             dischargeType: data.dischargeType || 'WITH_MEDICAL_ADVICE',
             conditionAtDischarge: data.conditionAtDischarge || {},
             advice: Array.isArray(data.advice) ? data.advice : [],
