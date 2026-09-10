@@ -58,7 +58,7 @@ fastify.register(require('@fastify/static'), {
 
 // Serve index.html for all other unmatched non-API routes (SPA fallback)
 fastify.get('/*', async (req, reply) => {
-  if (req.url.startsWith('/api')) {
+  if (req.url.startsWith('/api') || req.url.startsWith('/assets/') || req.url.startsWith('/uploads/')) {
     reply.code(404).send({ error: 'Not Found' });
     return;
   }
