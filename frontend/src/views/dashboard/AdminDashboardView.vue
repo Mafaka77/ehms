@@ -619,11 +619,11 @@ onMounted(async () => {
       </div>
 
       <!-- Categorized Wards Content -->
-      <div v-else-if="displayedWardGroups.length" class="divide-y divide-slate-100">
+      <div v-else-if="displayedWardGroups.length" class="divide-y divide-slate-100 max-h-[70vh] sm:max-h-none overflow-y-auto overscroll-contain custom-scrollbar">
         <div
           v-for="wg in displayedWardGroups"
           :key="wg.id"
-          class="p-6 space-y-3"
+          class="p-4 sm:p-6 space-y-3"
         >
           <!-- Ward Header Banner -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
@@ -659,8 +659,8 @@ onMounted(async () => {
           </div>
 
           <!-- Ward Beds Table (Available First) -->
-          <div class="rounded-xl border border-slate-100 overflow-hidden shadow-2xs">
-            <table class="w-full text-sm">
+          <div class="rounded-xl border border-slate-100 overflow-x-auto shadow-2xs">
+            <table class="w-full text-sm min-w-[500px] sm:min-w-full">
               <thead>
                 <tr class="bg-slate-50/70">
                   <th class="px-4 py-2.5 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Bed No.</th>
@@ -718,3 +718,20 @@ onMounted(async () => {
 
   </div>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+</style>
