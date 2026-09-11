@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/authStore'
+import { usePwaInstall } from '../composables/usePwaInstall'
 
 const props = defineProps({
   collapsed: {
@@ -242,6 +243,17 @@ const isActive = (href) => {
   return route.path === href || route.path.startsWith(href + '/')
 }
 
+const { isInstallable, isInstalled, isIOS, installPwa } = usePwaInstall()
+const showIosInstallModal = ref(false)
+
+const handleInstallClick = async () => {
+  if (isIOS.value) {
+    showIosInstallModal.value = true
+  } else {
+    await installPwa()
+  }
+}
+
 const handleLogout = () => {
   authStore.logout()
   router.push('/login')
@@ -445,6 +457,37 @@ const handleLogout = () => {
       </div>
     </nav>
 
+    <!-- PWA Install Button -->
+    <div v-if="(isInstallable || (isIOS && !isInstalled)) && !isInstalled" class="border-t border-white/10 bg-slate-900/95 shrink-0" :class="collapsed ? 'p-2' : 'p-3'">
+      <div v-if="collapsed" class="relative group/tip">
+        <button 
+          @click="handleInstallClick" 
+          class="flex items-center justify-center w-full p-3 rounded-xl text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors duration-200"
+          title="Install EHMS App"
+        >
+          <svg class="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        </button>
+        <div class="absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 hidden group-hover/tip:block">
+          <div class="bg-indigo-900 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xl whitespace-nowrap border border-indigo-500/30">Install EHMS App</div>
+        </div>
+      </div>
+      <button 
+        v-else 
+        @click="handleInstallClick" 
+        class="flex items-center justify-between w-full px-3.5 py-2.5 text-xs font-semibold text-indigo-300 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 rounded-xl transition-all duration-200 group shadow-sm cursor-pointer"
+      >
+        <div class="flex items-center">
+          <svg class="w-4 h-4 mr-2.5 text-indigo-400 group-hover:scale-110 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span class="truncate">Install App</span>
+        </div>
+        <span class="text-[9px] uppercase tracking-wider bg-indigo-500 text-white font-bold px-1.5 py-0.5 rounded-md">PWA</span>
+      </button>
+    </div>
+
     <!-- Bottom Logout -->
     <div class="border-t border-white/10 bg-slate-900 shrink-0" :class="collapsed ? 'p-2' : 'p-4'">
       <div v-if="collapsed" class="relative group/tip">
@@ -463,6 +506,44 @@ const handleLogout = () => {
         </svg>
         Sign Out
       </button>
+    </div>
+
+    <!-- iOS PWA Install Instruction Modal -->
+    <div v-if="showIosInstallModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm">
+      <div class="bg-slate-900 border border-slate-700/60 rounded-3xl p-6 max-w-sm w-full text-white shadow-2xl relative space-y-4">
+        <button @click="showIosInstallModal = false" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-full bg-slate-800">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-extrabold shadow-lg">
+            <img src="/icons/icon-192x192.png" alt="EHMS" class="w-9 h-9 object-contain" />
+          </div>
+          <div>
+            <h3 class="font-bold text-sm text-white">Install EHMS App</h3>
+            <p class="text-xs text-slate-400">Add to iPhone / iPad Home Screen</p>
+          </div>
+        </div>
+
+        <div class="space-y-3 pt-2 text-xs text-slate-300">
+          <div class="flex items-start gap-3 bg-slate-800/80 p-3 rounded-xl border border-slate-700/50">
+            <span class="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 font-bold flex items-center justify-center shrink-0 text-[11px]">1</span>
+            <p>Tap the <strong>Share</strong> button <span class="inline-block px-1 py-0.5 bg-slate-700 rounded text-[11px]">⎋</span> at the bottom of Safari.</p>
+          </div>
+          <div class="flex items-start gap-3 bg-slate-800/80 p-3 rounded-xl border border-slate-700/50">
+            <span class="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 font-bold flex items-center justify-center shrink-0 text-[11px]">2</span>
+            <p>Scroll down and tap <strong>Add to Home Screen</strong> <span class="inline-block px-1 py-0.5 bg-slate-700 rounded text-[11px]">➕</span>.</p>
+          </div>
+          <div class="flex items-start gap-3 bg-slate-800/80 p-3 rounded-xl border border-slate-700/50">
+            <span class="w-5 h-5 rounded-full bg-indigo-500/30 text-indigo-300 font-bold flex items-center justify-center shrink-0 text-[11px]">3</span>
+            <p>Tap <strong>Add</strong> in the top-right corner to finish.</p>
+          </div>
+        </div>
+
+        <button @click="showIosInstallModal = false" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 font-semibold text-xs rounded-xl transition-all shadow-md">
+          Got it
+        </button>
+      </div>
     </div>
   </aside>
 </template>
