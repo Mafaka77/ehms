@@ -24,7 +24,12 @@ const authStore = useAuthStore()
 
 const isSuperAdmin = computed(() => {
   const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
-  return roleName === 'SuperAdmin' || roleName === 'Super Admin'
+  return roleName === 'SuperAdmin' || roleName === 'Super Admin' 
+})
+
+const isDoctor = computed(() => {
+  const roleName = authStore.user?.roleName || authStore.user?.role?.name || authStore.user?.role
+  return roleName === 'Doctor'
 })
 
 const loading = ref(false)
@@ -657,7 +662,7 @@ const doctorOptions = computed(() => {
               <td class="px-5 py-3.5 text-center">
                 <div class="flex items-center justify-center gap-1.5">
                   <button 
-                    v-if="isSuperAdmin"
+                    v-if="isSuperAdmin || isDoctor"
                     @click="router.push({ name: 'ipd-patient-view', params: { id: adm._id } })"
                     class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-all border border-blue-100 cursor-pointer"
                     title="View Patient Medical Details"
