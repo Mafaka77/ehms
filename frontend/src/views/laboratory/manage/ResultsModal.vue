@@ -184,10 +184,20 @@ const formatDate = (dateString) => {
       <!-- Main Body -->
       <div v-else class="flex-grow overflow-y-auto p-6 space-y-6">
         <!-- Patient Banner -->
-        <div class="bg-slate-50 border border-slate-100 rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+        <div class="bg-slate-50 border border-slate-100 rounded-xl p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-xs">
           <div>
             <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Patient</div>
             <div class="font-semibold text-slate-800 mt-1">{{ order.patientId?.fullName }}</div>
+          </div>
+          <div>
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Bed / Ward</div>
+            <div class="font-semibold text-indigo-700 mt-1">
+              <template v-if="order.admissionId?.bedId?.bedNo">
+                Bed {{ order.admissionId.bedId.bedNo }}
+                <span v-if="order.admissionId?.bedId?.wardId?.name" class="text-slate-500 font-normal">({{ order.admissionId.bedId.wardId.name }})</span>
+              </template>
+              <span v-else class="text-slate-400 font-normal">N/A</span>
+            </div>
           </div>
           <div>
             <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Age / Gender</div>

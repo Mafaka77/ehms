@@ -568,6 +568,7 @@ const formatDate = (dateString) => {
                 <p><strong>Patient ID / Code:</strong> <span class="font-mono">{{ order.patientId?.patientCode || 'N/A' }}</span></p>
                 <p><strong>Age / Gender:</strong> {{ patientAge }} / {{ order.patientId?.gender }}</p>
                 <p><strong>Contact No:</strong> {{ order.patientId?.mobileNo }}</p>
+                <p v-if="order.admissionId?.bedId?.bedNo"><strong>Bed / Ward:</strong> Bed {{ order.admissionId.bedId.bedNo }} <span v-if="order.admissionId?.bedId?.wardId?.name">({{ order.admissionId.bedId.wardId.name }})</span></p>
               </div>
               <div class="text-right">
                 <p><strong>Order No:</strong> <span class="font-mono">{{ order.orderNo }}</span></p>

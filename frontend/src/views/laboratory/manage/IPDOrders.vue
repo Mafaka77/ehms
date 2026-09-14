@@ -260,6 +260,16 @@ onMounted(async () => {
               <span class="font-semibold text-slate-800 text-right truncate max-w-[180px]">{{ order.patientId?.fullName }}</span>
             </div>
             <div class="flex items-center justify-between">
+              <span class="text-slate-400 text-xs">Bed / Ward</span>
+              <span class="font-semibold text-indigo-700 text-right text-xs">
+                <template v-if="order.admissionId?.bedId?.bedNo">
+                  Bed {{ order.admissionId.bedId.bedNo }}
+                  <span v-if="order.admissionId?.bedId?.wardId?.name" class="text-slate-500 font-normal">({{ order.admissionId.bedId.wardId.name }})</span>
+                </template>
+                <span v-else class="text-slate-400 font-normal">N/A</span>
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
               <span class="text-slate-400 text-xs">Code / Info</span>
               <span class="font-mono text-xs text-slate-600 text-right">
                 {{ order.patientId?.patientCode || 'N/A' }} ({{ calculateAge(order.patientId) }} / {{ order.patientId?.gender }})
@@ -419,6 +429,19 @@ onMounted(async () => {
               <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Patient</div>
               <div class="font-semibold text-slate-800 mt-1">{{ selectedOrder.patientId?.fullName }}</div>
               <div class="text-xs text-slate-500 mt-0.5">Code: {{ selectedOrder.patientId?.patientCode }}</div>
+            </div>
+            <div>
+              <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Bed & Ward</div>
+              <div class="font-semibold text-indigo-700 mt-1">
+                <template v-if="selectedOrder.admissionId?.bedId?.bedNo">
+                  Bed {{ selectedOrder.admissionId.bedId.bedNo }}
+                  <span v-if="selectedOrder.admissionId?.bedId?.wardId?.name" class="text-xs text-slate-500 font-normal">
+                    ({{ selectedOrder.admissionId.bedId.wardId.name }})
+                  </span>
+                </template>
+                <span v-else class="text-slate-400 font-normal">N/A</span>
+              </div>
+              <div v-if="selectedOrder.admissionId?.admissionNo" class="text-xs text-slate-500 mt-0.5">IPD: {{ selectedOrder.admissionId.admissionNo }}</div>
             </div>
             <div>
               <div class="text-[10px] text-slate-400 uppercase tracking-wider font-bold">Age / Gender</div>

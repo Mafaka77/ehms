@@ -10,6 +10,9 @@ const Employee = require('../hr/employee.model')
 const User = require('../auth/user.model')
 const Role = require('../auth/role.model')
 const Notification = require('../notification/notification.model')
+require('../clinical/ipd/admission.model')
+require('../clinical/ipd/bed.model')
+require('../clinical/ipd/ward.model')
 const { sendMulticast } = require('../../config/firebase')
 const STATUS_CODES = require('../../utils/statuscode')
 
@@ -653,6 +656,18 @@ exports.getAllLabOrders = async (query = {}) => {
             .sort({ createdAt: -1 })
             .populate('patientId')
             .populate('doctorId')
+            .populate({
+                path: 'admissionId',
+                select: 'admissionNo bedId status admissionDate',
+                populate: {
+                    path: 'bedId',
+                    select: 'bedNo bedType wardId floor',
+                    populate: {
+                        path: 'wardId',
+                        select: 'name code'
+                    }
+                }
+            })
 
         if (limit > 0) {
             queryExec = queryExec.skip(skip).limit(limit)
@@ -680,6 +695,18 @@ exports.getLabOrderById = async (id) => {
             .populate('patientId')
             .populate('doctorId')
             .populate('opdAppointmentId')
+            .populate({
+                path: 'admissionId',
+                select: 'admissionNo bedId status admissionDate',
+                populate: {
+                    path: 'bedId',
+                    select: 'bedNo bedType wardId floor',
+                    populate: {
+                        path: 'wardId',
+                        select: 'name code'
+                    }
+                }
+            })
         if (!order) {
             const error = new Error('Lab order not found')
             error.status = STATUS_CODES.NOT_FOUND
@@ -848,7 +875,19 @@ exports.getLabOrderResults = async (orderId) => {
         
         const order = await LabOrder.findById(orderId)
             .populate('patientId')
-            .populate('doctorId');
+            .populate('doctorId')
+            .populate({
+                path: 'admissionId',
+                select: 'admissionNo bedId status admissionDate',
+                populate: {
+                    path: 'bedId',
+                    select: 'bedNo bedType wardId floor',
+                    populate: {
+                        path: 'wardId',
+                        select: 'name code'
+                    }
+                }
+            });
             
         if (!order) {
             const error = new Error('Lab order not found')
