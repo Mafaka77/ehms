@@ -82,8 +82,9 @@ const admissionSchema = new mongoose.Schema({
   type: String,
   enum: [
     'MUHCS',
-    'MR_STATE',
-    'MR_CENTRAL',
+    'GOLDEN_CARD',
+    'CIVIL_PENSIONER',
+    'GIA',
     'HEALTH_INSURANCE',
     'NORMAL'
   ],

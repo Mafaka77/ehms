@@ -283,8 +283,9 @@ const getAdmissionTypeColor = (type) => {
 const getPayerTypeLabel = (type) => {
   switch (type) {
     case 'MUHCS': return 'MUHCS'
-    case 'MR_STATE': return 'MR (STATE)'
-    case 'MR_CENTRAL': return 'MR (CENTRAL)'
+    case 'GOLDEN_CARD': return 'GOLDEN CARD'
+    case 'CIVIL_PENSIONER': return 'CIVIL PENSIONER'
+    case 'GIA': return 'GIA'
     case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
     case 'NORMAL':
     default: return 'NORMAL'
@@ -1402,8 +1403,9 @@ onMounted(async () => {
               >
                 <option value="NORMAL">NORMAL</option>
                 <option value="MUHCS">MUHCS</option>
-                <option value="MR_STATE">MR (STATE)</option>
-                <option value="MR_CENTRAL">MR (CENTRAL)</option>
+                <option value="GOLDEN_CARD">GOLDEN CARD</option>
+                <option value="CIVIL_PENSIONER">CIVIL PENSIONER</option>
+                <option value="GIA">GIA</option>
                 <option value="HEALTH_INSURANCE">HEALTH INSURANCE</option>
               </select>
             </div>

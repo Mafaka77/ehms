@@ -144,7 +144,7 @@ const generateEditorContent = () => {
     }
 
     if (notesArr.length > 0) {
-      html += `<tr><td colspan="4" style="font-size: 9.5px; color: #1e293b; padding: 2px 0 2px 0; line-height: 1.2;">${notesArr.join('<br>')}</td></tr>`
+      html += `<tr><td colspan="4" class="remarks-cell" style="border-top: 1px solid #cbd5e1; padding-top: 10px; padding-bottom: 4px;"><div class="remarks-box" style="border: 1px solid #cbd5e1; background-color: #f8fafc; border-radius: 4px; padding: 6px 10px; font-size: 9.5px; color: #1e293b; line-height: 1.35;"><strong style="font-weight: 700; color: #0f172a;">Remarks:</strong> ${notesArr.join('<br>')}</div></td></tr>`
     }
   })
   
@@ -160,7 +160,7 @@ const generateEditorContent = () => {
     }
   }
 
-  html += '<p style="margin-top: 4px; margin-bottom: 2px;"><strong>Remarks:</strong> </p>'
+  // html += '<p style="margin-top: 4px; margin-bottom: 2px;"><strong>Remarks:</strong> </p>'
   
   return html
 }
@@ -227,6 +227,30 @@ const Color = Extension.create({
   },
 })
 
+const CustomTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      class: {
+        default: null,
+        parseHTML: element => element.getAttribute('class'),
+        renderHTML: attributes => {
+          if (!attributes.class) return {}
+          return { class: attributes.class }
+        },
+      },
+      style: {
+        default: null,
+        parseHTML: element => element.getAttribute('style'),
+        renderHTML: attributes => {
+          if (!attributes.style) return {}
+          return { style: attributes.style }
+        },
+      },
+    }
+  },
+})
+
 const editor = useEditor({
   extensions: [
     StarterKit,
@@ -236,7 +260,7 @@ const editor = useEditor({
     Table.configure({ resizable: false }),
     TableRow,
     TableHeader,
-    TableCell,
+    CustomTableCell,
     TextAlign.configure({
       types: ['heading', 'paragraph', 'tableCell', 'tableHeader'],
     }),
@@ -929,6 +953,25 @@ const formatDate = (dateString) => {
   border: none !important;
   border-top: 1px dashed #cbd5e1 !important;
   padding: 1px 0 !important;
+}
+
+.tiptap-editor :deep(.tiptap td.remarks-cell) {
+  border: none !important;
+  border-top: 1px solid #cbd5e1 !important;
+  padding-top: 10px !important;
+  padding-bottom: 4px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+
+.tiptap-editor :deep(.tiptap .remarks-box) {
+  border: 1px solid #cbd5e1;
+  background-color: #f8fafc;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 9.5px;
+  color: #1e293b;
+  line-height: 1.35;
 }
 
 .signatures {

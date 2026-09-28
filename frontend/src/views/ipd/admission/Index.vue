@@ -121,8 +121,9 @@ watch(() => admissionForm.value.isNewBorn, (val) => {
 const payerTypeOptions = [
   { value: 'NORMAL', label: 'NORMAL' },
   { value: 'MUHCS', label: 'MUHCS' },
-  { value: 'MR_STATE', label: 'MR (STATE)' },
-  { value: 'MR_CENTRAL', label: 'MR (CENTRAL)' },
+  { value: 'GOLDEN_CARD', label: 'GOLDEN CARD' },
+  { value: 'CIVIL_PENSIONER', label: 'CIVIL PENSIONER' },
+  { value: 'GIA', label: 'GIA' },
   { value: 'HEALTH_INSURANCE', label: 'HEALTH INSURANCE' }
 ]
 const availableBeds = ref([])
@@ -411,8 +412,9 @@ const getAdmissionTypeColor = (type) => {
 const getPayerTypeLabel = (type) => {
   switch (type) {
     case 'MUHCS': return 'MUHCS'
-    case 'MR_STATE': return 'MR (STATE)'
-    case 'MR_CENTRAL': return 'MR (CENTRAL)'
+    case 'GOLDEN_CARD': return 'GOLDEN CARD'
+    case 'CIVIL_PENSIONER': return 'CIVIL PENSIONER'
+    case 'GIA': return 'GIA'
     case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
     case 'NORMAL':
     default: return 'NORMAL'
@@ -423,10 +425,12 @@ const getPayerTypeColor = (type) => {
   switch (type) {
     case 'MUHCS':
       return 'bg-purple-50 text-purple-700 border-purple-200'
-    case 'MR_STATE':
+    case 'GOLDEN_CARD':
       return 'bg-teal-50 text-teal-700 border-teal-200'
-    case 'MR_CENTRAL':
+    case 'CIVIL_PENSIONER':
       return 'bg-cyan-50 text-cyan-700 border-cyan-200'
+    case 'GIA':
+      return 'bg-amber-50 text-amber-700 border-amber-200'
     case 'HEALTH_INSURANCE':
       return 'bg-amber-50 text-amber-700 border-amber-200'
     case 'NORMAL':

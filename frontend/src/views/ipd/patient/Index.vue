@@ -183,8 +183,9 @@ const getStatusColor = (status) => {
 const getPayerTypeLabel = (type) => {
   switch (type) {
     case 'MUHCS': return 'MUHCS'
-    case 'MR_STATE': return 'MR (STATE)'
-    case 'MR_CENTRAL': return 'MR (CENTRAL)'
+    case 'GOLDEN_CARD': return 'GOLDEN CARD'
+    case 'CIVIL_PENSIONER': return 'CIVIL PENSIONER'
+    case 'GIA': return 'GIA'
     case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
     case 'NORMAL':
     default: return 'NORMAL'
