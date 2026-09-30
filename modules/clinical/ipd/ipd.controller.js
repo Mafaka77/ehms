@@ -896,3 +896,38 @@ exports.deleteAdmissionBedHistory = async (req, res) => {
         })
     }
 }
+
+exports.getDeathSummary = async (req, res) => {
+    try {
+        const result = await ipdService.getDeathSummary(req.params.id)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            data: result
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to fetch death summary',
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+
+exports.saveDeathSummary = async (req, res) => {
+    try {
+        const userId = req.user?._id || req.user?.id
+        const result = await ipdService.saveDeathSummary(req.params.id, req.body, userId)
+        return res.code(STATUS_CODES.OK).send({
+            success: true,
+            message: 'Death summary saved successfully',
+            data: result
+        })
+    } catch (error) {
+        return res.code(error.status || STATUS_CODES.INTERNAL_SERVER_ERROR).send({
+            success: false,
+            message: error.message || 'Failed to save death summary',
+            status: error.status || STATUS_CODES.INTERNAL_SERVER_ERROR
+        })
+    }
+}
+

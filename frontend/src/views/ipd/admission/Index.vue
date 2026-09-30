@@ -631,6 +631,9 @@ const doctorOptions = computed(() => {
                       <span v-if="adm.isNewBorn" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-pink-50 text-pink-700 border border-pink-200 uppercase tracking-wider">
                         Newborn
                       </span>
+                      <span v-if="adm.isDeceased" class="px-1.5 py-0.2 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase tracking-wider">
+                        Deceased
+                      </span>
                     </div>
                     <p class="text-[11px] text-slate-400 font-mono mt-0.5">{{ adm.patientId?.patientCode || '-' }} • {{ adm.patientId?.gender || '-' }}, {{ adm.patientId?.age || '?' }}y</p>
                     <p v-if="adm.isNewBorn && adm.mothersId" class="text-[10px] text-pink-600 font-medium mt-0.5">

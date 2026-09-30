@@ -693,6 +693,36 @@ export const useIpdAdmissionStore = defineStore('ipdAdmission', {
       } finally {
         this.loading = false
       }
+    },
+
+    async fetchDeathSummary(admissionId) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.get(`/ipd/admission/${admissionId}/death-summary`)
+        return { success: true, data: response.data.data }
+      } catch (err) {
+        console.error('Error fetching death summary:', err)
+        this.error = err.response?.data?.message || 'Failed to fetch death summary'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async saveDeathSummary(admissionId, data) {
+      this.loading = true
+      this.error = null
+      try {
+        const response = await api.post(`/ipd/admission/${admissionId}/death-summary`, data)
+        return { success: true, data: response.data.data, message: response.data.message || 'Death summary saved successfully' }
+      } catch (err) {
+        console.error('Error saving death summary:', err)
+        this.error = err.response?.data?.message || 'Failed to save death summary'
+        return { success: false, message: this.error }
+      } finally {
+        this.loading = false
+      }
     }
   }
 })

@@ -20,6 +20,11 @@ const admissionSchema = new mongoose.Schema({
     default: false
   },
 
+  isDeceased: {
+    type: Boolean,
+    default: false
+  },
+
   mothersId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Patient',

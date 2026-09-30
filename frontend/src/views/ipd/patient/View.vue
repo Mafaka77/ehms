@@ -12,6 +12,7 @@ import PatientCharge from './PatientCharge.vue'
 
 import DischargeSummary from './DischargeSummary.vue'
 import NewBornDischargeSummary from './NewBornDischargeSummary.vue'
+import DeathSummary from './DeathSummary.vue'
 import Test from './Test.vue'
 import Transactions from './Transactions.vue'
 import { useIpdWardStore } from '../../../stores/ipdWardStore'
@@ -63,7 +64,72 @@ const loading = ref(true)
 const admission = ref(null)
 const activeTab = ref('charges') // charges, pharmacy, doctor_charges, files, bed_history, transactions
 const isNewborn = ref(false)
+const isDeceased = ref(false)
 const transactionsRef = ref(null)
+
+watch(isNewborn, (val) => {
+  if (val) {
+    isDeceased.value = false
+  }
+})
+
+watch(isDeceased, (val) => {
+  if (val) {
+    isNewborn.value = false
+  }
+})
+
+const onToggleNewborn = async (event) => {
+  if (!admission.value?._id) return
+  const checked = event.target.checked
+  isNewborn.value = checked
+  if (checked) {
+    isDeceased.value = false
+  }
+  
+  try {
+    const res = await admissionStore.updateAdmission(admission.value._id, {
+      isNewBorn: checked,
+      isDeceased: checked ? false : !!admission.value.isDeceased
+    })
+    if (res.success) {
+      admission.value.isNewBorn = checked
+      if (checked) admission.value.isDeceased = false
+      snackbarStore.show({ message: `Patient marked as ${checked ? 'Newborn' : 'not Newborn'}`, type: 'success' })
+    } else {
+      snackbarStore.show({ message: res.message || 'Failed to update admission', type: 'error' })
+    }
+  } catch (err) {
+    console.error(err)
+    snackbarStore.show({ message: 'Error updating admission status', type: 'error' })
+  }
+}
+
+const onToggleDeceased = async (event) => {
+  if (!admission.value?._id) return
+  const checked = event.target.checked
+  isDeceased.value = checked
+  if (checked) {
+    isNewborn.value = false
+  }
+  
+  try {
+    const res = await admissionStore.updateAdmission(admission.value._id, {
+      isDeceased: checked,
+      isNewBorn: checked ? false : !!admission.value.isNewBorn
+    })
+    if (res.success) {
+      admission.value.isDeceased = checked
+      if (checked) admission.value.isNewBorn = false
+      snackbarStore.show({ message: `Patient marked as ${checked ? 'Deceased' : 'not Deceased'}`, type: 'success' })
+    } else {
+      snackbarStore.show({ message: res.message || 'Failed to update admission', type: 'error' })
+    }
+  } catch (err) {
+    console.error(err)
+    snackbarStore.show({ message: 'Error updating admission status', type: 'error' })
+  }
+}
 
 // Change Consultant Doctor Modal States
 const showDoctorModal = ref(false)
@@ -228,6 +294,9 @@ const fetchAdmissionDetails = async () => {
     admission.value = res.data
     if (res.data?.isNewBorn) {
       isNewborn.value = true
+    }
+    if (res.data?.isDeceased) {
+      isDeceased.value = true
     }
   } else {
     snackbarStore.show({ message: res.message, type: 'error' })
@@ -753,6 +822,9 @@ onMounted(async () => {
                 <span v-if="admission.isNewBorn" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-pink-50 text-pink-700 border border-pink-200 uppercase tracking-wider">
                   Newborn
                 </span>
+                <span v-if="admission.isDeceased" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 uppercase tracking-wider">
+                  Deceased
+                </span>
               </div>
               <p class="text-slate-400 font-mono text-xs mt-0.5">{{ admission.patientId?.patientCode || '-' }}</p>
             </div>
@@ -971,17 +1043,31 @@ onMounted(async () => {
         <!-- Tab: Discharge Summary -->
         <div v-else-if="activeTab === 'discharge_summary'" class="space-y-4 animate-in fade-in duration-200">
           <div class="flex items-center justify-between pb-3 border-b border-slate-100">
-            <label class="inline-flex items-center gap-2.5 cursor-pointer select-none px-3.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/70 transition-colors">
-              <input 
-                type="checkbox" 
-                v-model="isNewborn" 
-                class="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
-              />
-              <span class="text-sm font-semibold text-slate-700">New Born</span>
-            </label>
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center gap-2.5 cursor-pointer select-none px-3.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/70 transition-colors">
+                <input 
+                  type="checkbox" 
+                  :checked="isNewborn" 
+                  @change="onToggleNewborn"
+                  class="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                />
+                <span class="text-sm font-semibold text-slate-700">New Born</span>
+              </label>
+
+              <label class="inline-flex items-center gap-2.5 cursor-pointer select-none px-3.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 hover:bg-slate-100/70 transition-colors">
+                <input 
+                  type="checkbox" 
+                  :checked="isDeceased" 
+                  @change="onToggleDeceased"
+                  class="w-4 h-4 text-rose-600 bg-white border-slate-300 rounded focus:ring-rose-500 cursor-pointer"
+                />
+                <span class="text-sm font-semibold text-slate-700">Is Deceased</span>
+              </label>
+            </div>
           </div>
 
-          <NewBornDischargeSummary v-if="isNewborn" :admissionId="admission._id" :admission="admission" />
+          <DeathSummary v-if="isDeceased" :admissionId="admission._id" :admission="admission" />
+          <NewBornDischargeSummary v-else-if="isNewborn" :admissionId="admission._id" :admission="admission" />
           <DischargeSummary v-else :admissionId="admission._id" :admission="admission" />
         </div>
 

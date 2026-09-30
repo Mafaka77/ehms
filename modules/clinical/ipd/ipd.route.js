@@ -74,6 +74,10 @@ module.exports = async (fastify, options) => {
     fastify.get('/admission/:id/newborn-discharge-summary', { onRequest: [auth] }, ipdController.getNewbornDischargeSummary)
     fastify.post('/admission/:id/newborn-discharge-summary', { onRequest: [auth] }, ipdController.saveNewbornDischargeSummary)
 
+    // Death Summary routes
+    fastify.get('/admission/:id/death-summary', { onRequest: [auth] }, ipdController.getDeathSummary)
+    fastify.post('/admission/:id/death-summary', { onRequest: [auth] }, ipdController.saveDeathSummary)
+
     // Sync dates route
     fastify.post('/sync-dates', { onRequest: [auth, authorizeRole(['SuperAdmin', 'HospitalAdmin'])] }, ipdController.syncAdmissionDates)
 }

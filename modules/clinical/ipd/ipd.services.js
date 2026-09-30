@@ -8,6 +8,7 @@ const AdmissionNote = require('./admission_note.model')
 const AdmissionAdvance = require('./admission_advance.model')
 const DischargeSummary = require('./discharge_summary.model')
 const NewbornDischargeSummary = require('./newborn_discharge_summary')
+const DeathSummary = require('./death_summary.model')
 const STATUS_CODES = require('../../../utils/statuscode')
 
 // ==========================================
@@ -1932,3 +1933,69 @@ exports.saveNewbornDischargeSummary = async (admissionId, data, userId) => {
         throw error
     }
 }
+
+exports.getDeathSummary = async (admissionId) => {
+    try {
+        let summary = await DeathSummary.findOne({ admissionId })
+            .populate('patientId', 'patientCode fullName age gender mobileNo address')
+            .lean()
+
+        if (!summary) {
+            const admission = await Admission.findById(admissionId)
+                .populate('patientId')
+                .lean()
+
+            if (!admission) {
+                const error = new Error('Admission record not found')
+                error.status = STATUS_CODES.NOT_FOUND
+                throw error
+            }
+
+            return {
+                admissionId: admission._id,
+                patientId: admission.patientId?._id || admission.patientId,
+                deathDateTime: null,
+                details: '',
+                isNew: true
+            }
+        }
+        return summary
+    } catch (error) {
+        throw error
+    }
+}
+
+exports.saveDeathSummary = async (admissionId, data, userId) => {
+    try {
+        const admission = await Admission.findById(admissionId)
+        if (!admission) {
+            const error = new Error('Admission record not found')
+            error.status = STATUS_CODES.NOT_FOUND
+            throw error
+        }
+
+        const patientId = data.patientId || admission.patientId
+
+        const updateData = {
+            admissionId,
+            patientId,
+            deathDateTime: data.deathDateTime || new Date(),
+            details: data.details || null
+        }
+
+        const record = await DeathSummary.findOneAndUpdate(
+            { admissionId },
+            updateData,
+            { new: true, upsert: true, runValidators: true }
+        )
+
+        await Admission.findByIdAndUpdate(admissionId, {
+            isDeceased: true
+        })
+
+        return record
+    } catch (error) {
+        throw error
+    }
+}
+
