@@ -49,7 +49,7 @@ const generateInvoicePDF = async () => {
     
     const imgData = canvas.toDataURL('image/jpeg', 0.98)
     
-    const pdf = new jsPDF('l', 'mm', 'a5')
+    const pdf = new jsPDF('p', 'mm', 'a5')
     const pdfWidth = pdf.internal.pageSize.getWidth()
     const ratio = pdfWidth / canvas.width
     const imgHeight = canvas.height * ratio
@@ -138,10 +138,10 @@ const numberToWords = (num) => {
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm print:hidden" @click="emit('close')"></div>
     
     <!-- Modal Wrapper -->
-    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh] print:static print:block print:max-w-none print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
+    <div class="relative bg-slate-100 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh] print:static print:block print:max-w-none print:max-h-none print:overflow-visible print:bg-white print:shadow-none print:rounded-none">
       
       <!-- Preview Area -->
-      <div class="flex-grow flex flex-col relative bg-slate-600 min-h-[500px]">
+      <div class="flex-grow flex flex-col relative bg-slate-600 min-h-[600px] h-[75vh]">
         
         <!-- Loading State -->
         <div v-if="printingPDF" class="absolute inset-0 flex items-center justify-center bg-slate-800 z-50">
@@ -159,12 +159,13 @@ const numberToWords = (num) => {
               <!-- Header Brand -->
               <div class="receipt-header">
                 <div class="flex items-center justify-between mb-2">
-                  <img src="../../../assets/logo_final.png" alt="Logo" class="h-16 w-auto object-contain" />
+                  <img src="../../../assets/logo_final.png" alt="Logo" class="h-14 w-auto object-contain" />
                   <div class="text-right">
-                    <p class="text-2xl font-bold">EMMANUEL HOSPITAL PHARMACY (General Retail)</p>
-                    <p>Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
-                    <p>Phone: 0389-2913340 / 8974326872, GSTIN: 15CDTPN0612H1ZK</p>
-                    <p>Licence No: 01/01/26/2003 (20) & 01/01/26/2004 (21)</p>
+                    <p class="text-sm font-bold text-slate-900 leading-tight">EMMANUEL HOSPITAL PHARMACY</p>
+                    <p class="text-[7px] font-semibold text-slate-700">(General Retail)</p>
+                    <p class="text-[7px] text-slate-600">Y-67,Luangmual,Aizawl, Mizoram - 796009</p>
+                    <p class="text-[7px] text-slate-600">Phone: 0389-2913340 / 8974326872, GSTIN: 15CDTPN0612H1ZK</p>
+                    <p class="text-[7px] text-slate-600">Licence No: 01/01/26/2003 (20) & 01/01/26/2004 (21)</p>
                   </div>
                 </div>
                 <hr class="receipt-divider" />
@@ -213,23 +214,23 @@ const numberToWords = (num) => {
                       {{ item.medicineId?.medicineName }}
                       <span v-if="item.medicineId?.brandName" class="text-[8px] text-slate-500 font-normal ml-1">({{ item.medicineId.brandName }})</span>
                     </td>
-                    <td class="text-center font-mono text-[9px]">{{ item.medicineId?.hsn || '—' }}</td>
-                    <td class="text-center font-mono font-bold text-[9px]">{{ item.batchId?.batchNo || '—' }}</td>
-                    <td class="text-center font-mono text-[9px]">{{ formatDateShort(item.batchId?.expiryDate) }}</td>
-                    <td class="text-center font-mono text-[9px]">{{ item.quantity }}</td>
-                    <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.rate) }}</td>
-                    <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.amount * 0.025) }}</td>
-                    <td class="text-right font-mono text-[9px]">{{ formatCurrency(item.amount * 0.025) }}</td>
-                    <td class="text-right font-mono font-semibold text-[9px]">{{ formatCurrency(item.amount) }}</td>
+                    <td class="text-center font-mono text-[7px]">{{ item.medicineId?.hsn || '—' }}</td>
+                    <td class="text-center font-mono font-bold text-[7px]">{{ item.batchId?.batchNo || '—' }}</td>
+                    <td class="text-center font-mono text-[7px]">{{ formatDateShort(item.batchId?.expiryDate) }}</td>
+                    <td class="text-center font-mono text-[7px]">{{ item.quantity }}</td>
+                    <td class="text-right font-mono text-[7px]">{{ formatCurrency(item.rate) }}</td>
+                    <td class="text-right font-mono text-[7px]">{{ formatCurrency(item.amount * 0.025) }}</td>
+                    <td class="text-right font-mono text-[7px]">{{ formatCurrency(item.amount * 0.025) }}</td>
+                    <td class="text-right font-mono font-semibold text-[7px]">{{ formatCurrency(item.amount) }}</td>
                   </tr>
                 </tbody>
               </table>
 
               <!-- Financials Summary -->
               <div class="financials-summary-container flex justify-between mt-3">
-                <div class="amount-words text-[10px] font-semibold text-slate-700 italic max-w-[60%] flex flex-col">
+                <div class="amount-words text-[7px] font-semibold text-slate-700 italic max-w-[60%] flex flex-col">
                   <div>
-                    <span class="text-slate-500 text-[9px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
+                    <span class="text-slate-500 text-[6px] uppercase tracking-wider not-italic">Amount in Words:</span><br/>
                     {{ numberToWords(netPayable) }}
                   </div>
                   <div class="mt-3 not-italic text-slate-800 space-y-0.5">
@@ -313,16 +314,15 @@ const numberToWords = (num) => {
 
 <style scoped>
 .print-receipt-container {
-  width: 210mm;
-  min-height: 148mm;
+  width: 148mm;
+  min-height: 210mm;
   height: auto;
   overflow: visible;
   max-width: 100%;
   box-sizing: border-box;
   background-color: #ffffff;
-  border: 1px dashed #cbd5e1;
   color: #000000;
-  padding: 24px;
+  padding: 16px;
   border-radius: 8px;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   font-family: ui-mono, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -330,11 +330,11 @@ const numberToWords = (num) => {
 
 .receipt-header {
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .receipt-header h1 {
-  font-size: 14px;
+  font-size: 8px;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: -0.025em;
@@ -343,7 +343,7 @@ const numberToWords = (num) => {
 }
 
 .receipt-header p {
-  font-size: 10px;
+  font-size: 8px;
   color: #000000;
   margin: 0;
 }
@@ -355,7 +355,7 @@ const numberToWords = (num) => {
 }
 
 .receipt-header h2 {
-  font-size: 11px;
+  font-size: 9px;
   font-weight: bold;
   letter-spacing: 0.05em;
   color: #000000;
@@ -367,7 +367,7 @@ const numberToWords = (num) => {
   grid-template-columns: 1fr 1fr;
   column-gap: 16px;
   row-gap: 4px;
-  font-size: 10px;
+  font-size: 7px;
   margin-bottom: 12px;
   line-height: 1.25;
 }
@@ -385,28 +385,28 @@ const numberToWords = (num) => {
 .items-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 10px;
-  margin-bottom: 16px;
+  font-size: 6px;
+  margin-bottom: 4px;
 }
 
 .items-table th {
   border-top: 1px dashed #94a3b8;
   border-bottom: 1px dashed #94a3b8;
   font-weight: bold;
-  padding: 6px 0;
+  padding: 2px 0;
   color: #000000;
 }
 
 .items-table td {
-  border-bottom: 1px dashed #cbd5e1;
-  padding: 6px 0;
+  border-bottom: 0.3px dashed #cbd5e1;
+  padding: 2px 0;
   color: #000000;
 }
 
 .financials-summary {
   width: 50%;
   margin-left: auto;
-  font-size: 10px;
+  font-size: 6px;
   border-top: 1px dashed #94a3b8;
   padding-top: 8px;
   line-height: 1.25;
@@ -420,7 +420,7 @@ const numberToWords = (num) => {
   border-top: 1px dashed #94a3b8;
   padding-top: 4px;
   color: #000000;
-  font-size: 11px;
+  font-size: 6px;
   font-weight: bold;
 }
 
@@ -428,7 +428,7 @@ const numberToWords = (num) => {
   margin-top: 24px;
   display: flex;
   justify-content: space-between;
-  font-size: 8px;
+  font-size: 6px;
   color: #000000;
   line-height: 1.25;
 }
@@ -447,8 +447,8 @@ const numberToWords = (num) => {
 
 .notice {
   text-align: center;
-  margin-top: 16px;
-  font-size: 8px;
+  margin-top: 8px;
+  font-size: 6px;
   color: #000000;
   font-style: italic;
   line-height: 1.25;
@@ -466,7 +466,7 @@ const numberToWords = (num) => {
 
 @media print {
   @page {
-    size: A5 landscape;
+    size: A5 portrait;
     margin: 0;
   }
 
@@ -476,9 +476,9 @@ const numberToWords = (num) => {
   }
 
   html, body {
-    width: 210mm !important;
+    width: 148mm !important;
     height: auto !important;
-    min-height: 148mm !important;
+    min-height: 210mm !important;
     overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -487,11 +487,11 @@ const numberToWords = (num) => {
 
   .print-receipt-container {
     position: static !important;
-    width: 210mm !important;
-    min-height: 148mm !important;
+    width: 148mm !important;
+    min-height: 210mm !important;
     height: auto !important;
     overflow: visible !important;
-    padding: 15mm !important;
+    padding: 10mm !important;
     margin: 0 !important;
     box-sizing: border-box !important;
     box-shadow: none !important;
