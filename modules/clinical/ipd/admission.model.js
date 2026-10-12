@@ -89,6 +89,8 @@ const admissionSchema = new mongoose.Schema({
     'MUHCS',
     'GOLDEN_CARD',
     'CIVIL_PENSIONER',
+    'GOVT_EMPLOYEE',
+    'Govt Employee',
     'GIA',
     'HEALTH_INSURANCE',
     'NORMAL'

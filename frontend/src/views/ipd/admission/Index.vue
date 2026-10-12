@@ -123,6 +123,7 @@ const payerTypeOptions = [
   { value: 'MUHCS', label: 'MUHCS' },
   { value: 'GOLDEN_CARD', label: 'GOLDEN CARD' },
   { value: 'CIVIL_PENSIONER', label: 'CIVIL PENSIONER' },
+  { value: 'GOVT_EMPLOYEE', label: 'GOVT EMPLOYEE' },
   { value: 'GIA', label: 'GIA' },
   { value: 'HEALTH_INSURANCE', label: 'HEALTH INSURANCE' }
 ]
@@ -414,6 +415,8 @@ const getPayerTypeLabel = (type) => {
     case 'MUHCS': return 'MUHCS'
     case 'GOLDEN_CARD': return 'GOLDEN CARD'
     case 'CIVIL_PENSIONER': return 'CIVIL PENSIONER'
+    case 'GOVT_EMPLOYEE':
+    case 'Govt Employee': return 'GOVT EMPLOYEE'
     case 'GIA': return 'GIA'
     case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
     case 'NORMAL':
@@ -429,6 +432,9 @@ const getPayerTypeColor = (type) => {
       return 'bg-teal-50 text-teal-700 border-teal-200'
     case 'CIVIL_PENSIONER':
       return 'bg-cyan-50 text-cyan-700 border-cyan-200'
+    case 'GOVT_EMPLOYEE':
+    case 'Govt Employee':
+      return 'bg-blue-50 text-blue-700 border-blue-200'
     case 'GIA':
       return 'bg-amber-50 text-amber-700 border-amber-200'
     case 'HEALTH_INSURANCE':

@@ -354,6 +354,8 @@ const getPayerTypeLabel = (type) => {
     case 'MUHCS': return 'MUHCS'
     case 'GOLDEN_CARD': return 'GOLDEN CARD'
     case 'CIVIL_PENSIONER': return 'CIVIL PENSIONER'
+    case 'GOVT_EMPLOYEE':
+    case 'Govt Employee': return 'GOVT EMPLOYEE'
     case 'GIA': return 'GIA'
     case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
     case 'NORMAL':
@@ -1491,6 +1493,7 @@ onMounted(async () => {
                 <option value="MUHCS">MUHCS</option>
                 <option value="GOLDEN_CARD">GOLDEN CARD</option>
                 <option value="CIVIL_PENSIONER">CIVIL PENSIONER</option>
+                <option value="GOVT_EMPLOYEE">GOVT EMPLOYEE</option>
                 <option value="GIA">GIA</option>
                 <option value="HEALTH_INSURANCE">HEALTH INSURANCE</option>
               </select>

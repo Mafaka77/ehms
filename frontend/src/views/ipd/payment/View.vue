@@ -139,6 +139,11 @@ const formatDate = (dateString) => {
 const getPayerTypeLabel = (type) => {
   switch (type) {
     case 'MUHCS': return 'MUHCS'
+    case 'GOLDEN_CARD': return 'GOLDEN CARD'
+    case 'CIVIL_PENSIONER': return 'CIVIL PENSIONER'
+    case 'GOVT_EMPLOYEE':
+    case 'Govt Employee': return 'GOVT EMPLOYEE'
+    case 'GIA': return 'GIA'
     case 'MR_STATE': return 'MR (STATE)'
     case 'MR_CENTRAL': return 'MR (CENTRAL)'
     case 'HEALTH_INSURANCE': return 'HEALTH INSURANCE'
