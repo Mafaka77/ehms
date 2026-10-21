@@ -16,34 +16,41 @@ const formatDate = (dateStr) => {
 }
 
 // Ensure safe access to nested properties
-const patient = computed(() => props.appointment.patientId || {})
-const doctor = computed(() => props.appointment.doctorId || {})
+const patient = computed(() => props.appointment?.patientId || {})
+const doctor = computed(() => props.appointment?.doctorId || {})
 const specialization = computed(() => doctor.value.specializationId?.name || 'General')
 
 const patientAge = computed(() => {
   if (patient.value.dateOfBirth) {
     const dob = new Date(patient.value.dateOfBirth)
-    const today = new Date()
-    
-    let years = today.getFullYear() - dob.getFullYear()
-    let months = today.getMonth() - dob.getMonth()
-    let days = today.getDate() - dob.getDate()
-    
-    if (months < 0 || (months === 0 && days < 0)) {
-      years--
-    }
-    
-    if (years > 0) {
-      return `${years} Yrs`
-    } else {
-      let totalMonths = (today.getFullYear() - dob.getFullYear()) * 12 + today.getMonth() - dob.getMonth()
-      if (today.getDate() < dob.getDate()) {
-        totalMonths--
+    if (!isNaN(dob.getTime())) {
+      const today = new Date()
+      
+      let years = today.getFullYear() - dob.getFullYear()
+      let months = today.getMonth() - dob.getMonth()
+      let days = today.getDate() - dob.getDate()
+      
+      if (days < 0) {
+        months--
       }
-      return `${Math.max(0, totalMonths)} Months`
+      if (months < 0) {
+        years--
+        months += 12
+      }
+      if (years < 0) {
+        years = 0
+        months = 0
+      }
+
+      const yearsPart = `${years} ${years === 1 ? 'Yr' : 'Yrs'}`
+      const monthsPart = `${months} ${months === 1 ? 'Month' : 'Months'}`
+
+      return `${yearsPart} ${monthsPart}`
     }
   }
-  return patient.value.age ? `${patient.value.age} Yrs` : '-'
+  return (patient.value.age !== undefined && patient.value.age !== null && patient.value.age !== '')
+    ? `${patient.value.age} ${Number(patient.value.age) === 1 ? 'Yr' : 'Yrs'}`
+    : '-'
 })
 </script>
 
@@ -94,11 +101,11 @@ const patientAge = computed(() => {
           <div class="grid grid-cols-2 gap-y-2 gap-x-3">
             <div>
               <p class="text-[9px] text-slate-500 uppercase font-semibold">Appt. ID</p>
-              <p class="font-bold text-xs text-slate-900">{{ appointment.appointmentId || '-' }}</p>
+              <p class="font-bold text-xs text-slate-900">{{ appointment?.appointmentId || '-' }}</p>
             </div>
             <div>
               <p class="text-[9px] text-slate-500 uppercase font-semibold">Date</p>
-              <p class="font-bold text-xs text-slate-900">{{ formatDate(appointment.appointmentDate) }}</p>
+              <p class="font-bold text-xs text-slate-900">{{ formatDate(appointment?.appointmentDate) }}</p>
             </div>
             <div class="col-span-2">
               <p class="text-[9px] text-slate-500 uppercase font-semibold">Doctor</p>

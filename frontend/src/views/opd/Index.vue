@@ -226,8 +226,21 @@ const exportToExcel = (reportData) => {
     const apptId = appointment.appointmentId || ''
     const apptDate = appointment.appointmentDate ? new Date(appointment.appointmentDate).toLocaleDateString('en-IN') : ''
     const patientCode = appointment.patientId?.patientCode || ''
-    const patientName = appointment.patientId?.fullName || ''
-    const patientAgeGender = `${appointment.patientId?.age || ''} / ${appointment.patientId?.gender || ''}`
+    let patientAgeFormatted = (appointment.patientId?.age !== undefined && appointment.patientId?.age !== null && appointment.patientId?.age !== '') ? `${appointment.patientId.age} Yrs` : ''
+    if (appointment.patientId?.dateOfBirth) {
+      const dob = new Date(appointment.patientId.dateOfBirth)
+      if (!isNaN(dob.getTime())) {
+        const today = new Date()
+        let years = today.getFullYear() - dob.getFullYear()
+        let months = today.getMonth() - dob.getMonth()
+        let days = today.getDate() - dob.getDate()
+        if (days < 0) months--
+        if (months < 0) { years--; months += 12; }
+        if (years < 0) { years = 0; months = 0; }
+        patientAgeFormatted = `${years} ${years === 1 ? 'Yr' : 'Yrs'} ${months} ${months === 1 ? 'Month' : 'Months'}`
+      }
+    }
+    const patientAgeGender = `${patientAgeFormatted || '-'} / ${appointment.patientId?.gender || '-'}`
     const patientContact = appointment.patientId?.mobileNo || ''
     const docName = appointment.doctorId ? appointment.doctorId.fullName : ''
     const status = appointment.status || ''
