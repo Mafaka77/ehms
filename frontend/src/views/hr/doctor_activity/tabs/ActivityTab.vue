@@ -9,6 +9,8 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['open-export'])
+
 const doctorActivityStore = useDoctorActivityStore()
 
 const dateRange = ref('this_month') // 'today', 'this_month', 'last_month', 'custom'
@@ -217,20 +219,33 @@ onMounted(() => {
           </button>
         </div>
 
-        <!-- Right: Activity Type Selector -->
-        <div class="flex items-center gap-2">
-          <span class="font-bold text-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">Activity Filter:</span>
-          <select
-            v-model="activityType"
-            @change="loadLogs"
-            class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
+        <!-- Right: Activity Type Selector & Export -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold text-slate-700 uppercase tracking-wider text-[10px] whitespace-nowrap">Filter:</span>
+            <select
+              v-model="activityType"
+              @change="loadLogs"
+              class="px-3 py-1.5 rounded-xl border border-slate-200 bg-white font-semibold text-slate-700 focus:outline-none focus:border-indigo-500 cursor-pointer"
+            >
+              <option value="ALL">Full / All Activities</option>
+              <option value="OPD">OPD Bill Invoices Only</option>
+              <option value="IPD_CHARGE">IPD Charges &amp; Addons</option>
+              <option value="DENTAL">Dental Treatments &amp; Charges</option>
+              <option value="BILL">General Bills &amp; Invoices</option>
+            </select>
+          </div>
+
+          <button
+            @click="emit('open-export', { range: dateRange, startDate, endDate, type: activityType })"
+            class="px-3 py-1.5 rounded-xl bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+            title="Export report for selected period"
           >
-            <option value="ALL">Full / All Activities</option>
-            <option value="OPD">OPD Bill Invoices Only</option>
-            <option value="IPD_CHARGE">IPD Charges &amp; Addons</option>
-            <option value="DENTAL">Dental Treatments &amp; Charges</option>
-            <option value="BILL">General Bills &amp; Invoices</option>
-          </select>
+            <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <span>Export Report</span>
+          </button>
         </div>
 
       </div>

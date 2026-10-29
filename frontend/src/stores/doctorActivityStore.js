@@ -81,6 +81,22 @@ export const useDoctorActivityStore = defineStore('doctorActivity', {
             } finally {
                 this.loadingLogs = false;
             }
+        },
+
+        async fetchDoctorActivityReport(doctorId, params = {}) {
+            try {
+                const query = new URLSearchParams();
+                if (params.range) query.append('range', params.range);
+                if (params.startDate) query.append('startDate', params.startDate);
+                if (params.endDate) query.append('endDate', params.endDate);
+                if (params.type) query.append('type', params.type);
+
+                const response = await api.get(`/doctor-activity/${doctorId}/logs?${query.toString()}`);
+                return { success: true, data: response.data.data };
+            } catch (error) {
+                console.error('Error fetching doctor activity report:', error);
+                return { success: false, message: error.response?.data?.message || 'Failed to fetch report data' };
+            }
         }
     }
 });
